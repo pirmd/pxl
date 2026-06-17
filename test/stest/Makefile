@@ -1,13 +1,15 @@
 LIB = libstest.a
+SRC = stest.c
 HDR = stest.h
-OBJ = stest.o
+OBJ = ${SRC:.c=.o}
 
 CC      ?= cc
-CFLAGS  ?= -O2 -std=c99 -pedantic -Wall -Wextra -Wshadow -Wvla
+CFLAGS  ?= -O2 -std=c99 -Wpedantic -Wall -Wextra -Wshadow -Wvla
 
 all: ${LIB}
 
-${OBJ}: ${HDR}
+${OBJ}: ${SRC} ${HDR}
+	$(CC) $(CFLAGS) -c ${SRC} -o $@
 
 ${LIB}: ${OBJ}
 	ar rcs $@ ${OBJ}
@@ -18,4 +20,4 @@ test: ${LIB}
 clean:
 	rm -f ${OBJ} ${LIB}
 
-.PHONY: all clean install uninstall test
+.PHONY: all clean test

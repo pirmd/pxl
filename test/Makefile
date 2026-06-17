@@ -2,35 +2,44 @@
 
 TESTS = test_pixbuf test_geom test_canvas
 
-STEST_LIB = stest/libstest.a
-PXL_LIB   = ../libpxl.a
+PXL_SRC  = ../src/canvas.c
+PXL_SRC += ../src/canvas.h ../src/pixbuf.h ../src/geom.h ../include/err.h
 
-# --- Tools & Flags --------------------------------------------------------------
+-include "../config.mk"
+
 CC     ?= cc
-CFLAGS ?= -O0 -g -std=c99 -pedantic -Wall -Wextra -Wshadow -Wvla
+CFLAGS ?= -O0 -g -std=c99 -Wall -Wextra
 CFLAGS += -I../include -I../src -Istest -I.
+
 LDFLAGS += -L.. -lpxl -Lstest -lstest
 
-# --- Targets ------------------------------------------------------------------
-all: $(TESTS)
 
-$(STEST_LIB):
-	$(MAKE) -C stest
+CFLAGS_LINT  = -Werror -fsyntax-only
+CFLAGS_LINT += -Wpedantic -Wshadow -Wvla -Wstrict-prototypes -Wconversion -Wdouble-promotion
+CFLAGS_LINT += -Wno-unused-parameter -Wno-unused-function -Wno-sign-conversion
 
-.for t in $(TESTS)
-$(t): $(t).c $(PXL_LIB) $(STEST_LIB)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
-.endfor
+all: test
 
-test: $(TESTS)
+test: lint $(TESTS)
 	@for t in $(TESTS); do \
 		printf "%s" "$${t}... "; \
 		./$${t} >/dev/null 2>/dev/null || { echo "fail"; exit 1; }; \
 		echo "ok"; \
 		done
 
+.for t in $(TESTS)
+$(t): $(t).c ../libpxl.a stest/libstest.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
+.endfor
+
+stest/libstest.a:
+	$(MAKE) -C stest libstest.a
+
+lint: $(PXL_SRC) 
+	$(CC) $(CFLAGS) $(CFLAGS_LINT) $(PXL_SRC)
+
 clean:
 	rm -f $(TESTS)
 	$(MAKE) -C stest clean
 
-.PHONY: all test clean
+.PHONY: all test lint clean

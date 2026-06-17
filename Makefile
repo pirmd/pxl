@@ -2,8 +2,14 @@
 
 LIB = libpxl.a
 
+SRC = src/canvas.c
+HDR = src/canvas.h src/pixbuf.h src/geom.h include/err.h
+OBJ = ${SRC:.c=.o}
+
+-include "config.mk"
+
 CC     ?= cc
-CFLAGS  = -std=c99 -pedantic -Wall -Wextra
+CFLAGS  = -std=c99 -Wall -Wextra
 CFLAGS += -Iinclude -Isrc
 
 .if defined(RELEASE)
@@ -14,17 +20,17 @@ CFLAGS += -O0 -g
 
 all: $(LIB)
 
-$(LIB): src/canvas.o
+$(LIB): $(OBJ)
 	ar rcs $@ $?
 
-src/canvas.o: src/canvas.c src/canvas.h src/pixbuf.h include/err.h
-	$(CC) $(CFLAGS) -c src/canvas.c -o $@
+$(OBJ): $(SRC) $(HDR)
+	$(CC) $(CFLAGS) -c $(SRC) -o $@
 
 test: $(LIB)
-	$(MAKE) -C test test
+	$(MAKE) -C test all
 
 clean:
-	rm -f $(LIB)
+	rm -f $(OBJ) $(LIB)
 	$(MAKE) -C test clean
 
 .PHONY: all test clean
