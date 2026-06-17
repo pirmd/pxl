@@ -96,10 +96,10 @@ test_pixbuf_ptr_stride(void) {
 		return;
 	};
 
-	pxl_pixel_t *ptr_row0 = pixbuf_ptr(&pb, 0, 0);
-	pxl_pixel_t *ptr_row1 = pixbuf_ptr(&pb, 0, 1);
+	pix_t *ptr_row0 = pixbuf_ptr(&pb, 0, 0);
+	pix_t *ptr_row1 = pixbuf_ptr(&pb, 0, 1);
 	ptrdiff_t diff = (char *)ptr_row1 - (char *)ptr_row0;
-	ST_CHECK(diff == (ptrdiff_t)(pb.stride * sizeof(pxl_pixel_t)),
+	ST_CHECK(diff == (ptrdiff_t)(pb.stride * sizeof(pix_t)),
 	         "row pointer difference equals stride * pixel_size");
 
 	pixbuf_deinit(&pb);
@@ -113,8 +113,8 @@ test_pixbuf_ptr_write_read(void) {
 		return;
 	};
 
-	pxl_pixel_t value = 0xCAFEBABE;
-	pxl_pixel_t *ptr = pixbuf_ptr(&pb, 3, 4);
+	pix_t value = 0xCAFEBABE;
+	pix_t *ptr = pixbuf_ptr(&pb, 3, 4);
 	*ptr = value;
 	ST_CHECK(*pixbuf_ptr(&pb, 3, 4) == value,
 	         "value written via pixbuf_ptr can be read back");
@@ -130,7 +130,7 @@ test_pixbuf_ptr_corners(void) {
 		return;
 	};
 
-	pxl_pixel_t *ptr;
+	pix_t *ptr;
 
 	ptr = pixbuf_ptr(&pb, 0, 0);
 	*ptr = 1;
@@ -165,15 +165,15 @@ test_pixbuf_ptr_grid_access(void) {
 	/* Fill all pixels with unique values via pixbuf_ptr */
 	for (int y = 0; y < H; y++) {
 		for (int x = 0; x < W; x++) {
-			pxl_pixel_t *ptr = pixbuf_ptr(&pb, x, y);
-			*ptr = (pxl_pixel_t)(x + y * W);
+			pix_t *ptr = pixbuf_ptr(&pb, x, y);
+			*ptr = (pix_t)(x + y * W);
 		}
 	}
 
 	/* Verify all pixels */
 	for (int y = 0; y < H; y++) {
 		for (int x = 0; x < W; x++) {
-			ST_CHECK(*pixbuf_ptr(&pb, x, y) == (pxl_pixel_t)(x + y * W),
+			ST_CHECK(*pixbuf_ptr(&pb, x, y) == (pix_t)(x + y * W),
 			         "pixel (%d,%d) has correct value", x, y);
 		}
 	}

@@ -1,6 +1,6 @@
 # pxl - Unit tests
 
-TESTS = test_pixbuf
+TESTS = test_pixbuf test_geom test_canvas
 
 STEST_LIB = stest/libstest.a
 PXL_LIB   = ../libpxl.a
