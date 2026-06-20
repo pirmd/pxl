@@ -64,11 +64,6 @@ in_scissor(int x, int y, const canvas_t *cnv) {
 	return x >= s->x && x < s->x + s->w && y >= s->y && y < s->y + s->h;
 }
 
-static inline bool
-is_on_span(int x, int y, int span_y, int span_x, int span_w) {
-	return y == span_y && x >= span_x && x < span_x + span_w;
-}
-
 /* Calcule la zone effectivement blittee dans la destination (apres clipping scissor + source).
  *
  * Parametres :
@@ -288,96 +283,6 @@ test_canvas_clear_full_white(void) {
 
 /* Test fill_span ---------------------------------------------------------- */
 
-static void
-test_canvas_fill_span_basic(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-	
-	pix_t fg = COLOR_BLUE;
-	canvas_set_color(&f.cnv, fg);
-
-	canvas_fill_span(&f.cnv, 5, 5, 10);
-
-	for (int y = 0; y < w; ++y) {
-		for (int x = 0; x < h; ++x) {
-			pix_t  got = *pixbuf_ptr(&f.pb, x, y);
-			bool inside_scissor = in_scissor(x, y, &f.cnv);
-			bool on_span = is_on_span(x, y, 5, 5, 10);
-			pix_t want = (inside_scissor && on_span) ? fg: 0x00;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d)%s%s: want 0x%08X, got 0x%08X",
-			         x, y, inside_scissor ? " [in scissor]": "", on_span ? " [on span]": "", want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
-test_canvas_fill_span_clipped(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
-
-	pix_t fg = COLOR_GREEN;
-	canvas_set_color(&f.cnv, fg);
-
-	canvas_fill_span(&f.cnv, 3, 7, 10);
-
-	for (int y = 0; y < w; ++y) {
-		for (int x = 0; x < h; ++x) {
-			pix_t  got = *pixbuf_ptr(&f.pb, x, y);
-			bool inside_scissor = in_scissor(x, y, &f.cnv);
-			bool    on_span = is_on_span(x, y, 7, 3, 10);
-			pix_t want = (inside_scissor && on_span) ? fg: 0x00;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d)%s%s: want 0x%08X, got 0x%08X",
-			         x, y, inside_scissor ? " [in scissor]": "", on_span ? " [on span]": "", want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
-test_canvas_fill_span_fully_clipped(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
-
-	pix_t fg = COLOR_GREEN;
-	canvas_set_color(&f.cnv, fg);
-
-	canvas_fill_span(&f.cnv, 20, 20, 10);
-
-	for (int y = 0; y < w; ++y) {
-		for (int x = 0; x < h; ++x) {
-			pix_t  got = *pixbuf_ptr(&f.pb, x, y);
-			bool inside_scissor = in_scissor(x, y, &f.cnv);
-			bool    on_span = is_on_span(x, y, 20, 20, 10);
-			pix_t want = (inside_scissor && on_span) ? fg: 0x00;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d)%s%s: want 0x%08X, got 0x%08X",
-			         x, y, inside_scissor ? " [in scissor]": "", on_span ? " [on span]": "", want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
 
 /* Test blit_rect ---------------------------------------------------------- */
 
@@ -682,11 +587,6 @@ main(int argc, char *argv[]) {
 		ST_T(test_canvas_clear_white),
 		ST_T(test_canvas_clear_full_black),
 		ST_T(test_canvas_clear_full_white),
-
-		/* canvas_fill_span */
-		ST_T(test_canvas_fill_span_basic),
-		ST_T(test_canvas_fill_span_clipped),
-		ST_T(test_canvas_fill_span_fully_clipped),
 
 		/* canvas_blit_rect */
 		ST_T(test_canvas_blit_rect_basic),

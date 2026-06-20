@@ -2,8 +2,8 @@
 
 LIB = libpxl.a
 
-SRC = src/canvas.c
-HDR = src/canvas.h src/pixbuf.h src/geom.h include/err.h
+SRC = src/canvas.c src/draw2d.c
+HDR = src/canvas.h src/draw2d.h src/pixbuf.h src/geom.h include/err.h
 OBJ = ${SRC:.c=.o}
 
 -include "config.mk"
@@ -23,8 +23,11 @@ all: $(LIB)
 $(LIB): $(OBJ)
 	ar rcs $@ $?
 
-$(OBJ): $(SRC) $(HDR)
-	$(CC) $(CFLAGS) -c $(SRC) -o $@
+src/canvas.o: src/canvas.c $(HDR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+src/draw2d.o: src/draw2d.c $(HDR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 test: $(LIB)
 	$(MAKE) -C test all

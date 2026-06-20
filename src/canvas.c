@@ -73,34 +73,6 @@ canvas_clear(canvas_t *cnv) {
 }
 
 void
-canvas_fill_span(canvas_t *cnv, int x, int y, int w) {
-	assert(cnv && cnv->pb);
-	assert(w >= 0);
-
-	rect_t sc  = cnv->scissor;
-	
-	if (y < sc.y || y >= sc.y + sc.h) {
-		return;
-	}
-	
-	span_t span;
-	if (!clip_span(
-			(span_t){x, w},
-			(span_t){sc.x, sc.w},
-			&span
-		)) {
-		return;
-	}
-
-	pix_t pix = cnv->color;
-
-	pix_t *row = pixbuf_ptr(cnv->pb, span.x, y);
-	for (int dx = 0; dx < span.w; ++dx) {
-		row[dx] = pix;
-	}
-}
-
-void
 canvas_blit_rect(canvas_t *cnv, int x, int y,
 		 const pixbuf_t *src, int sx, int sy, int w, int h) {
 	assert(cnv && cnv->pb);

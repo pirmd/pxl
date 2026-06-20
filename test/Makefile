@@ -1,9 +1,9 @@
 # pxl - Unit tests
 
-TESTS = test_pixbuf test_geom test_canvas
+TESTS = test_pixbuf test_geom test_canvas test_draw2d
 
-PXL_SRC  = ../src/canvas.c
-PXL_SRC += ../src/canvas.h ../src/pixbuf.h ../src/geom.h ../include/err.h
+PXL_SRC  = ../src/canvas.c ../src/draw2d.c
+PXL_SRC += ../src/canvas.h ../src/draw2d.h ../src/pixbuf.h ../src/geom.h ../include/err.h
 
 -include "../config.mk"
 
