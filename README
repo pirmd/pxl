@@ -1,0 +1,45 @@
+PXL
+----
+
+Minimal 2D graphics library in C99.
+
+Features:
+  - 2D primitives: line, rect, circle, triangle (outline + filled)
+  - Canvas with scissor clipping, color, clear, blit
+  - ARGB8888 pixel buffer (pixbuf)
+  - Backends: SDL2, X11
+  - Keyboard/mouse input
+
+Build:
+  make          # lib + tests (SDL2 default)
+  make test     # run tests
+  make examples # all demos
+
+  Backend selection via -DBACKEND_SDL / -DBACKEND_X11 flags.
+  See examples/Makefile.
+
+Example:
+  See examples/demo.c for full API. Quick start:
+
+    backend_init("Title", 800, 600, false);
+    while (!input.quit_requested) {
+        backend_poll_events(&input);
+        backend_begin_frame(&pb);
+        canvas_init(&cnv, &pb);
+        /* drawing: draw2d_*(), canvas_*() */
+        backend_end_frame();
+    }
+    backend_deinit();
+
+Architecture:
+  src/pixbuf.h        - ARGB8888 pixel buffer with stride alignment
+  src/geom.h          - Geometry primitives (rect, span, point) and clipping
+  src/canvas.h, c     - Drawing surface with color, scissor, clear, blit
+  src/draw2d.h, c     - 2D primitives (line, rect, circle, triangle)
+  src/backend.h       - Backend interface (5 functions)
+  src/backend_sdl.c   - SDL2 backend (uses SDL_PIXELFORMAT_ARGB8888)
+  src/backend_x11.c   - X11 backend (uses ARGB visual)
+  include/err.h       - Error handling
+
+License:
+  MIT. See LICENSE.
