@@ -1,11 +1,12 @@
-#include <X11/Xlib.h>      /* defines Bool, XID, etc. */
+#include <assert.h>
+#include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XShm.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <time.h>
 
 #include "backend.h"
 #include "pixbuf.h"
@@ -170,6 +171,16 @@ backend_end_frame(void) {
 
 	XSync(g_x11.display, False);
 }
+
+double
+backend_get_time(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+        return 0.0;
+    }
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+}
+
 
 static int
 x11_keysym_to_key(KeySym keysym) {

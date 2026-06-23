@@ -84,6 +84,14 @@ backend_end_frame(void) {
 	SDL_RenderPresent(g_sdl.renderer);
 }
 
+double
+backend_get_time(void) {
+    uint64_t ticks = SDL_GetPerformanceCounter();
+    uint64_t freq = SDL_GetPerformanceFrequency();
+    
+    return (double)ticks / (double)freq;
+}
+
 static int
 sdl_keysym_to_key(SDL_Keycode keysym) {
 	switch (keysym) {
