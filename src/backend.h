@@ -38,8 +38,8 @@ backend_end_frame(void);
 double
 backend_get_time(void);
 
-// Poll events - update input state, returns false on quit
-bool
+// Poll events - drains the event queue
+void
 backend_poll_events(input_t *input);
 
 /* Clock management for main loop control -------------------------------- */

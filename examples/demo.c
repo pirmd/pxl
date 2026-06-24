@@ -63,24 +63,24 @@ render_world(canvas_t *cnv, const world_t *world) {
 }
 
 void
-process_input(input_t *input, world_t *cur, bool *running) {
-	if (input_is_down(input, KEY_ESCAPE)) {
+process_input(const input_t *in, world_t *cur, bool *running) {
+	if (in->keys[KEY_ESCAPE]) {
 		*running = false;
 	}
 
-	if (input_is_down(input, KEY_LEFT))  {
+	if (in->keys[KEY_LEFT])  {
 		cur->p_v_x = -cur->speed;
 	}
 
-	if (input_is_down(input, KEY_RIGHT)) {
+	if (in->keys[KEY_RIGHT]) {
 		cur->p_v_x = cur->speed;
 	}
 
-	if (input_is_down(input, KEY_UP))    {
+	if (in->keys[KEY_UP])    {
 		cur->p_v_y = -cur->speed;
 	}
 
-	if (input_is_down(input, KEY_DOWN))  {
+	if (in->keys[KEY_DOWN])  {
 		cur->p_v_y = cur->speed;
 	}
 }
@@ -122,7 +122,7 @@ main(void) {
 	if (backend_init("PXL Demo", W, H, false) != PXL_SUCCESS) {
 		return EXIT_FAILURE;
 	}
-	input_t input = {0};
+	input_t in = {0};
 
 	world_t world_prev = {0};
 	world_t world_cur = {
@@ -137,9 +137,8 @@ main(void) {
     while (running) {
 		backend_new_frame();
 
-		if (backend_poll_events(&input)) {
-			process_input(&input, &world_cur, &running);
-		}
+		backend_poll_events(&in);
+		process_input(&in, &world_cur, &running);
 
 		float dt;
         while (backend_next_physics_step(&dt)) {
@@ -155,9 +154,9 @@ main(void) {
 			world_t w = interpolate_world(&world_cur, &world_prev, backend_get_alpha());
             render_world(&cnv, &w);
 
-			if (input.mouse_left) {
+			if (in.mouse_buttons[MOUSE_LEFT]) {
 				canvas_set_color(&cnv, GREEN);
-				draw2d_line(&cnv, 0, 0, input.mouse_x, input.mouse_y);
+				draw2d_line(&cnv, 0, 0, in.mouse_x, in.mouse_y);
 			}
 
 			update_fps();
