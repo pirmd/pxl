@@ -36,7 +36,7 @@ static struct {
 } g_x11;
 
 static bool
-select_argb_visual(Display *display, int scr, Visual **out_visual, int *out_depth) {
+select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
     XVisualInfo vi_tmpl = {
         .class      = TrueColor,
         .depth      = ARGB32_DEPTH,
@@ -71,12 +71,11 @@ backend_init(const char *title, int w, int h, bool fullscreen) {
     g_x11.display = XOpenDisplay(NULL);
     if (!g_x11.display) return PXL_E_BACKEND_INIT;
 
-    int scr = DefaultScreen(g_x11.display);
-
     Visual *visual = NULL;
     int depth = 0;
-    if (!select_argb_visual(g_x11.display, scr, &visual, &depth)) goto fail;
+    if (!select_argb_visual(g_x11.display, &visual, &depth)) goto fail;
 
+    int scr = DefaultScreen(g_x11.display);
     Window root = RootWindow(g_x11.display, scr);
     Colormap cmap = XCreateColormap(g_x11.display, root, visual, AllocNone);
 

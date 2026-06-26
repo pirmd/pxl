@@ -52,7 +52,7 @@ static struct {
     float  alpha;
 } g_clock = {0};
 
-static void
+static inline void
 backend_new_frame(void) {
     double   new_time = backend_get_time(); 
     double frame_time = new_time - g_clock.current_time;
@@ -63,7 +63,7 @@ backend_new_frame(void) {
     g_clock.accumulator += frame_time;
 }
 
-static bool
+static inline bool
 backend_next_physics_step(float *out_dt) {
     if (g_clock.accumulator >= FIXED_DT) {
         g_clock.accumulator -= FIXED_DT;
@@ -75,7 +75,7 @@ backend_next_physics_step(float *out_dt) {
     return false;
 }
 
-static float
+static inline float
 backend_get_alpha(void) {
    	return g_clock.alpha;
 }
