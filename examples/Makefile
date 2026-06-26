@@ -1,28 +1,29 @@
 # pxl - Examples
 
-CC     ?= cc
-CFLAGS ?= -O0 -g -std=c99 -Wall -Wextra
-CFLAGS += -I../include -I../src -I.
+-include "../config.mk"
+
+CC      ?= cc
+CFLAGS  ?= -O0 -g -std=c99 -Wall -Wextra
+CFLAGS  += -I.. -I.
+
 LDFLAGS += -L.. -lpxl
 
-# SDL backend
-SDL_CFLAGS = -I/usr/local/include/SDL2
-SDL_LIBS = -L/usr/local/lib -lSDL2
+X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
+SDL_LIBS   ?= -L/usr/local/lib -lSDL2
 
-demo_sdl: demo.c ../src/backend_sdl.c ../libpxl.a
-	$(CC) $(CFLAGS) $(SDL_CFLAGS) -o $@ $? $(SDL_LIBS) $(LDFLAGS)
+BACKEND ?= x11
+.if ${BACKEND} == "x11"
+LDFLAGS += $(X11_LIBS)
+.elif ${BACKEND} == "sdl"
+LDFLAGS += $(SDL_LIBS)
+.endif
 
-# X11 backend
-X11_CFLAGS = -I/usr/X11R6/include
-X11_LIBS = -L/usr/X11R6/lib -lX11 -lXext
+all: demo
 
-demo_x11: demo.c ../src/backend_x11.c ../libpxl.a
-	$(CC) $(CFLAGS) $(X11_CFLAGS) -o $@ $? $(X11_LIBS) $(LDFLAGS)
-
-# Default target
-all: demo_sdl
+demo: demo.c ../libpxl.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $>
 
 clean:
-	rm -f demo_sdl demo_x11
+	rm -f demo
 
 .PHONY: all clean
