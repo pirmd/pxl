@@ -1,0 +1,312 @@
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+#include "backend.h"
+#include "canvas.h"
+#include "draw2d.h"
+#include "stepper.h"
+#include "input.h"
+
+#define W 800
+#define H 600
+#define FPS 60.0f
+#define WHITE 0xFFFFFFFF
+#define BLUE  0xFF000080
+#define RED   0xFF0000FF
+
+// Pong game state
+typedef struct {
+    // Paddles
+    struct {
+        float x, y;
+        int w, h;
+        float speed;
+        float vy;
+    } paddle_left, paddle_right;
+
+    // Ball
+    struct {
+        float x, y;
+        int radius;
+        float vx, vy;
+        float speed;
+    } ball;
+
+    // Scores
+    int score_left;
+    int score_right;
+} pong_t;
+
+static void
+handle_input(pong_t *p, input_state_t *in) {
+    p->paddle_left.vy = 0;
+    p->paddle_right.vy = 0;  // Will be set by AI
+
+    // Left paddle: vim keys (k=up, j=down)
+    if (input_pressed(in, IN_KEYB_K)) {
+        p->paddle_left.vy = -p->paddle_left.speed;
+    }
+    if (input_pressed(in, IN_KEYB_J)) {
+        p->paddle_left.vy = p->paddle_left.speed;
+    }
+}
+
+static void
+reset_ball(pong_t *p) {
+    p->ball.x = W / 2.0f;
+    p->ball.y = H / 2.0f;
+    p->ball.vx = (rand() % 2 == 0 ? 1.0f : -1.0f) * p->ball.speed;
+    p->ball.vy = ((float)(rand() % 100) / 100.0f - 0.5f) * p->ball.speed * 1.5f;
+}
+
+static void
+pong_interpolate(pong_t *out, const pong_t *prev, const pong_t *cur, float alpha) {
+    out->paddle_left.x = cur->paddle_left.x;
+    out->paddle_left.y = prev->paddle_left.y + (cur->paddle_left.y - prev->paddle_left.y) * alpha;
+    out->paddle_left.w = cur->paddle_left.w;
+    out->paddle_left.h = cur->paddle_left.h;
+
+    out->paddle_right.x = cur->paddle_right.x;
+    out->paddle_right.y = prev->paddle_right.y + (cur->paddle_right.y - prev->paddle_right.y) * alpha;
+    out->paddle_right.w = cur->paddle_right.w;
+    out->paddle_right.h = cur->paddle_right.h;
+
+    out->ball.x = prev->ball.x + (cur->ball.x - prev->ball.x) * alpha;
+    out->ball.y = prev->ball.y + (cur->ball.y - prev->ball.y) * alpha;
+    out->ball.radius = cur->ball.radius;
+    out->ball.speed = cur->ball.speed;
+
+    out->score_left = cur->score_left;
+    out->score_right = cur->score_right;
+}
+
+static void
+ai_decide(pong_t *p) {
+    // Simple AI: predict ball position on right side
+    float target_y;
+    
+    // Ball going right: direct prediction
+    if (p->ball.vx > 0) {
+        float time_to_right = (p->paddle_right.x - p->ball.x) / p->ball.vx;
+        target_y = p->ball.y + p->ball.vy * time_to_right;
+    }
+    // Ball going left: move to center (simplest reliable strategy)
+    else {
+        target_y = H / 2.0f;
+    }
+    
+    // Clamp to playable area
+    target_y = fmaxf(p->paddle_right.h / 2.0f, 
+                   fminf(H - p->paddle_right.h / 2.0f, target_y));
+    
+    // Calculate required movement
+    float error = target_y - (p->paddle_right.y + p->paddle_right.h / 2.0f);
+    
+    if (fabsf(error) > 2.0f) {
+        p->paddle_right.vy = (error < 0 ? -1.0f : 1.0f) * p->paddle_right.speed;
+    } else {
+        p->paddle_right.vy = 0;
+    }
+}
+
+static void
+update(pong_t *p, float dt) {
+    // AI decision (separate from physics update)
+    ai_decide(p);
+
+    // Update paddles
+    p->paddle_left.y += p->paddle_left.vy * dt;
+    p->paddle_right.y += p->paddle_right.vy * dt;
+
+    // Clamp paddles to screen
+    if (p->paddle_left.y < 0) p->paddle_left.y = 0;
+    if (p->paddle_left.y + p->paddle_left.h > H) p->paddle_left.y = H - p->paddle_left.h;
+    if (p->paddle_right.y < 0) p->paddle_right.y = 0;
+    if (p->paddle_right.y + p->paddle_right.h > H) p->paddle_right.y = H - p->paddle_right.h;
+
+    // Update ball
+    p->ball.x += p->ball.vx * dt;
+    p->ball.y += p->ball.vy * dt;
+
+    // Ball collision with top and bottom
+    if (p->ball.y - p->ball.radius < 0) {
+        p->ball.y = p->ball.radius;
+        p->ball.vy = -p->ball.vy;
+    }
+    if (p->ball.y + p->ball.radius > H) {
+        p->ball.y = H - p->ball.radius;
+        p->ball.vy = -p->ball.vy;
+    }
+
+    // Ball collision with paddles
+    // Left paddle
+    if (p->ball.x - p->ball.radius < p->paddle_left.x + p->paddle_left.w &&
+        p->ball.y + p->ball.radius > p->paddle_left.y &&
+        p->ball.y - p->ball.radius < p->paddle_left.y + p->paddle_left.h) {
+        p->ball.x = p->paddle_left.x + p->paddle_left.w + p->ball.radius;
+        p->ball.vx = -p->ball.vx * 1.05f;
+        float paddle_center = p->paddle_left.y + p->paddle_left.h / 2.0f;
+        float hit_pos = (p->ball.y - paddle_center) / (p->paddle_left.h / 2.0f);
+        p->ball.vy = hit_pos * p->ball.speed * 0.8f;
+    }
+
+    // Right paddle
+    if (p->ball.x + p->ball.radius > p->paddle_right.x &&
+        p->ball.y + p->ball.radius > p->paddle_right.y &&
+        p->ball.y - p->ball.radius < p->paddle_right.y + p->paddle_right.h) {
+        p->ball.x = p->paddle_right.x - p->ball.radius;
+        p->ball.vx = -p->ball.vx * 1.05f;
+        float paddle_center = p->paddle_right.y + p->paddle_right.h / 2.0f;
+        float hit_pos = (p->ball.y - paddle_center) / (p->paddle_right.h / 2.0f);
+        p->ball.vy = hit_pos * p->ball.speed * 0.8f;
+    }
+
+    // Ball out of bounds (score)
+    if (p->ball.x - p->ball.radius < 0) {
+        p->score_right++;
+        reset_ball(p);
+    }
+    if (p->ball.x + p->ball.radius > W) {
+        p->score_left++;
+        reset_ball(p);
+    }
+}
+
+static void
+draw_score(canvas_t *cnv, const pong_t *p) {
+    // Draw dash separator
+    canvas_set_color(cnv, WHITE);
+    draw2d_fill_rect(cnv, W/2 - 10, 20, 20, 4);
+    
+    // Simple score indicators using rectangles
+    // Left score: draw one rect per point
+    canvas_set_color(cnv, WHITE);
+    for (int i = 0; i < p->score_left; i++) {
+        draw2d_fill_rect(cnv, W/2 - 40 - i * 15, 10, 8, 20);
+    }
+    
+    // Right score: draw one rect per point
+    for (int i = 0; i < p->score_right; i++) {
+        draw2d_fill_rect(cnv, W/2 + 25 + i * 15, 10, 8, 20);
+    }
+}
+
+static void
+render(canvas_t *cnv, const pong_t *p) {
+    // Clear
+    canvas_set_color(cnv, BLUE);
+    canvas_clear(cnv);
+
+    // Draw score
+    draw_score(cnv, p);
+
+    // Draw center line
+    canvas_set_color(cnv, WHITE);
+    for (int y = 0; y < H; y += 30) {
+        draw2d_fill_rect(cnv, W/2 - 2, y, 4, 20);
+    }
+
+    // Draw paddles
+    canvas_set_color(cnv, WHITE);
+    draw2d_fill_rect(cnv, (int)p->paddle_left.x, (int)p->paddle_left.y, 
+                     p->paddle_left.w, p->paddle_left.h);
+    draw2d_fill_rect(cnv, (int)p->paddle_right.x, (int)p->paddle_right.y, 
+                     p->paddle_right.w, p->paddle_right.h);
+
+    // Draw ball
+    draw2d_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, p->ball.radius);
+}
+
+static void
+log_fps(double now) {
+    static double t0 = 0;
+    static int n = 0;
+    if (t0 == 0) {
+        t0 = now;
+        return;
+    }
+    n++;
+    if (now - t0 >= 1.0) {
+        float fps = (float)n / (float)(now - t0);
+        printf("FPS: %d\r", (int)fps);
+        fflush(stdout);
+        n = 0;
+        t0 = now;
+    }
+}
+
+static void
+init_pong(pong_t *p) {
+    srand((unsigned int)time(NULL));
+    
+    // Paddles
+    p->paddle_left.x = 20;
+    p->paddle_left.y = H/2 - 50;
+    p->paddle_left.w = 15;
+    p->paddle_left.h = 100;
+    p->paddle_left.speed = 400.0f;
+
+    p->paddle_right.x = W - 20 - 15;
+    p->paddle_right.y = H/2 - 50;
+    p->paddle_right.w = 15;
+    p->paddle_right.h = 100;
+    p->paddle_right.speed = 400.0f;
+
+    // Ball
+    p->ball.radius = 8;
+    p->ball.speed = 300.0f;
+    reset_ball(p);
+
+    // Scores
+    p->score_left = 0;
+    p->score_right = 0;
+}
+
+int
+main(void) {
+    if (backend_init("PXL Pong", W, H, false) != PXL_SUCCESS)
+        return 1;
+
+    printf("Pong game. Vim keys: J=down, K=up. R=reset, ESC=quit\n");
+
+    pong_t pong, pong_prev;
+    init_pong(&pong);
+    pong_prev = pong;
+
+    time_stepper_t ts;
+    ts.dt = 1.0f / FPS;
+    stepper_init(&ts, backend_get_time());
+
+    input_state_t in;
+    input_init_state(&in);
+
+    while (!input_pressed(&in, IN_KEYB_ESCAPE) && !input_pressed(&in, IN_WM_QUIT)) {
+        stepper_sync_time(&ts, backend_get_time());
+        backend_poll_events(&in);
+        handle_input(&pong, &in);
+
+        while (stepper_advance(&ts)) {
+            pong_prev = pong;
+            update(&pong, (float)ts.dt);
+        }
+
+        pixbuf_t pb;
+        if (backend_begin_frame(&pb) == PXL_SUCCESS) {
+            canvas_t cnv;
+            canvas_init(&cnv, &pb);
+            
+            pong_t interpolated;
+            pong_interpolate(&interpolated, &pong_prev, &pong, ts.lerp_factor);
+            render(&cnv, &interpolated);
+            
+            log_fps(backend_get_time());
+            backend_end_frame();
+        }
+    }
+
+    printf("\nFinal Score: %d - %d\n", pong.score_left, pong.score_right);
+    backend_deinit();
+    return 0;
+}

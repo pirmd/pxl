@@ -1,5 +1,7 @@
 # pxl - Examples
 
+DEMOS = demo_sketch demo_pong demo_loops demo_gas
+
 -include "../config.mk"
 
 CC      ?= cc
@@ -18,12 +20,14 @@ LDFLAGS += $(X11_LIBS)
 LDFLAGS += $(SDL_LIBS)
 .endif
 
-all: demo
+all: $(DEMOS)
 
-demo: demo.c ../libpxl.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $>
+.for d in $(DEMOS)
+$(d): $(d).c ../libpxl.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(d).c
+.endfor
 
 clean:
-	rm -f demo
+	rm -f $(DEMOS)
 
 .PHONY: all clean
