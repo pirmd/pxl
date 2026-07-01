@@ -3,7 +3,7 @@
 LIB = libpxl.a
 
 SRC = canvas.c draw2d.c
-HDR = canvas.h draw2d.h pixbuf.h geom.h err.h
+HDR = canvas.h draw2d.h pixbuf.h geom.h err.h stepper.h
 
 -include "config.mk"
 

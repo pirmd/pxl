@@ -2,11 +2,10 @@
 #define BACKEND_H
 
 #include <stdbool.h>
-#include "pixbuf.h"
+#include "canvas.h"
 #include "input.h"
 #include "err.h"
 
-/* Backend API ----------------------------------------------------------- */
 /*
  * Adding a new backend:
  *   . Create backend_<name>.c implementing the 5 functions
@@ -40,44 +39,6 @@ backend_get_time(void);
 
 // Poll events - drains the event queue
 void
-backend_poll_events(input_t *input);
-
-/* Clock management for main loop control -------------------------------- */
-#define FIXED_FPS 60
-static const double FIXED_DT = 1.0 / FIXED_FPS;
-
-static struct {
-    double current_time;
-    double accumulator;
-    float  alpha;
-} g_clock = {0};
-
-static inline void
-backend_new_frame(void) {
-    double   new_time = backend_get_time(); 
-    double frame_time = new_time - g_clock.current_time;
-    g_clock.current_time = new_time;
-
-    if (frame_time > 0.25) frame_time = 0.25;
-
-    g_clock.accumulator += frame_time;
-}
-
-static inline bool
-backend_next_physics_step(float *out_dt) {
-    if (g_clock.accumulator >= FIXED_DT) {
-        g_clock.accumulator -= FIXED_DT;
-        *out_dt = (float)FIXED_DT;
-        return true;
-    }
-
-    g_clock.alpha = (float)(g_clock.accumulator / FIXED_DT);
-    return false;
-}
-
-static inline float
-backend_get_alpha(void) {
-   	return g_clock.alpha;
-}
+backend_poll_events(input_state_t *in);
 
 #endif /* BACKEND_H */

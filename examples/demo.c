@@ -1,174 +1,99 @@
 #include <stdbool.h>
 #include <stdio.h>
-
 #include "backend.h"
 #include "canvas.h"
-#include "color.h"
 #include "draw2d.h"
-#include "err.h"
+#include "stepper.h"
 #include "input.h"
-#include "pixbuf.h"
 
-#define WHITE color_argb(255, 255, 255, 255)
-#define BLUE  color_argb(255,   0,   0, 128)
-#define GREEN color_argb(255,   0, 128,   0)
+#define W 800
+#define H 600
+#define FPS 60.0f
+#define WHITE 0xFFFFFFFF
+#define BLUE  0xFF000080
 
 typedef struct {
-    float p_x, p_y;
-	int   p_w, p_h; 
+    float x, y, vx, vy;
+    int w, h;
+    float speed;
+    float prev_x, prev_y;
+} Square;
 
-    float p_v_x, p_v_y;
-
-	float speed;
-	int width, height;
-} world_t;
-
-world_t
-update_world(const world_t *cur, float dt) {
-	world_t nxt = *cur;
-
-	nxt.p_x = cur->p_x + cur->p_v_x * dt;
-
-	if (nxt.p_x < 0) nxt.p_x = 0; 
-	if (nxt.p_x + nxt.p_w > nxt.width) nxt.p_x = nxt.width - nxt.p_w - 1; 
-
-	nxt.p_y = cur->p_y + cur->p_v_y * dt;
-	if (nxt.p_y < 0) nxt.p_y = 0; 
-	if (nxt.p_y + nxt.p_h > nxt.height) nxt.p_y = nxt.height - nxt.p_h - 1; 
-
-	nxt.p_v_x = 0.0;
-	nxt.p_v_y = 0.0;
-
-	return nxt;
+static void handle_input(Square *s, input_state_t *in) {
+    s->vx = s->vy = 0;
+    if (input_pressed(in, IN_KEYB_LEFT)  || input_pressed(in, IN_KEYB_H)) s->vx = -s->speed;
+    if (input_pressed(in, IN_KEYB_RIGHT) || input_pressed(in, IN_KEYB_L)) s->vx =  s->speed;
+    if (input_pressed(in, IN_KEYB_UP)    || input_pressed(in, IN_KEYB_K)) s->vy = -s->speed;
+    if (input_pressed(in, IN_KEYB_DOWN)  || input_pressed(in, IN_KEYB_J)) s->vy =  s->speed;
 }
 
-world_t
-interpolate_world(const world_t *cur, const world_t *prev, float alpha) {
-	world_t w = *cur;
-
-    w.p_x = cur->p_x + (cur->p_x - prev->p_x) * alpha;
-    w.p_y = cur->p_y + (cur->p_y - prev->p_y) * alpha;
-
-	return w;
+static void update(Square *s, float dt, int width, int height) {
+    s->prev_x = s->x;
+    s->prev_y = s->y;
+    s->x += s->vx * dt;
+    s->y += s->vy * dt;
+    if (s->x < 0) s->x = 0;
+    if (s->x + s->w > width) s->x = width - s->w;
+    if (s->y < 0) s->y = 0;
+    if (s->y + s->h > height) s->y = height - s->h;
 }
 
-void
-render_world(canvas_t *cnv, const world_t *world) {
-	canvas_set_color(cnv, BLUE);
-	canvas_clear(cnv);
-	draw2d_circle(cnv, 100, 100, 50);
-
-	canvas_set_color(cnv, WHITE);
-	draw2d_fill_rect(cnv, world->p_x, world->p_y, world->p_w, world->p_h);
+static void render(canvas_t *cnv, const Square *s, float alpha) {
+    float x = s->x + (s->prev_x - s->x) * alpha;
+    float y = s->y + (s->prev_y - s->y) * alpha;
+    canvas_set_color(cnv, BLUE);
+    canvas_clear(cnv);
+    canvas_set_color(cnv, WHITE);
+    draw2d_fill_rect(cnv, (int)x, (int)y, s->w, s->h);
 }
 
-void
-process_input(const input_t *in, world_t *cur, bool *running) {
-	if (in->keys[KEY_ESCAPE]) {
-		*running = false;
-	}
-
-	if (in->keys[KEY_LEFT])  {
-		cur->p_v_x = -cur->speed;
-	}
-
-	if (in->keys[KEY_RIGHT]) {
-		cur->p_v_x = cur->speed;
-	}
-
-	if (in->keys[KEY_UP])    {
-		cur->p_v_y = -cur->speed;
-	}
-
-	if (in->keys[KEY_DOWN])  {
-		cur->p_v_y = cur->speed;
-	}
-}
-
-
-static struct {
-    double last_time;      /* temps du dernier calcul de FPS   */
-    int    frame_cnt;      /* nombre d'images depuis last_time */
-    int    fps;            /* FPS calculé                     */
-} g_fps = {0};
-
-static void
-update_fps(void) {
-    double now = backend_get_time();
-
-    if (g_fps.last_time == 0.0) {
-        g_fps.last_time = now;
+static void log_fps(double now) {
+    static double t0 = 0;
+    static int n = 0;
+    if (t0 == 0) {
+        t0 = now;
         return;
     }
-
-    ++g_fps.frame_cnt;
-
-    if (now - g_fps.last_time >= 1.0) {
-        g_fps.fps = g_fps.frame_cnt;
-        g_fps.frame_cnt = 0;
-        g_fps.last_time = now;
+    n++;
+    if (now - t0 >= 1.0) {
+        float fps = (float)n / (float)(now - t0);
+        printf("FPS: %d\r", (int)fps);
+        fflush(stdout);
+        n = 0;
+        t0 = now;
     }
 }
 
-static inline int
-get_fps(void) {
-   	return g_fps.fps;
-}
+int main(void) {
+    if (backend_init("PXL Demo", W, H, false) != PXL_SUCCESS)
+        return 1;
 
-int
-main(void) {
-	const int W = 800, H = 600;
+    Square square = {W/2-50, H/2-50, 0, 0, 100, 100, 300.0f, 0, 0};
+    time_stepper_t ts;
+    stepper_init(&ts, backend_get_time());
+    ts.dt = 1.0f / FPS;
+    input_state_t in;
+    input_init_state(&in);
 
-	if (backend_init("PXL Demo", W, H, false) != PXL_SUCCESS) {
-		return EXIT_FAILURE;
-	}
-	input_t in = {0};
+    while (!input_pressed(&in, IN_KEYB_ESCAPE) && !input_pressed(&in, IN_WM_QUIT)) {
+        stepper_sync_time(&ts, backend_get_time());
+        backend_poll_events(&in);
+        handle_input(&square, &in);
 
-	world_t world_prev = {0};
-	world_t world_cur = {
-		.p_w  = 100,
-		.p_h  = 100,
-		.speed = 300,
-		.width  = W,
-		.height = H
-	};
-
-    bool running = true;
-    while (running) {
-		backend_new_frame();
-
-		backend_poll_events(&in);
-		process_input(&in, &world_cur, &running);
-
-		float dt;
-        while (backend_next_physics_step(&dt)) {
-			world_prev = world_cur;
-            world_cur = update_world(&world_cur, dt);
+        while (stepper_advance(&ts)) {
+            update(&square, (float)ts.dt, W, H);
         }
 
         pixbuf_t pb;
         if (backend_begin_frame(&pb) == PXL_SUCCESS) {
             canvas_t cnv;
             canvas_init(&cnv, &pb);
-
-			world_t w = interpolate_world(&world_cur, &world_prev, backend_get_alpha());
-            render_world(&cnv, &w);
-
-			if (in.mouse_buttons[MOUSE_LEFT]) {
-				canvas_set_color(&cnv, GREEN);
-				draw2d_line(&cnv, 0, 0, in.mouse_x, in.mouse_y);
-			}
-
-			update_fps();
-			printf("FPS: %5d\r", get_fps());
-			fflush(stdout);
-
+            render(&cnv, &square, ts.lerp_factor);
+            log_fps(backend_get_time());
             backend_end_frame();
         }
-
     }
 
-	backend_deinit();
-	return 0;
+    backend_deinit();
+    return 0;
 }
-

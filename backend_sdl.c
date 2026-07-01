@@ -1,10 +1,11 @@
 #include "backend.h"
 #include "input.h"
+#include "pixbuf.h"
+
 #include <SDL.h>
 #include <assert.h>
 #include <stdint.h>
 
-/* Backend state */
 static struct {
     SDL_Window   *window;
     SDL_Renderer *renderer;
@@ -94,178 +95,176 @@ backend_get_time(void) {
     return (double)ticks / (double)freq;
 }
 
-static key_code_t
-sdl_keysym_to_key(SDL_Keycode sym) {
+static input_code_t
+sdl_keysym_to_input_code(SDL_Keycode sym) {
     switch (sym) {
-        case SDLK_ESCAPE: return KEY_ESCAPE;
-        case SDLK_RETURN: return KEY_ENTER;
-        case SDLK_TAB: return KEY_TAB;
-        case SDLK_BACKSPACE: return KEY_BACKSPACE;
-        case SDLK_INSERT: return KEY_INSERT;
-        case SDLK_DELETE: return KEY_DELETE;
-        case SDLK_HOME: return KEY_HOME;
-        case SDLK_END: return KEY_END;
-        case SDLK_PAGEUP: return KEY_PAGE_UP;
-        case SDLK_PAGEDOWN: return KEY_PAGE_DOWN;
+        case SDLK_ESCAPE: return IN_KEYB_ESCAPE;
+        case SDLK_RETURN: return IN_KEYB_ENTER;
+        case SDLK_TAB: return IN_KEYB_TAB;
+        case SDLK_BACKSPACE: return IN_KEYB_BACKSPACE;
+        case SDLK_INSERT: return IN_KEYB_INSERT;
+        case SDLK_DELETE: return IN_KEYB_DELETE;
+        case SDLK_HOME: return IN_KEYB_HOME;
+        case SDLK_END: return IN_KEYB_END;
+        case SDLK_PAGEUP: return IN_KEYB_PAGE_UP;
+        case SDLK_PAGEDOWN: return IN_KEYB_PAGE_DOWN;
 
-        case SDLK_UP: return KEY_UP;
-        case SDLK_DOWN: return KEY_DOWN;
-        case SDLK_LEFT: return KEY_LEFT;
-        case SDLK_RIGHT: return KEY_RIGHT;
+        case SDLK_UP: return IN_KEYB_UP;
+        case SDLK_DOWN: return IN_KEYB_DOWN;
+        case SDLK_LEFT: return IN_KEYB_LEFT;
+        case SDLK_RIGHT: return IN_KEYB_RIGHT;
 
-        case SDLK_LSHIFT: return KEY_LSHIFT;
-        case SDLK_RSHIFT: return KEY_RSHIFT;
-        case SDLK_LCTRL: return KEY_LCTRL;
-        case SDLK_RCTRL: return KEY_RCTRL;
-        case SDLK_LALT: return KEY_LALT;
-        case SDLK_RALT: return KEY_RALT;
-        case SDLK_LGUI: return KEY_LSUPER;
-        case SDLK_RGUI: return KEY_RSUPER;
+        case SDLK_LSHIFT: return IN_KEYB_LSHIFT;
+        case SDLK_RSHIFT: return IN_KEYB_RSHIFT;
+        case SDLK_LCTRL: return IN_KEYB_LCTRL;
+        case SDLK_RCTRL: return IN_KEYB_RCTRL;
+        case SDLK_LALT: return IN_KEYB_LALT;
+        case SDLK_RALT: return IN_KEYB_RALT;
+        case SDLK_LGUI: return IN_KEYB_LSUPER;
+        case SDLK_RGUI: return IN_KEYB_RSUPER;
 
-        case SDLK_SPACE: return KEY_SPACE;
-        case SDLK_QUOTE: return KEY_APOSTROPHE;
-        case SDLK_COMMA: return KEY_COMMA;
-        case SDLK_MINUS: return KEY_MINUS;
-        case SDLK_PERIOD: return KEY_PERIOD;
-        case SDLK_SLASH: return KEY_SLASH;
-        case SDLK_SEMICOLON: return KEY_SEMICOLON;
-        case SDLK_EQUALS: return KEY_EQUAL;
-        case SDLK_LEFTBRACKET: return KEY_LEFT_BRACKET;
-        case SDLK_BACKSLASH: return KEY_BACKSLASH;
-        case SDLK_RIGHTBRACKET: return KEY_RIGHT_BRACKET;
-        case SDLK_BACKQUOTE: return KEY_GRAVE_ACCENT;
+        case SDLK_SPACE: return IN_KEYB_SPACE;
+        case SDLK_QUOTE: return IN_KEYB_APOSTROPHE;
+        case SDLK_COMMA: return IN_KEYB_COMMA;
+        case SDLK_MINUS: return IN_KEYB_MINUS;
+        case SDLK_PERIOD: return IN_KEYB_PERIOD;
+        case SDLK_SLASH: return IN_KEYB_SLASH;
+        case SDLK_SEMICOLON: return IN_KEYB_SEMICOLON;
+        case SDLK_EQUALS: return IN_KEYB_EQUAL;
+        case SDLK_LEFTBRACKET: return IN_KEYB_LEFT_BRACKET;
+        case SDLK_BACKSLASH: return IN_KEYB_BACKSLASH;
+        case SDLK_RIGHTBRACKET: return IN_KEYB_RIGHT_BRACKET;
+        case SDLK_BACKQUOTE: return IN_KEYB_GRAVE_ACCENT;
 
-        case SDLK_0: return KEY_0;
-        case SDLK_1: return KEY_1;
-        case SDLK_2: return KEY_2;
-        case SDLK_3: return KEY_3;
-        case SDLK_4: return KEY_4;
-        case SDLK_5: return KEY_5;
-        case SDLK_6: return KEY_6;
-        case SDLK_7: return KEY_7;
-        case SDLK_8: return KEY_8;
-        case SDLK_9: return KEY_9;
+        case SDLK_0: return IN_KEYB_0;
+        case SDLK_1: return IN_KEYB_1;
+        case SDLK_2: return IN_KEYB_2;
+        case SDLK_3: return IN_KEYB_3;
+        case SDLK_4: return IN_KEYB_4;
+        case SDLK_5: return IN_KEYB_5;
+        case SDLK_6: return IN_KEYB_6;
+        case SDLK_7: return IN_KEYB_7;
+        case SDLK_8: return IN_KEYB_8;
+        case SDLK_9: return IN_KEYB_9;
 
-        case SDLK_a: return KEY_A;
-        case SDLK_b: return KEY_B;
-        case SDLK_c: return KEY_C;
-        case SDLK_d: return KEY_D;
-        case SDLK_e: return KEY_E;
-        case SDLK_f: return KEY_F;
-        case SDLK_g: return KEY_G;
-        case SDLK_h: return KEY_H;
-        case SDLK_i: return KEY_I;
-        case SDLK_j: return KEY_J;
-        case SDLK_k: return KEY_K;
-        case SDLK_l: return KEY_L;
-        case SDLK_m: return KEY_M;
-        case SDLK_n: return KEY_N;
-        case SDLK_o: return KEY_O;
-        case SDLK_p: return KEY_P;
-        case SDLK_q: return KEY_Q;
-        case SDLK_r: return KEY_R;
-        case SDLK_s: return KEY_S;
-        case SDLK_t: return KEY_T;
-        case SDLK_u: return KEY_U;
-        case SDLK_v: return KEY_V;
-        case SDLK_w: return KEY_W;
-        case SDLK_x: return KEY_X;
-        case SDLK_y: return KEY_Y;
-        case SDLK_z: return KEY_Z;
+        case SDLK_a: return IN_KEYB_A;
+        case SDLK_b: return IN_KEYB_B;
+        case SDLK_c: return IN_KEYB_C;
+        case SDLK_d: return IN_KEYB_D;
+        case SDLK_e: return IN_KEYB_E;
+        case SDLK_f: return IN_KEYB_F;
+        case SDLK_g: return IN_KEYB_G;
+        case SDLK_h: return IN_KEYB_H;
+        case SDLK_i: return IN_KEYB_I;
+        case SDLK_j: return IN_KEYB_J;
+        case SDLK_k: return IN_KEYB_K;
+        case SDLK_l: return IN_KEYB_L;
+        case SDLK_m: return IN_KEYB_M;
+        case SDLK_n: return IN_KEYB_N;
+        case SDLK_o: return IN_KEYB_O;
+        case SDLK_p: return IN_KEYB_P;
+        case SDLK_q: return IN_KEYB_Q;
+        case SDLK_r: return IN_KEYB_R;
+        case SDLK_s: return IN_KEYB_S;
+        case SDLK_t: return IN_KEYB_T;
+        case SDLK_u: return IN_KEYB_U;
+        case SDLK_v: return IN_KEYB_V;
+        case SDLK_w: return IN_KEYB_W;
+        case SDLK_x: return IN_KEYB_X;
+        case SDLK_y: return IN_KEYB_Y;
+        case SDLK_z: return IN_KEYB_Z;
 
-        case SDLK_F1: return KEY_F1;
-        case SDLK_F2: return KEY_F2;
-        case SDLK_F3: return KEY_F3;
-        case SDLK_F4: return KEY_F4;
-        case SDLK_F5: return KEY_F5;
-        case SDLK_F6: return KEY_F6;
-        case SDLK_F7: return KEY_F7;
-        case SDLK_F8: return KEY_F8;
-        case SDLK_F9: return KEY_F9;
-        case SDLK_F10: return KEY_F10;
-        case SDLK_F11: return KEY_F11;
-        case SDLK_F12: return KEY_F12;
-        case SDLK_F13: return KEY_F13;
-        case SDLK_F14: return KEY_F14;
-        case SDLK_F15: return KEY_F15;
-        case SDLK_F16: return KEY_F16;
-        case SDLK_F17: return KEY_F17;
-        case SDLK_F18: return KEY_F18;
-        case SDLK_F19: return KEY_F19;
-        case SDLK_F20: return KEY_F20;
-        case SDLK_F21: return KEY_F21;
-        case SDLK_F22: return KEY_F22;
-        case SDLK_F23: return KEY_F23;
-        case SDLK_F24: return KEY_F24;
+        case SDLK_F1: return IN_KEYB_F1;
+        case SDLK_F2: return IN_KEYB_F2;
+        case SDLK_F3: return IN_KEYB_F3;
+        case SDLK_F4: return IN_KEYB_F4;
+        case SDLK_F5: return IN_KEYB_F5;
+        case SDLK_F6: return IN_KEYB_F6;
+        case SDLK_F7: return IN_KEYB_F7;
+        case SDLK_F8: return IN_KEYB_F8;
+        case SDLK_F9: return IN_KEYB_F9;
+        case SDLK_F10: return IN_KEYB_F10;
+        case SDLK_F11: return IN_KEYB_F11;
+        case SDLK_F12: return IN_KEYB_F12;
+        case SDLK_F13: return IN_KEYB_F13;
+        case SDLK_F14: return IN_KEYB_F14;
+        case SDLK_F15: return IN_KEYB_F15;
+        case SDLK_F16: return IN_KEYB_F16;
+        case SDLK_F17: return IN_KEYB_F17;
+        case SDLK_F18: return IN_KEYB_F18;
+        case SDLK_F19: return IN_KEYB_F19;
+        case SDLK_F20: return IN_KEYB_F20;
+        case SDLK_F21: return IN_KEYB_F21;
+        case SDLK_F22: return IN_KEYB_F22;
+        case SDLK_F23: return IN_KEYB_F23;
+        case SDLK_F24: return IN_KEYB_F24;
 
-        case SDLK_KP_0: return KEY_KP_0;
-        case SDLK_KP_1: return KEY_KP_1;
-        case SDLK_KP_2: return KEY_KP_2;
-        case SDLK_KP_3: return KEY_KP_3;
-        case SDLK_KP_4: return KEY_KP_4;
-        case SDLK_KP_5: return KEY_KP_5;
-        case SDLK_KP_6: return KEY_KP_6;
-        case SDLK_KP_7: return KEY_KP_7;
-        case SDLK_KP_8: return KEY_KP_8;
-        case SDLK_KP_9: return KEY_KP_9;
-        case SDLK_KP_PERIOD: return KEY_KP_DECIMAL;
-        case SDLK_KP_DIVIDE: return KEY_KP_DIVIDE;
-        case SDLK_KP_MULTIPLY: return KEY_KP_MULTIPLY;
-        case SDLK_KP_MINUS: return KEY_KP_SUBTRACT;
-        case SDLK_KP_PLUS: return KEY_KP_ADD;
-        case SDLK_KP_ENTER: return KEY_KP_ENTER;
-        case SDLK_KP_EQUALS: return KEY_KP_EQUAL;
+        case SDLK_KP_0: return IN_KEYB_KP_0;
+        case SDLK_KP_1: return IN_KEYB_KP_1;
+        case SDLK_KP_2: return IN_KEYB_KP_2;
+        case SDLK_KP_3: return IN_KEYB_KP_3;
+        case SDLK_KP_4: return IN_KEYB_KP_4;
+        case SDLK_KP_5: return IN_KEYB_KP_5;
+        case SDLK_KP_6: return IN_KEYB_KP_6;
+        case SDLK_KP_7: return IN_KEYB_KP_7;
+        case SDLK_KP_8: return IN_KEYB_KP_8;
+        case SDLK_KP_9: return IN_KEYB_KP_9;
+        case SDLK_KP_PERIOD: return IN_KEYB_KP_DECIMAL;
+        case SDLK_KP_DIVIDE: return IN_KEYB_KP_DIVIDE;
+        case SDLK_KP_MULTIPLY: return IN_KEYB_KP_MULTIPLY;
+        case SDLK_KP_MINUS: return IN_KEYB_KP_SUBTRACT;
+        case SDLK_KP_PLUS: return IN_KEYB_KP_ADD;
+        case SDLK_KP_ENTER: return IN_KEYB_KP_ENTER;
+        case SDLK_KP_EQUALS: return IN_KEYB_KP_EQUAL;
 
-        default: return KEY_UNKNOWN;
+        default: return IN_UNKNOWN;
     }
 }
 
-static mouse_button_t
-sdl_button_to_mouse(Uint8 button) {
+static input_code_t
+sdl_button_to_input_code(Uint8 button) {
     switch (button) {
-        case SDL_BUTTON_LEFT:   return MOUSE_LEFT;
-        case SDL_BUTTON_RIGHT:  return MOUSE_RIGHT;
-        case SDL_BUTTON_MIDDLE: return MOUSE_MIDDLE;
-        default: return MOUSE_COUNT;
+        case SDL_BUTTON_LEFT:   return IN_MOUSE_LEFT;
+        case SDL_BUTTON_RIGHT:  return IN_MOUSE_RIGHT;
+        case SDL_BUTTON_MIDDLE: return IN_MOUSE_MIDDLE;
+        default: return IN_UNKNOWN;
     }
 }
 
 void
-backend_poll_events(input_t *input) {
+backend_poll_events(input_state_t *in) {
     SDL_Event event;
-
-    input_begin_frame(input);
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_QUIT:
-                input->quit_requested = true;
+				input_press(in, IN_WM_QUIT);
                 break;
 
             case SDL_KEYDOWN:
                 if (!event.key.repeat) {
-                    input->keys[sdl_keysym_to_key(event.key.keysym.sym)] = true;
+					input_press(in, sdl_keysym_to_input_code(event.key.keysym.sym));
                 }
                 break;
 
             case SDL_KEYUP:
-                input->keys[sdl_keysym_to_key(event.key.keysym.sym)] = false;
+				input_release(in, sdl_keysym_to_input_code(event.key.keysym.sym));
                 break;
 
             case SDL_MOUSEBUTTONDOWN:
-                input->mouse_buttons[sdl_button_to_mouse(event.button.button)] = true;
+				input_press(in, sdl_button_to_input_code(event.key.keysym.sym));
                 break;
 
             case SDL_MOUSEBUTTONUP:
-                input->mouse_buttons[sdl_button_to_mouse(event.button.button)] = false;
+				input_release(in, sdl_button_to_input_code(event.key.keysym.sym));
                 break;
 
             case SDL_MOUSEMOTION:
-                input_set_mouse_pos(input, event.motion.x, event.motion.y);
+                input_set_mouse_pos(in, event.motion.x, event.motion.y);
                 break;
 
             case SDL_MOUSEWHEEL:
-                input_add_mouse_wheel(input, event.wheel.x, event.wheel.y);
+                input_inc_mouse_wheel(in, event.wheel.x, event.wheel.y);
                 break;
         }
     }

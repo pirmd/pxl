@@ -1,9 +1,10 @@
 # pxl - Unit tests
 
-TESTS = test_pixbuf test_geom test_canvas test_draw2d
+TESTS = test_pixbuf test_geom test_canvas test_draw2d test_stepper test_input
 
 PXL_SRC  = ../canvas.c ../draw2d.c
 PXL_SRC += ../canvas.h ../draw2d.h ../pixbuf.h ../geom.h ../err.h
+PXL_SRC += ../stepper.h ../input.h
 
 -include "../config.mk"
 
