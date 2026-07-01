@@ -1,6 +1,7 @@
 #ifndef STEPPER_H
 #define STEPPER_H
 
+#include <assert.h>
 #include <stdbool.h>
 
 typedef struct {

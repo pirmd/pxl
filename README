@@ -21,9 +21,7 @@ Build:
   Changing Backends requires manual make clean.
   Test an ddemo will work only if main lib use the same BACKEND. Use make clean as needed.
 
-Example:
-  See examples/demo_sketch.c for full API. Quick start:
-
+Quick start:
     backend_init("Title", 800, 600, false);
     while (!input.quit_requested) {
         backend_poll_events(&input);
@@ -34,7 +32,7 @@ Example:
     }
     backend_deinit();
 
-Demos:
+Examples:
   - demo_sketch.c - Etch-a-Sketch: arrow/Vim keys for drawing, Shift for big steps,
                      ESC to clear, Q to quit
   - demo_pong.c   - Pong game: vim keys (J=down, K=up), simple predictive AI,
@@ -47,16 +45,21 @@ Demos:
                      (Up/Down: add/remove 10 particles, ESC to quit)
 
 Architecture:
-  pixbuf.h        - ARGB8888 pixel buffer with stride alignment
-  geom.h          - Geometry primitives (rect, span, point) and clipping
-  canvas.h, c     - Drawing surface with color, scissor, clear, blit
-  draw2d.h, c     - 2D primitives (line, rect, circle, triangle)
-  stepper.h       - Time-stepped physics loop helper (fixed timestep, interpolation)
-  backend.h       - Backend interface (5 functions)
-  input.h         - Input state handling (keyboard, mouse, window events)
-  backend_sdl.c   - SDL2 backend (uses SDL_PIXELFORMAT_ARGB8888)
-  backend_x11.c   - X11 backend (uses ARGB visual)
-  err.h           - Error handling
+  Core:
+    pixbuf.h      - ARGB8888 pixel buffer with stride alignment
+    geom.h        - Geometry primitives (rect, span, point) and clipping
+    canvas.h/c    - Drawing surface with color, scissor, clear, blit
+    draw2d.h/c    - 2D primitives (line, rect, circle, triangle)
+    err.h         - Error handling
+
+  Backend:
+    backend.h     - Backend interface (5 functions)
+    input.h       - Input state handling (keyboard, mouse, window events)
+    backend_sdl.c - SDL2 backend (uses SDL_PIXELFORMAT_ARGB8888)
+    backend_x11.c - X11 backend (uses ARGB visual)
+
+  Loop:
+    stepper.h     - Time-stepped physics loop helper (fixed timestep, interpolation)
 
 License:
   MIT. See LICENSE.
