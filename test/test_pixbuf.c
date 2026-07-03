@@ -19,13 +19,13 @@ test_pixbuf_init_basic(void) {
 	int W = 100, H = 120;
 
 	pixbuf_t pb;
-	pxl_err_t err = pixbuf_init(&pb, W, H);
+	ST_CHECK(pixbuf_init(&pb, W, H) == PXL_SUCCESS, "pixbuf_init failed");
 	ST_CHECK(pb.data != NULL, "pixbuf_init returns NULL data");
 	ST_CHECK(pb.width == W, "Want: %d\n Got: %d", W, pb.width);
 	ST_CHECK(pb.height == H, "Want: %d\n Got: %d", H, pb.height);
 
 	size_t want_stride = calc_stride(pb.width, PXL_ALIGN);
-	ST_CHECK(pb.stride == want_stride, "Want: %zu\n Got: %zu", want_stride, pb.stride);
+	ST_CHECK(pb.stride == (int)want_stride, "Want: %zu\n Got: %zu", want_stride, (size_t)pb.stride);
 	ST_CHECK(is_addr_aligned(pb.data, PXL_ALIGN), "pixbuf_init does not align data address");
 
 	pixbuf_deinit(&pb);
@@ -53,7 +53,7 @@ test_pixbuf_stride_alignment(void) {
 	};
 
 	size_t want_stride = calc_stride(pb.width, PXL_ALIGN);
-	ST_CHECK(pb.stride == want_stride, "Want: %zu\n Got: %zu", want_stride, pb.stride);
+	ST_CHECK(pb.stride == (int)want_stride, "Want: %zu\n Got: %zu", want_stride, (size_t)pb.stride);
 	pixbuf_deinit(&pb);
 
 	int W2 = 101, H2 = 10;
@@ -62,7 +62,7 @@ test_pixbuf_stride_alignment(void) {
 	};
 
 	want_stride = calc_stride(pb.width, PXL_ALIGN);
-	ST_CHECK(pb.stride == want_stride, "Want: %zu\n Got: %zu", want_stride, pb.stride);
+	ST_CHECK(pb.stride == (int)want_stride, "Want: %zu\n Got: %zu", want_stride, (size_t)pb.stride);
 	pixbuf_deinit(&pb);
 }
 
@@ -160,7 +160,7 @@ test_pixbuf_ptr_grid_access(void) {
 	};
 
 	size_t want_stride = calc_stride(W, PXL_ALIGN);
-	ST_CHECK(pb.stride == want_stride, "stride mismatch: want %zu, got %zu", want_stride, pb.stride);
+	ST_CHECK(pb.stride == (int)want_stride, "stride mismatch: want %zu, got %zu", want_stride, (size_t)pb.stride);
 
 	/* Fill all pixels with unique values via pixbuf_ptr */
 	for (int y = 0; y < H; y++) {

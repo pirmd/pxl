@@ -134,9 +134,6 @@ is_drawn_inside_fill_circle(int x, int y, int cx, int cy, int r) {
 	int d = 1 - r;
 
 	while (c_x >= c_y) {
-		int w1 = 2 * c_x + 1;
-		int w2 = 2 * c_y + 1;
-
 		int yy1 = cy + c_y;
 		int yy2 = cy - c_y;
 		int yy3 = cy + c_x;
