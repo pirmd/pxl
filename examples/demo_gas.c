@@ -4,11 +4,8 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
-#include "backend.h"
-#include "canvas.h"
-#include "draw2d.h"
-#include "stepper.h"
-#include "input.h"
+
+#include "pxl.h"
 
 #define W 800
 #define H 600
@@ -249,23 +246,23 @@ gas_interpolate(gas_t *out, const gas_t *prev, const gas_t *cur, float alpha) {
 
 // Render gas simulation
 static void
-gas_render(canvas_t *cnv, const gas_t *gas) {
-    canvas_set_color(cnv, BLACK);
-    canvas_clear(cnv);
+gas_render(pxl_canvas_t *cnv, const gas_t *gas) {
+    pxl_canvas_set_color(cnv, BLACK);
+    pxl_canvas_clear(cnv);
     
     // Particle count indicator (1 white square = 100 particles)
-    canvas_set_color(cnv, WHITE);
+    pxl_canvas_set_color(cnv, WHITE);
     size_t indicator_count = gas->count / 100;
     if (indicator_count > 30) indicator_count = 30;
     for (size_t i = 0; i < indicator_count; i++) {
-        draw2d_fill_rect(cnv, W - 10 - (int)i * 10, 10, 8, 8);
+        pxl_fill_rect(cnv, W - 10 - (int)i * 10, 10, 8, 8);
     }
     
     // Draw all particles
     for (size_t i = 0; i < gas->count; i++) {
         const particle_t *p = &gas->particles[i];
-        canvas_set_color(cnv, p->color);
-        draw2d_fill_circle(cnv, (int)p->x, (int)p->y, PARTICLE_RADIUS);
+        pxl_canvas_set_color(cnv, p->color);
+        pxl_fill_circle(cnv, (int)p->x, (int)p->y, PARTICLE_RADIUS);
     }
 }
 
@@ -291,7 +288,7 @@ log_fps(double now, size_t particle_count) {
 
 int
 main(void) {
-    if (backend_init("PXL Gas Demo (Spatial Grid)", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("PXL Gas Demo (Spatial Grid)", W, H, false) != PXL_SUCCESS)
         return 1;
 
     printf("Gas simulation with spatial grid. Up/Down arrow: add/remove 10 particles, ESC to quit\n");
@@ -300,45 +297,45 @@ main(void) {
     gas_init(&gas, 200);
     gas_prev = gas;
 
-    time_stepper_t ts;
+    pxl_time_stepper_t ts;
     ts.dt = 1.0f / FPS;
-    stepper_init(&ts, backend_get_time());
+    pxl_stepper_init(&ts, pxl_backend_get_time());
 
-    input_state_t in;
-    input_init_state(&in);
+    pxl_input_state_t in;
+    pxl_input_init_state(&in);
 
-    while (!input_pressed(&in, IN_KEYB_ESCAPE) && !input_pressed(&in, IN_WM_QUIT)) {
-        stepper_sync_time(&ts, backend_get_time());
-        backend_poll_events(&in);
+    while (!pxl_input_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_pressed(&in, PXL_WM_QUIT)) {
+        pxl_stepper_sync_time(&ts, pxl_backend_get_time());
+        pxl_backend_poll_events(&in);
 
-        if (input_pressed(&in, IN_KEYB_UP)) {
+        if (pxl_input_pressed(&in, PXL_KEYB_UP)) {
             gas_add_particles(&gas, 10);
         }
-        if (input_pressed(&in, IN_KEYB_DOWN)) {
+        if (pxl_input_pressed(&in, PXL_KEYB_DOWN)) {
             gas_remove_particles(&gas, 10);
         }
 
-        while (stepper_advance(&ts)) {
+        while (pxl_stepper_advance(&ts)) {
             gas_prev = gas;
             gas_update(&gas, (float)ts.dt);
         }
 
-        pixbuf_t pb;
-        if (backend_begin_frame(&pb) == PXL_SUCCESS) {
-            canvas_t cnv;
-            canvas_init(&cnv, &pb);
+        pxl_buf_t pb;
+        if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
+            pxl_canvas_t cnv;
+            pxl_canvas_init(&cnv, &pb);
             
             gas_t interpolated;
             gas_interpolate(&interpolated, &gas_prev, &gas, ts.lerp_factor);
             gas_render(&cnv, &interpolated);
             
-            log_fps(backend_get_time(), gas.count);
-            backend_end_frame();
+            log_fps(pxl_backend_get_time(), gas.count);
+            pxl_backend_end_frame();
         }
     }
 
     printf("\n");
     gas_free(&gas);
-    backend_deinit();
+    pxl_backend_deinit();
     return 0;
 }

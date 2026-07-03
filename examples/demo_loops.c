@@ -3,11 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-#include "backend.h"
-#include "canvas.h"
-#include "draw2d.h"
-#include "stepper.h"
-#include "input.h"
+
+#include "pxl.h"
 
 #define W 800
 #define H 600
@@ -38,7 +35,7 @@ typedef struct {
     loop_type_t loop_type;
     
     // For fixed timestep modes
-    time_stepper_t stepper;
+    pxl_time_stepper_t stepper;
     
     // For variable timestep
     double prev_time;
@@ -72,8 +69,8 @@ init_square(square_t *s, float x, float y, uint32_t color, loop_type_t loop_type
     
     // Initialize stepper for fixed timestep modes
     s->stepper.dt = 1.0f / FPS;
-    stepper_init(&s->stepper, backend_get_time());
-    s->prev_time = backend_get_time();
+    pxl_stepper_init(&s->stepper, pxl_backend_get_time());
+    s->prev_time = pxl_backend_get_time();
 }
 
 static void
@@ -96,15 +93,15 @@ static void
 square_update(square_t *s, float slowdown_factor) {
     switch (s->loop_type) {
         case LOOP_VARIABLE: {
-            double now = backend_get_time();
+            double now = pxl_backend_get_time();
             float dt = (float)(now - s->prev_time) * slowdown_factor;
             s->prev_time = now;
             update_square(s, dt);
             break;
         }
         case LOOP_FIXED_ACCUM: {
-            stepper_sync_time(&s->stepper, backend_get_time());
-            while (stepper_advance(&s->stepper)) {
+            pxl_stepper_sync_time(&s->stepper, pxl_backend_get_time());
+            while (pxl_stepper_advance(&s->stepper)) {
                 // For fixed timestep, apply slowdown by modifying effective dt
                 update_square(s, (float)s->stepper.dt * slowdown_factor);
             }
@@ -113,8 +110,8 @@ square_update(square_t *s, float slowdown_factor) {
         case LOOP_FIXED_LERP: {
             // Save position before update for interpolation
             s->prev_x = s->x;
-            stepper_sync_time(&s->stepper, backend_get_time());
-            while (stepper_advance(&s->stepper)) {
+            pxl_stepper_sync_time(&s->stepper, pxl_backend_get_time());
+            while (pxl_stepper_advance(&s->stepper)) {
                 update_square(s, (float)s->stepper.dt * slowdown_factor);
             }
             break;
@@ -125,7 +122,7 @@ square_update(square_t *s, float slowdown_factor) {
 }
 
 static void
-render_square(canvas_t *cnv, const square_t *s, float lerp_factor) {
+render_square(pxl_canvas_t *cnv, const square_t *s, float lerp_factor) {
     float draw_x = s->x;
     
     // Only interpolate for lerp mode
@@ -133,8 +130,8 @@ render_square(canvas_t *cnv, const square_t *s, float lerp_factor) {
         draw_x = s->prev_x + (s->x - s->prev_x) * lerp_factor;
     }
     
-    canvas_set_color(cnv, s->color);
-    draw2d_fill_rect(cnv, (int)draw_x, (int)s->y, s->w, s->h);
+    pxl_canvas_set_color(cnv, s->color);
+    pxl_fill_rect(cnv, (int)draw_x, (int)s->y, s->w, s->h);
 }
 
 static void
@@ -160,7 +157,7 @@ main(void) {
     printf("3 squares (Red=Variable, Green=Fixed Accum, Blue=Fixed Lerp)\n");
     printf("Keys: 1-4=slowdown factor, R=reset, ESC=quit\n\n");
     
-    if (backend_init("PXL Loop Comparison", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("PXL Loop Comparison", W, H, false) != PXL_SUCCESS)
         return 1;
 
     demo_state_t state;
@@ -175,24 +172,24 @@ main(void) {
     init_square(&state.squares[1], state.start_x, H / 2.0f + state.y_offsets[1], GREEN, LOOP_FIXED_ACCUM);
     init_square(&state.squares[2], state.start_x, H / 2.0f + state.y_offsets[2], BLUE,  LOOP_FIXED_LERP);
 
-    input_state_t in;
-    input_init_state(&in);
+    pxl_input_state_t in;
+    pxl_input_init_state(&in);
 
-    while (!input_pressed(&in, IN_KEYB_ESCAPE) && !input_pressed(&in, IN_WM_QUIT)) {
-        backend_poll_events(&in);
+    while (!pxl_input_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_pressed(&in, PXL_WM_QUIT)) {
+        pxl_backend_poll_events(&in);
         
         // Reset on R key
-        if (input_pressed(&in, IN_KEYB_R)) {
+        if (pxl_input_pressed(&in, PXL_KEYB_R)) {
             init_square(&state.squares[0], state.start_x, H / 2.0f + state.y_offsets[0], RED,   LOOP_VARIABLE);
             init_square(&state.squares[1], state.start_x, H / 2.0f + state.y_offsets[1], GREEN, LOOP_FIXED_ACCUM);
             init_square(&state.squares[2], state.start_x, H / 2.0f + state.y_offsets[2], BLUE,  LOOP_FIXED_LERP);
         }
         
         // FPS simulation controls
-        if (input_pressed(&in, IN_KEYB_1)) state.slowdown_factor = 1.0f;  // Normal (60 FPS)
-        if (input_pressed(&in, IN_KEYB_2)) state.slowdown_factor = 2.0f;  // Simulate 30 FPS
-        if (input_pressed(&in, IN_KEYB_3)) state.slowdown_factor = 3.0f;  // Simulate 20 FPS
-        if (input_pressed(&in, IN_KEYB_4)) state.slowdown_factor = 4.0f;  // Simulate 15 FPS
+        if (pxl_input_pressed(&in, PXL_KEYB_1)) state.slowdown_factor = 1.0f;  // Normal (60 FPS)
+        if (pxl_input_pressed(&in, PXL_KEYB_2)) state.slowdown_factor = 2.0f;  // Simulate 30 FPS
+        if (pxl_input_pressed(&in, PXL_KEYB_3)) state.slowdown_factor = 3.0f;  // Simulate 20 FPS
+        if (pxl_input_pressed(&in, PXL_KEYB_4)) state.slowdown_factor = 4.0f;  // Simulate 15 FPS
         
         // Update each square with its own loop type
         for (int i = 0; i < 3; i++) {
@@ -202,26 +199,26 @@ main(void) {
         // Get lerp factor from blue square (Fixed Lerp) for rendering
         float lerp_factor = state.squares[2].stepper.lerp_factor;
 
-        pixbuf_t pb;
-        if (backend_begin_frame(&pb) == PXL_SUCCESS) {
-            canvas_t cnv;
-            canvas_init(&cnv, &pb);
+        pxl_buf_t pb;
+        if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
+            pxl_canvas_t cnv;
+            pxl_canvas_init(&cnv, &pb);
             
             // Clear
-            canvas_set_color(&cnv, BLACK);
-            canvas_clear(&cnv);
+            pxl_canvas_set_color(&cnv, BLACK);
+            pxl_canvas_clear(&cnv);
             
             // Draw all squares
             for (int i = 0; i < 3; i++) {
                 render_square(&cnv, &state.squares[i], lerp_factor);
             }
             
-            log_fps(backend_get_time(), state.slowdown_factor);
-            backend_end_frame();
+            log_fps(pxl_backend_get_time(), state.slowdown_factor);
+            pxl_backend_end_frame();
         }
     }
 
     printf("\n");  // Clean up FPS line
-    backend_deinit();
+    pxl_backend_deinit();
     return 0;
 }

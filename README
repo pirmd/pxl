@@ -19,37 +19,37 @@ Build:
 
   Backend selection via BACKEND=sdl or BACKEND=x11 (default)
   Changing Backends requires manual make clean.
-  Test an ddemo will work only if main lib use the same BACKEND. Use make clean as needed.
+  Test and demo will work only if main lib use the same BACKEND. Use make clean as needed.
 
 Quick start:
-    backend_init("Title", 800, 600, false);
-    while (!input.quit_requested) {
-        backend_poll_events(&input);
-        backend_begin_frame(&pb);
-        canvas_init(&cnv, &pb);
-        /* drawing: draw2d_*(), canvas_*() */
-        backend_end_frame();
+    pxl_backend_init("Title", 800, 600, false);
+    while (!pxl_input_is_pressed(PXL_WM_QUIT)) {
+        pxl_backend_poll_events(&input);
+        pxl_backend_begin_frame(&pb);
+        pxl_canvas_init(&cnv, &pb);
+        /* drawing: pxl_draw_*(), pxl_canvas_clear() */
+        pxl_backend_end_frame();
     }
     backend_deinit();
 
 Examples:
   - demo_sketch.c - Etch-a-Sketch: arrow/Vim keys for drawing, Shift for big steps,
-                     ESC to clear, Q to quit
+                    ESC to clear, Q to quit
   - demo_pong.c   - Pong game: vim keys (J=down, K=up), simple predictive AI,
-                     score display, FPS counter
+                    score display, FPS counter
   - demo_loops.c  - Game loop comparison: 3 squares on same line showing
-                     Variable vs Fixed Accum vs Fixed Lerp timesteps
-                     (1-4: slowdown factor, R: reset)
+                    Variable vs Fixed Accum vs Fixed Lerp timesteps
+                    (1-4: slowdown factor, R: reset)
   - demo_gas.c    - Boltzmann gas simulation: spatial grid optimized particle collisions,
-                     elastic physics, random colors
-                     (Up/Down: add/remove 10 particles, ESC to quit)
+                    elastic physics, random colors
+                    (Up/Down: add/remove 10 particles, ESC to quit)
 
 Architecture:
   Core:
-    pixbuf.h      - ARGB8888 pixel buffer with stride alignment
+    buf.h         - ARGB8888 pixel buffer with stride alignment
     geom.h        - Geometry primitives (rect, span, point) and clipping
-    canvas.h/c    - Drawing surface with color, scissor, clear, blit
-    draw2d.h/c    - 2D primitives (line, rect, circle, triangle)
+    canvas.h      - Drawing surface with color, scissor, clear, blit
+    draw.h/c      - 2D primitives (line, rect, circle, triangle)
     err.h         - Error handling
 
   Backend:

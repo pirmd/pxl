@@ -3,11 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-#include "backend.h"
-#include "canvas.h"
-#include "draw2d.h"
-#include "stepper.h"
-#include "input.h"
+
+#include "pxl.h"
 
 #define W 800
 #define H 600
@@ -40,15 +37,15 @@ typedef struct {
 } pong_t;
 
 static void
-handle_input(pong_t *p, input_state_t *in) {
+handle_input(pong_t *p, pxl_input_state_t *in) {
     p->paddle_left.vy = 0;
     p->paddle_right.vy = 0;  // Will be set by AI
 
     // Left paddle: vim keys (k=up, j=down)
-    if (input_pressed(in, IN_KEYB_K)) {
+    if (pxl_input_pressed(in, PXL_KEYB_K)) {
         p->paddle_left.vy = -p->paddle_left.speed;
     }
-    if (input_pressed(in, IN_KEYB_J)) {
+    if (pxl_input_pressed(in, PXL_KEYB_J)) {
         p->paddle_left.vy = p->paddle_left.speed;
     }
 }
@@ -175,48 +172,48 @@ update(pong_t *p, float dt) {
 }
 
 static void
-draw_score(canvas_t *cnv, const pong_t *p) {
+draw_score(pxl_canvas_t *cnv, const pong_t *p) {
     // Draw dash separator
-    canvas_set_color(cnv, WHITE);
-    draw2d_fill_rect(cnv, W/2 - 10, 20, 20, 4);
+    pxl_canvas_set_color(cnv, WHITE);
+    pxl_fill_rect(cnv, W/2 - 10, 20, 20, 4);
     
     // Simple score indicators using rectangles
     // Left score: draw one rect per point
-    canvas_set_color(cnv, WHITE);
+    pxl_canvas_set_color(cnv, WHITE);
     for (int i = 0; i < p->score_left; i++) {
-        draw2d_fill_rect(cnv, W/2 - 40 - i * 15, 10, 8, 20);
+        pxl_fill_rect(cnv, W/2 - 40 - i * 15, 10, 8, 20);
     }
     
     // Right score: draw one rect per point
     for (int i = 0; i < p->score_right; i++) {
-        draw2d_fill_rect(cnv, W/2 + 25 + i * 15, 10, 8, 20);
+        pxl_fill_rect(cnv, W/2 + 25 + i * 15, 10, 8, 20);
     }
 }
 
 static void
-render(canvas_t *cnv, const pong_t *p) {
+render(pxl_canvas_t *cnv, const pong_t *p) {
     // Clear
-    canvas_set_color(cnv, BLUE);
-    canvas_clear(cnv);
+    pxl_canvas_set_color(cnv, BLUE);
+    pxl_canvas_clear(cnv);
 
     // Draw score
     draw_score(cnv, p);
 
     // Draw center line
-    canvas_set_color(cnv, WHITE);
+    pxl_canvas_set_color(cnv, WHITE);
     for (int y = 0; y < H; y += 30) {
-        draw2d_fill_rect(cnv, W/2 - 2, y, 4, 20);
+        pxl_fill_rect(cnv, W/2 - 2, y, 4, 20);
     }
 
     // Draw paddles
-    canvas_set_color(cnv, WHITE);
-    draw2d_fill_rect(cnv, (int)p->paddle_left.x, (int)p->paddle_left.y, 
+    pxl_canvas_set_color(cnv, WHITE);
+    pxl_fill_rect(cnv, (int)p->paddle_left.x, (int)p->paddle_left.y, 
                      p->paddle_left.w, p->paddle_left.h);
-    draw2d_fill_rect(cnv, (int)p->paddle_right.x, (int)p->paddle_right.y, 
+    pxl_fill_rect(cnv, (int)p->paddle_right.x, (int)p->paddle_right.y, 
                      p->paddle_right.w, p->paddle_right.h);
 
     // Draw ball
-    draw2d_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, p->ball.radius);
+    pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, p->ball.radius);
 }
 
 static void
@@ -266,7 +263,7 @@ init_pong(pong_t *p) {
 
 int
 main(void) {
-    if (backend_init("PXL Pong", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("PXL Pong", W, H, false) != PXL_SUCCESS)
         return 1;
 
     printf("Pong game. Vim keys: J=down, K=up. R=reset, ESC=quit\n");
@@ -275,38 +272,38 @@ main(void) {
     init_pong(&pong);
     pong_prev = pong;
 
-    time_stepper_t ts;
+    pxl_time_stepper_t ts;
     ts.dt = 1.0f / FPS;
-    stepper_init(&ts, backend_get_time());
+    pxl_stepper_init(&ts, pxl_backend_get_time());
 
-    input_state_t in;
-    input_init_state(&in);
+    pxl_input_state_t in;
+    pxl_input_init_state(&in);
 
-    while (!input_pressed(&in, IN_KEYB_ESCAPE) && !input_pressed(&in, IN_WM_QUIT)) {
-        stepper_sync_time(&ts, backend_get_time());
-        backend_poll_events(&in);
+    while (!pxl_input_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_pressed(&in, PXL_WM_QUIT)) {
+        pxl_stepper_sync_time(&ts, pxl_backend_get_time());
+        pxl_backend_poll_events(&in);
         handle_input(&pong, &in);
 
-        while (stepper_advance(&ts)) {
+        while (pxl_stepper_advance(&ts)) {
             pong_prev = pong;
             update(&pong, (float)ts.dt);
         }
 
-        pixbuf_t pb;
-        if (backend_begin_frame(&pb) == PXL_SUCCESS) {
-            canvas_t cnv;
-            canvas_init(&cnv, &pb);
+        pxl_buf_t pb;
+        if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
+            pxl_canvas_t cnv;
+            pxl_canvas_init(&cnv, &pb);
             
             pong_t interpolated;
             pong_interpolate(&interpolated, &pong_prev, &pong, ts.lerp_factor);
             render(&cnv, &interpolated);
             
-            log_fps(backend_get_time());
-            backend_end_frame();
+            log_fps(pxl_backend_get_time());
+            pxl_backend_end_frame();
         }
     }
 
     printf("\nFinal Score: %d - %d\n", pong.score_left, pong.score_right);
-    backend_deinit();
+    pxl_backend_deinit();
     return 0;
 }

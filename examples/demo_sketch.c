@@ -2,10 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "backend.h"
-#include "canvas.h"
-#include "draw2d.h"
-#include "input.h"
+
+#include "pxl.h"
 
 #define W 800
 #define H 600
@@ -39,7 +37,7 @@ log_fps(double now) {
 
 int
 main(void) {
-    if (backend_init("Etch-a-Sketch", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("Etch-a-Sketch", W, H, false) != PXL_SUCCESS)
         return 1;
 
     printf("Arrow/Vim keys to draw (Shift for big steps), ESC to clear, Q to quit\n");
@@ -51,24 +49,24 @@ main(void) {
     int step_small = 5;
     int step_big = 20;
 
-    input_t in;
-    input_init(&in);
+    pxl_input_t in;
+    pxl_input_init(&in);
 
-    while (!input_is_pressed(&in, IN_KEYB_Q) && !input_pressed(&in.cur, IN_WM_QUIT)) {
-        input_next_state(&in);
-        backend_poll_events(&in.cur);
+    while (!pxl_input_is_pressed(&in, PXL_KEYB_Q) && !pxl_input_pressed(&in.cur, PXL_WM_QUIT)) {
+        pxl_input_next_state(&in);
+        pxl_backend_poll_events(&in.cur);
 
         // Clear on Escape
-        if (input_was_pressed(&in, IN_KEYB_ESCAPE)) {
+        if (pxl_input_was_pressed(&in, PXL_KEYB_ESCAPE)) {
             trail_len = 0;
         }
 
-        int step = input_is_pressed(&in, IN_KEYB_LSHIFT) || input_is_pressed(&in, IN_KEYB_RSHIFT) ? step_big : step_small;
+        int step = pxl_input_is_pressed(&in, PXL_KEYB_LSHIFT) || pxl_input_is_pressed(&in, PXL_KEYB_RSHIFT) ? step_big : step_small;
 
-        if (input_was_pressed(&in, IN_KEYB_LEFT)  || input_was_pressed(&in, IN_KEYB_H)) pen.x -= step;
-        if (input_was_pressed(&in, IN_KEYB_RIGHT) || input_was_pressed(&in, IN_KEYB_L)) pen.x += step;
-        if (input_was_pressed(&in, IN_KEYB_UP)    || input_was_pressed(&in, IN_KEYB_K)) pen.y -= step;
-        if (input_was_pressed(&in, IN_KEYB_DOWN)  || input_was_pressed(&in, IN_KEYB_J)) pen.y += step;
+        if (pxl_input_was_pressed(&in, PXL_KEYB_LEFT)  || pxl_input_was_pressed(&in, PXL_KEYB_H)) pen.x -= step;
+        if (pxl_input_was_pressed(&in, PXL_KEYB_RIGHT) || pxl_input_was_pressed(&in, PXL_KEYB_L)) pen.x += step;
+        if (pxl_input_was_pressed(&in, PXL_KEYB_UP)    || pxl_input_was_pressed(&in, PXL_KEYB_K)) pen.y -= step;
+        if (pxl_input_was_pressed(&in, PXL_KEYB_DOWN)  || pxl_input_was_pressed(&in, PXL_KEYB_J)) pen.y += step;
 
         // Clamp to screen
         if (pen.x < 0) pen.x = 0;
@@ -95,30 +93,30 @@ main(void) {
             pen_prev = pen;
         }
 
-        pixbuf_t pb;
-        if (backend_begin_frame(&pb) == PXL_SUCCESS) {
-            canvas_t cnv;
-            canvas_init(&cnv, &pb);
+        pxl_buf_t pb;
+        if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
+            pxl_canvas_t cnv;
+            pxl_canvas_init(&cnv, &pb);
 
-            canvas_set_color(&cnv, BLUE);
-            canvas_clear(&cnv);
+            pxl_canvas_set_color(&cnv, BLUE);
+            pxl_canvas_clear(&cnv);
 
             // Draw trail
-            canvas_set_color(&cnv, WHITE);
+            pxl_canvas_set_color(&cnv, WHITE);
             for (int i = 0; i < trail_len; i++) {
-                draw2d_fill_rect(&cnv, (int)trail[i].x, (int)trail[i].y, PEN_SIZE, PEN_SIZE);
+                pxl_fill_rect(&cnv, (int)trail[i].x, (int)trail[i].y, PEN_SIZE, PEN_SIZE);
             }
 
             // Current pen position
-            canvas_set_color(&cnv, RED);
-            draw2d_fill_rect(&cnv, (int)pen.x, (int)pen.y, PEN_SIZE, PEN_SIZE);
+            pxl_canvas_set_color(&cnv, RED);
+            pxl_fill_rect(&cnv, (int)pen.x, (int)pen.y, PEN_SIZE, PEN_SIZE);
 
-            log_fps(backend_get_time());
-            backend_end_frame();
+            log_fps(pxl_backend_get_time());
+            pxl_backend_end_frame();
         }
     }
 
     printf("\n");
-    backend_deinit();
+    pxl_backend_deinit();
     return 0;
 }

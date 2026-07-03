@@ -13,7 +13,7 @@
 
 #include "backend.h"
 #include "input.h"
-#include "pixbuf.h"
+#include "buf.h"
 
 /* Only little-endian is supported - X11 uses ARGB8888 in memory */
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__)
@@ -63,10 +63,10 @@ select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
 }
 
 pxl_err_t
-backend_init(const char *title, int w, int h, bool fullscreen) {
+pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
     (void)fullscreen;        /* TODO */
 
-    backend_deinit();
+    pxl_backend_deinit();
 
     g_x11.display = XOpenDisplay(NULL);
     if (!g_x11.display) return PXL_E_BACKEND_INIT;
@@ -111,7 +111,7 @@ backend_init(const char *title, int w, int h, bool fullscreen) {
     if (!g_x11.img) goto fail;
 
 	/* ensure we are pixel-aligned */
-    if (g_x11.img->bytes_per_line % (int)sizeof(pix_t) != 0) goto fail;
+    if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) goto fail;
 
     g_x11.shm.shmid = shmget(IPC_PRIVATE,
                              g_x11.img->bytes_per_line * h,
@@ -137,12 +137,12 @@ backend_init(const char *title, int w, int h, bool fullscreen) {
     return PXL_SUCCESS;
 
 fail:
-    backend_deinit();
+    pxl_backend_deinit();
     return PXL_E_BACKEND_INIT;
 }
 
 void
-backend_deinit(void) {
+pxl_backend_deinit(void) {
     if (!g_x11.display) return;
 
     if (g_x11.img) {
@@ -170,20 +170,20 @@ backend_deinit(void) {
 }
 
 pxl_err_t
-backend_begin_frame(pixbuf_t *out_pb) {
+pxl_backend_begin_frame(pxl_buf_t *out_pb) {
     assert(g_x11.display && g_x11.img && g_x11.img->data);
-    assert(g_x11.img->bytes_per_line % (int)sizeof(pix_t) == 0);
+    assert(g_x11.img->bytes_per_line % (int)sizeof(pxl_t) == 0);
 
     out_pb->width  = g_x11.width;
     out_pb->height = g_x11.height;
-    out_pb->stride = g_x11.img->bytes_per_line / (int)sizeof(pix_t);
-    out_pb->data   = (pix_t *)g_x11.img->data;
+    out_pb->stride = g_x11.img->bytes_per_line / (int)sizeof(pxl_t);
+    out_pb->data   = (pxl_t *)g_x11.img->data;
 
     return PXL_SUCCESS;
 }
 
 void
-backend_end_frame(void) {
+pxl_backend_end_frame(void) {
     assert(g_x11.display && g_x11.img && g_x11.img->data);
 
     XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
@@ -193,105 +193,105 @@ backend_end_frame(void) {
 }
 
 double
-backend_get_time(void) {
+pxl_backend_get_time(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0.0;
     return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
 }
 
-static input_code_t
-x11_keysym_to_input_code(KeySym sym) {
+static pxl_input_code_t
+x11_keysym_to_pxl_input_code(KeySym sym) {
     switch (sym) {
-        case XK_Escape: return IN_KEYB_ESCAPE;
-        case XK_Return: return IN_KEYB_ENTER;
-        case XK_Tab: return IN_KEYB_TAB;
-        case XK_BackSpace: return IN_KEYB_BACKSPACE;
-        case XK_Insert: return IN_KEYB_INSERT;
-        case XK_Delete: return IN_KEYB_DELETE;
-        case XK_Home: return IN_KEYB_HOME;
-        case XK_End: return IN_KEYB_END;
-        case XK_Page_Up: return IN_KEYB_PAGE_UP;
-        case XK_Page_Down: return IN_KEYB_PAGE_DOWN;
+        case XK_Escape: return PXL_KEYB_ESCAPE;
+        case XK_Return: return PXL_KEYB_ENTER;
+        case XK_Tab: return PXL_KEYB_TAB;
+        case XK_BackSpace: return PXL_KEYB_BACKSPACE;
+        case XK_Insert: return PXL_KEYB_INSERT;
+        case XK_Delete: return PXL_KEYB_DELETE;
+        case XK_Home: return PXL_KEYB_HOME;
+        case XK_End: return PXL_KEYB_END;
+        case XK_Page_Up: return PXL_KEYB_PAGE_UP;
+        case XK_Page_Down: return PXL_KEYB_PAGE_DOWN;
 
-        case XK_Up: return IN_KEYB_UP;
-        case XK_Down: return IN_KEYB_DOWN;
-        case XK_Left: return IN_KEYB_LEFT;
-        case XK_Right: return IN_KEYB_RIGHT;
+        case XK_Up: return PXL_KEYB_UP;
+        case XK_Down: return PXL_KEYB_DOWN;
+        case XK_Left: return PXL_KEYB_LEFT;
+        case XK_Right: return PXL_KEYB_RIGHT;
 
-        case XK_Shift_L: return IN_KEYB_LSHIFT;
-        case XK_Shift_R: return IN_KEYB_RSHIFT;
-        case XK_Control_L: return IN_KEYB_LCTRL;
-        case XK_Control_R: return IN_KEYB_RCTRL;
-        case XK_Alt_L: return IN_KEYB_LALT;
-        case XK_Alt_R: return IN_KEYB_RALT;
-        case XK_Super_L: return IN_KEYB_LSUPER;
-        case XK_Super_R: return IN_KEYB_RSUPER;
+        case XK_Shift_L: return PXL_KEYB_LSHIFT;
+        case XK_Shift_R: return PXL_KEYB_RSHIFT;
+        case XK_Control_L: return PXL_KEYB_LCTRL;
+        case XK_Control_R: return PXL_KEYB_RCTRL;
+        case XK_Alt_L: return PXL_KEYB_LALT;
+        case XK_Alt_R: return PXL_KEYB_RALT;
+        case XK_Super_L: return PXL_KEYB_LSUPER;
+        case XK_Super_R: return PXL_KEYB_RSUPER;
 
-        case XK_space: return IN_KEYB_SPACE;
-        case XK_apostrophe: return IN_KEYB_APOSTROPHE;
-        case XK_comma: return IN_KEYB_COMMA;
-        case XK_minus: return IN_KEYB_MINUS;
-        case XK_period: return IN_KEYB_PERIOD;
-        case XK_slash: return IN_KEYB_SLASH;
-        case XK_semicolon: return IN_KEYB_SEMICOLON;
-        case XK_equal: return IN_KEYB_EQUAL;
-        case XK_bracketleft: return IN_KEYB_LEFT_BRACKET;
-        case XK_backslash: return IN_KEYB_BACKSLASH;
-        case XK_bracketright: return IN_KEYB_RIGHT_BRACKET;
-        case XK_grave: return IN_KEYB_GRAVE_ACCENT;
+        case XK_space: return PXL_KEYB_SPACE;
+        case XK_apostrophe: return PXL_KEYB_APOSTROPHE;
+        case XK_comma: return PXL_KEYB_COMMA;
+        case XK_minus: return PXL_KEYB_MINUS;
+        case XK_period: return PXL_KEYB_PERIOD;
+        case XK_slash: return PXL_KEYB_SLASH;
+        case XK_semicolon: return PXL_KEYB_SEMICOLON;
+        case XK_equal: return PXL_KEYB_EQUAL;
+        case XK_bracketleft: return PXL_KEYB_LEFT_BRACKET;
+        case XK_backslash: return PXL_KEYB_BACKSLASH;
+        case XK_bracketright: return PXL_KEYB_RIGHT_BRACKET;
+        case XK_grave: return PXL_KEYB_GRAVE_ACCENT;
 
-        case XK_0: return IN_KEYB_0; case XK_1: return IN_KEYB_1; case XK_2: return IN_KEYB_2;
-        case XK_3: return IN_KEYB_3; case XK_4: return IN_KEYB_4; case XK_5: return IN_KEYB_5;
-        case XK_6: return IN_KEYB_6; case XK_7: return IN_KEYB_7; case XK_8: return IN_KEYB_8;
-        case XK_9: return IN_KEYB_9;
+        case XK_0: return PXL_KEYB_0; case XK_1: return PXL_KEYB_1; case XK_2: return PXL_KEYB_2;
+        case XK_3: return PXL_KEYB_3; case XK_4: return PXL_KEYB_4; case XK_5: return PXL_KEYB_5;
+        case XK_6: return PXL_KEYB_6; case XK_7: return PXL_KEYB_7; case XK_8: return PXL_KEYB_8;
+        case XK_9: return PXL_KEYB_9;
 
-        case XK_a: return IN_KEYB_A; case XK_b: return IN_KEYB_B; case XK_c: return IN_KEYB_C;
-        case XK_d: return IN_KEYB_D; case XK_e: return IN_KEYB_E; case XK_f: return IN_KEYB_F;
-        case XK_g: return IN_KEYB_G; case XK_h: return IN_KEYB_H; case XK_i: return IN_KEYB_I;
-        case XK_j: return IN_KEYB_J; case XK_k: return IN_KEYB_K; case XK_l: return IN_KEYB_L;
-        case XK_m: return IN_KEYB_M; case XK_n: return IN_KEYB_N; case XK_o: return IN_KEYB_O;
-        case XK_p: return IN_KEYB_P; case XK_q: return IN_KEYB_Q; case XK_r: return IN_KEYB_R;
-        case XK_s: return IN_KEYB_S; case XK_t: return IN_KEYB_T; case XK_u: return IN_KEYB_U;
-        case XK_v: return IN_KEYB_V; case XK_w: return IN_KEYB_W; case XK_x: return IN_KEYB_X;
-        case XK_y: return IN_KEYB_Y; case XK_z: return IN_KEYB_Z;
+        case XK_a: return PXL_KEYB_A; case XK_b: return PXL_KEYB_B; case XK_c: return PXL_KEYB_C;
+        case XK_d: return PXL_KEYB_D; case XK_e: return PXL_KEYB_E; case XK_f: return PXL_KEYB_F;
+        case XK_g: return PXL_KEYB_G; case XK_h: return PXL_KEYB_H; case XK_i: return PXL_KEYB_I;
+        case XK_j: return PXL_KEYB_J; case XK_k: return PXL_KEYB_K; case XK_l: return PXL_KEYB_L;
+        case XK_m: return PXL_KEYB_M; case XK_n: return PXL_KEYB_N; case XK_o: return PXL_KEYB_O;
+        case XK_p: return PXL_KEYB_P; case XK_q: return PXL_KEYB_Q; case XK_r: return PXL_KEYB_R;
+        case XK_s: return PXL_KEYB_S; case XK_t: return PXL_KEYB_T; case XK_u: return PXL_KEYB_U;
+        case XK_v: return PXL_KEYB_V; case XK_w: return PXL_KEYB_W; case XK_x: return PXL_KEYB_X;
+        case XK_y: return PXL_KEYB_Y; case XK_z: return PXL_KEYB_Z;
 
-        case XK_F1: return IN_KEYB_F1; case XK_F2: return IN_KEYB_F2; case XK_F3: return IN_KEYB_F3;
-        case XK_F4: return IN_KEYB_F4; case XK_F5: return IN_KEYB_F5; case XK_F6: return IN_KEYB_F6;
-        case XK_F7: return IN_KEYB_F7; case XK_F8: return IN_KEYB_F8; case XK_F9: return IN_KEYB_F9;
-        case XK_F10: return IN_KEYB_F10; case XK_F11: return IN_KEYB_F11; case XK_F12: return IN_KEYB_F12;
-        case XK_F13: return IN_KEYB_F13; case XK_F14: return IN_KEYB_F14; case XK_F15: return IN_KEYB_F15;
-        case XK_F16: return IN_KEYB_F16; case XK_F17: return IN_KEYB_F17; case XK_F18: return IN_KEYB_F18;
-        case XK_F19: return IN_KEYB_F19; case XK_F20: return IN_KEYB_F20; case XK_F21: return IN_KEYB_F21;
-        case XK_F22: return IN_KEYB_F22; case XK_F23: return IN_KEYB_F23; case XK_F24: return IN_KEYB_F24;
+        case XK_F1: return PXL_KEYB_F1; case XK_F2: return PXL_KEYB_F2; case XK_F3: return PXL_KEYB_F3;
+        case XK_F4: return PXL_KEYB_F4; case XK_F5: return PXL_KEYB_F5; case XK_F6: return PXL_KEYB_F6;
+        case XK_F7: return PXL_KEYB_F7; case XK_F8: return PXL_KEYB_F8; case XK_F9: return PXL_KEYB_F9;
+        case XK_F10: return PXL_KEYB_F10; case XK_F11: return PXL_KEYB_F11; case XK_F12: return PXL_KEYB_F12;
+        case XK_F13: return PXL_KEYB_F13; case XK_F14: return PXL_KEYB_F14; case XK_F15: return PXL_KEYB_F15;
+        case XK_F16: return PXL_KEYB_F16; case XK_F17: return PXL_KEYB_F17; case XK_F18: return PXL_KEYB_F18;
+        case XK_F19: return PXL_KEYB_F19; case XK_F20: return PXL_KEYB_F20; case XK_F21: return PXL_KEYB_F21;
+        case XK_F22: return PXL_KEYB_F22; case XK_F23: return PXL_KEYB_F23; case XK_F24: return PXL_KEYB_F24;
 
-        case XK_KP_0: return IN_KEYB_KP_0; case XK_KP_1: return IN_KEYB_KP_1; case XK_KP_2: return IN_KEYB_KP_2;
-        case XK_KP_3: return IN_KEYB_KP_3; case XK_KP_4: return IN_KEYB_KP_4; case XK_KP_5: return IN_KEYB_KP_5;
-        case XK_KP_6: return IN_KEYB_KP_6; case XK_KP_7: return IN_KEYB_KP_7; case XK_KP_8: return IN_KEYB_KP_8;
-        case XK_KP_9: return IN_KEYB_KP_9;
-        case XK_KP_Decimal: return IN_KEYB_KP_DECIMAL;
-        case XK_KP_Divide: return IN_KEYB_KP_DIVIDE;
-        case XK_KP_Multiply: return IN_KEYB_KP_MULTIPLY;
-        case XK_KP_Subtract: return IN_KEYB_KP_SUBTRACT;
-        case XK_KP_Add: return IN_KEYB_KP_ADD;
-        case XK_KP_Enter: return IN_KEYB_KP_ENTER;
-        case XK_KP_Equal: return IN_KEYB_KP_EQUAL;
+        case XK_KP_0: return PXL_KEYB_KP_0; case XK_KP_1: return PXL_KEYB_KP_1; case XK_KP_2: return PXL_KEYB_KP_2;
+        case XK_KP_3: return PXL_KEYB_KP_3; case XK_KP_4: return PXL_KEYB_KP_4; case XK_KP_5: return PXL_KEYB_KP_5;
+        case XK_KP_6: return PXL_KEYB_KP_6; case XK_KP_7: return PXL_KEYB_KP_7; case XK_KP_8: return PXL_KEYB_KP_8;
+        case XK_KP_9: return PXL_KEYB_KP_9;
+        case XK_KP_Decimal: return PXL_KEYB_KP_DECIMAL;
+        case XK_KP_Divide: return PXL_KEYB_KP_DIVIDE;
+        case XK_KP_Multiply: return PXL_KEYB_KP_MULTIPLY;
+        case XK_KP_Subtract: return PXL_KEYB_KP_SUBTRACT;
+        case XK_KP_Add: return PXL_KEYB_KP_ADD;
+        case XK_KP_Enter: return PXL_KEYB_KP_ENTER;
+        case XK_KP_Equal: return PXL_KEYB_KP_EQUAL;
 
-        default: return IN_UNKNOWN;
+        default: return PXL_IN_UNKNOWN;
     }
 }
 
-static input_code_t
-x11_button_to_input_code(unsigned int button) {
+static pxl_input_code_t
+x11_button_to_pxl_input_code(unsigned int button) {
     switch (button) {
-        case Button1: return IN_MOUSE_LEFT;
-        case Button2: return IN_MOUSE_MIDDLE;
-        case Button3: return IN_MOUSE_RIGHT;
-        default: return IN_UNKNOWN;
+        case Button1: return PXL_MOUSE_LEFT;
+        case Button2: return PXL_MOUSE_MIDDLE;
+        case Button3: return PXL_MOUSE_RIGHT;
+        default: return PXL_IN_UNKNOWN;
     }
 }
 
 void
-backend_poll_events(input_state_t *in) {
+pxl_backend_poll_events(pxl_input_state_t *in) {
     XEvent event;
 
     while (XPending(g_x11.display)) {
@@ -300,41 +300,41 @@ backend_poll_events(input_state_t *in) {
         switch (event.type) {
             case ClientMessage:
                 if ((Atom)event.xclient.data.l[0] == g_x11.wm_delete) {
-                    input_press(in, IN_WM_QUIT);
+                    pxl_input_press(in, PXL_WM_QUIT);
                 }
                 break;
 
             case KeyPress:
-                input_press(in, x11_keysym_to_input_code(XLookupKeysym(&event.xkey, 0)));
+                pxl_input_press(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event.xkey, 0)));
                 break;
 
             case KeyRelease:
-                input_release(in, x11_keysym_to_input_code(XLookupKeysym(&event.xkey, 0)));
+                pxl_input_release(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event.xkey, 0)));
                 break;
 
             case ButtonPress: {
-                input_code_t b = x11_button_to_input_code(event.xbutton.button);
-                if (b != IN_UNKNOWN) {
-					input_press(in, b);
+                pxl_input_code_t b = x11_button_to_pxl_input_code(event.xbutton.button);
+                if (b != PXL_IN_UNKNOWN) {
+					pxl_input_press(in, b);
                 } else if (event.xbutton.button == 4) {
-                    input_inc_mouse_wheel(in, 0, 1);
+                    pxl_input_inc_mouse_wheel(in, 0, 1);
                 } else if (event.xbutton.button == 5) {
-                    input_inc_mouse_wheel(in, 0, -1);
+                    pxl_input_inc_mouse_wheel(in, 0, -1);
                 } else if (event.xbutton.button == 6) {
-                    input_inc_mouse_wheel(in, -1, 0);
+                    pxl_input_inc_mouse_wheel(in, -1, 0);
                 } else if (event.xbutton.button == 7) {
-                    input_inc_mouse_wheel(in, 1, 0);
+                    pxl_input_inc_mouse_wheel(in, 1, 0);
                 }
                 break;
             }
 
             case ButtonRelease: {
-				input_release(in, x11_button_to_input_code(event.xbutton.button));
+				pxl_input_release(in, x11_button_to_pxl_input_code(event.xbutton.button));
                 break;
             }
 
             case MotionNotify:
-                input_set_mouse_pos(in, event.xmotion.x, event.xmotion.y);
+                pxl_input_set_mouse_pos(in, event.xmotion.x, event.xmotion.y);
                 break;
         }
     }

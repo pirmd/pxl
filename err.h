@@ -9,4 +9,4 @@ typedef enum {
     PXL_E_BACKEND_FRAME,
 } pxl_err_t;
 
-#endif
+#endif /* PXL_ERR_H */
