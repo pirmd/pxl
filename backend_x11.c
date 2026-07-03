@@ -100,8 +100,8 @@ backend_init(const char *title, int w, int h, bool fullscreen) {
         ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
         StructureNotifyMask);
 
-	Bool supported;
-	XkbSetDetectableAutoRepeat(g_x11.display, True, &supported);
+	
+	XkbSetDetectableAutoRepeat(g_x11.display, True, NULL);
 
     g_x11.wm_delete = XInternAtom(g_x11.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(g_x11.display, g_x11.window, &g_x11.wm_delete, 1);
