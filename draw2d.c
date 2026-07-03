@@ -271,66 +271,50 @@ draw2d_fill_circle(canvas_t *cnv, int x, int y, int r) {
 		return;
 	}
 
-	/* Bounding box and clip to scissor to get valid Y range */
 	rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
 	rect_t clipped;
 	if (!clip_rect(bbox, cnv->scissor, &clipped)) {
 		return;
 	}
-	int y_start = clipped.y;
-	int y_end = clipped.y + clipped.h - 1;
 
-	/* Bresenham's circle algorithm adapted for filled circle */
+	int y_top = clipped.y;
+	int y_bot = clipped.y + clipped.h - 1;
+
 	int cx = r;
 	int cy = 0;
-	int df = 1 - r;
-	int d_e = 3;
-	int d_se = -2 * r + 5;
+	int d = 1 - r;
 
-	/* Draw center line (cy = 0) */
-	if (y >= y_start && y <= y_end) {
-		draw_span(cnv, x - r, y, 2 * r + 1);
-	}
+	while (cx >= cy) {
+		int w1 = 2 * cx + 1;
+		int w2 = 2 * cy + 1;
 
-	/* Draw top and bottom single points */
-	if (y + r >= y_start && y + r <= y_end) {
-		draw_span(cnv, x, y + r, 1);
-	}
-	if (y - r >= y_start && y - r <= y_end) {
-		draw_span(cnv, x, y - r, 1);
-	}
+		int yy1 = y + cy;
+		int yy2 = y - cy;
+		int yy3 = y + cx;
+		int yy4 = y - cx;
 
-	cx--;
-	while (cy < cx) {
-		if (df < 0) {
-			df += d_e;
-			d_e += 2;
-		} else {
-			df += d_se;
-			d_e += 2;
-			d_se += 2;
-			cx--;
+		if (yy1 >= y_top && yy1 <= y_bot) {
+			draw_span(cnv, x - cx, yy1, w1);
 		}
+		if (cy != 0 && yy2 >= y_top && yy2 <= y_bot) {
+			draw_span(cnv, x - cx, yy2, w1);
+		}
+
+		if (cx != cy) {
+			if (yy3 >= y_top && yy3 <= y_bot) {
+				draw_span(cnv, x - cy, yy3, w2);
+			}
+			if (cx != 0 && yy4 >= y_top && yy4 <= y_bot) {
+				draw_span(cnv, x - cy, yy4, w2);
+			}
+		}
+
 		cy++;
-
-		/* Draw horizontal spans only if y is in valid range */
-		int span_w = 2 * cx + 1;
-		if (y + cy >= y_start && y + cy <= y_end) {
-			draw_span(cnv, x - cx, y + cy, span_w);
-		}
-		if (y - cy >= y_start && y - cy <= y_end) {
-			draw_span(cnv, x - cx, y - cy, span_w);
-		}
-	}
-
-	/* Final iteration when cy == cx (fill the middle rows) */
-	if (cy == cx) {
-		int span_w = 2 * cx + 1;
-		if (y + cy >= y_start && y + cy <= y_end) {
-			draw_span(cnv, x - cx, y + cy, span_w);
-		}
-		if (y - cy >= y_start && y - cy <= y_end) {
-			draw_span(cnv, x - cx, y - cy, span_w);
+		if (d < 0) {
+			d += 2 * cy + 1;
+		} else {
+			cx--;
+			d += 2 * (cy - cx) + 1;
 		}
 	}
 }

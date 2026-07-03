@@ -107,7 +107,7 @@ is_drawn_on_circle(int x, int y, int cx, int cy, int r) {
 }
 
 /* Check if point (x,y) is inside the filled circle drawn by draw2d_fill_circle.
- * This helper EXACTLY reproduces the Bresenham algorithm from draw2d_fill_circle
+ * This helper EXACTLY reproduces the algorithm from draw2d_fill_circle
  * to ensure 100% consistency between drawing and testing. */
 static inline bool
 is_drawn_inside_fill_circle(int x, int y, int cx, int cy, int r) {
@@ -115,50 +115,51 @@ is_drawn_inside_fill_circle(int x, int y, int cx, int cy, int r) {
 		return false;
 	}
 
+	int dx = abs(x - cx);
+	int dy = abs(y - cy);
+
 	/* Check center line (y == cy) - drawn first in draw2d_fill_circle */
-	if (y == cy && x >= cx - r && x <= cx + r) {
+	if (y == cy && dx <= r) {
 		return true;
 	}
 
 	/* Check top and bottom single points (x=cx, y=cy±r) */
-	if (x == cx && (y == cy + r || y == cy - r)) {
+	if (x == cx && (dy == r)) {
 		return true;
 	}
 
-	/* Bresenham's circle algorithm - same as draw2d_fill_circle */
-	int cx_algo = r;
-	int cy_algo = 0;
-	int df = 1 - r;
-	int d_e = 3;
-	int d_se = -2 * r + 5;
+	/* Same algorithm as draw2d_fill_circle */
+	int c_x = r;
+	int c_y = 0;
+	int d = 1 - r;
 
-	cx_algo--;
-	while (cy_algo < cx_algo) {
-		if (df < 0) {
-			df += d_e;
-			d_e += 2;
+	while (c_x >= c_y) {
+		int w1 = 2 * c_x + 1;
+		int w2 = 2 * c_y + 1;
+
+		int yy1 = cy + c_y;
+		int yy2 = cy - c_y;
+		int yy3 = cy + c_x;
+		int yy4 = cy - c_x;
+
+		/* Check spans at y = cy ± c_y */
+		if ((y == yy1 || y == yy2) && dx <= c_x) {
+			return true;
+		}
+
+		/* Check spans at y = cy ± c_x (if different from c_y) */
+		if (c_x != c_y) {
+			if ((y == yy3 || y == yy4) && dx <= c_y) {
+				return true;
+			}
+		}
+
+		c_y++;
+		if (d < 0) {
+			d += 2 * c_y + 1;
 		} else {
-			df += d_se;
-			d_e += 2;
-			d_se += 2;
-			cx_algo--;
-		}
-		cy_algo++;
-
-		/* Check horizontal spans at y = cy ± cy_algo */
-		int span_w = 2 * cx_algo + 1;
-		if ((y == cy + cy_algo || y == cy - cy_algo) &&
-		    x >= cx - cx_algo && x <= cx + cx_algo) {
-			return true;
-		}
-	}
-
-	/* Final iteration when cy_algo == cx_algo */
-	if (cy_algo == cx_algo) {
-		int span_w = 2 * cx_algo + 1;
-		if ((y == cy + cy_algo || y == cy - cy_algo) &&
-		    x >= cx - cx_algo && x <= cx + cx_algo) {
-			return true;
+			c_x--;
+			d += 2 * (c_y - c_x) + 1;
 		}
 	}
 
