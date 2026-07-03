@@ -2,16 +2,33 @@
 #define PXL_DRAW_H
 
 #include "canvas.h"
+#include "buf.h"
+#include "geom.h"
+
+/* draw a horizontal span respecting scissor X (Y must be pre-clipped by caller) */
+static inline void
+pxl_draw_span(pxl_canvas_t *cnv, int x, int y, int w) {
+	assert(cnv && cnv->pb);
+	assert(w >= 0);
+	assert(y >= cnv->scissor.y && y < cnv->scissor.y + cnv->scissor.h);
+
+	pxl_span_t span;
+	if (!pxl_clip_span((pxl_span_t){x, w}, (pxl_span_t){cnv->scissor.x, cnv->scissor.w}, &span)) {
+		return;
+	}
+
+	pxl_t pix = cnv->color;
+	pxl_t *row = pxl_buf_ptr(cnv->pb, span.x, y);
+	for (int dx = 0; dx < span.w; ++dx) {
+		row[dx] = pix;
+	}
+}
 
 /* Outline primitives */
 void pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1);
 void pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h);
-void pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r);
-void pxl_draw_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int y2);
 
 /* Filled primitives */
 void pxl_fill_rect(pxl_canvas_t *cnv, int x, int y, int w, int h);
-void pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r);
-void pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int y2);
 
 #endif /* PXL_DRAW_H */

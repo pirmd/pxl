@@ -10,6 +10,7 @@
 /* Drawing */
 #include "canvas.h"
 #include "draw.h"
+#include "draw_extra.h"
 
 /* Input and time */
 #include "input.h"

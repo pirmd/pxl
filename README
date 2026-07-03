@@ -33,27 +33,23 @@ Quick start:
     backend_deinit();
 
 Examples:
-  - demo_sketch.c - Etch-a-Sketch: arrow/Vim keys for drawing, Shift for big steps,
-                    ESC to clear, Q to quit
-  - demo_pong.c   - Pong game: vim keys (J=down, K=up), simple predictive AI,
-                    score display, FPS counter
+  - demo_sketch.c - Etch-a-Sketch
+  - demo_pong.c   - Pong game
   - demo_loops.c  - Game loop comparison: 3 squares on same line showing
                     Variable vs Fixed Accum vs Fixed Lerp timesteps
-                    (1-4: slowdown factor, R: reset)
-  - demo_gas.c    - Boltzmann gas simulation: spatial grid optimized particle collisions,
-                    elastic physics, random colors
-                    (Up/Down: add/remove 10 particles, ESC to quit)
+  - demo_gas.c    - Boltzmann gas simulation
 
 Architecture:
   Core:
-    buf.h         - ARGB8888 pixel buffer with stride alignment
-    geom.h        - Geometry primitives (rect, span, point) and clipping
-    canvas.h      - Drawing surface with color, scissor, clear, blit
-    draw.h/c      - 2D primitives (line, rect, circle, triangle)
-    err.h         - Error handling
+    buf.h          - ARGB8888 pixel buffer with stride alignment
+    geom.h         - Geometry primitives (rect, span, point) and clipping
+    canvas.h       - Drawing surface with color, scissor, clear, blit
+    draw.h/c       - Basic 2D primitives (line, rect, span)
+    draw_extra.h/c - Advanced 2D primitives (circle, triangle)
+    err.h          - Error handling
 
   Backend:
-    backend.h     - Backend interface (5 functions)
+    backend.h     - Backend interface
     input.h       - Input state handling (keyboard, mouse, window events)
     backend_sdl.c - SDL2 backend (uses SDL_PIXELFORMAT_ARGB8888)
     backend_x11.c - X11 backend (uses ARGB visual)
