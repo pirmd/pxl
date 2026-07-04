@@ -6,6 +6,7 @@
 void
 pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 	assert(cnv);
+	assert(x0 >= 0 && y0 >= 0 && x1 >= 0 && y1 >= 0);
 
 	/* Bounding box */
 	int min_x = pxl_min(x0, x1);
@@ -87,10 +88,7 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 void
 pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	assert(cnv);
-
-	if (w <= 0 || h <= 0) {
-		return;
-	}
+	assert(w > 0 && h > 0);
 
 	pxl_rect_t r;
 	if (!pxl_clip_rect((pxl_rect_t){x, y, w, h}, cnv->scissor, &r)) {
@@ -144,10 +142,7 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 void
 pxl_fill_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	assert(cnv);
-
-	if (w <= 0 || h <= 0) {
-		return;
-	}
+	assert(w > 0 && h > 0);
 
 	pxl_rect_t r;
 	if (!pxl_clip_rect((pxl_rect_t){x, y, w, h}, cnv->scissor, &r)) {

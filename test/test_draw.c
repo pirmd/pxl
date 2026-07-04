@@ -350,41 +350,6 @@ test_pxl_draw_rect_basic(void) {
 }
 
 static void
-test_pxl_draw_rect_zero_size(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw rect with zero size - should do nothing */
-	/* Note: only the last call matters for the test since all draw to the same pixbuf */
-	int rx = 5, ry = 5, rw = 0, rh = 10;
-	pxl_draw_rect(&f.cnv, 5, 5, 0, 0);
-	pxl_draw_rect(&f.cnv, 5, 5, 10, 0);
-	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_rect = is_drawn_on_rect(x, y, rx, ry, rw, rh, f.cnv.scissor);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, on_rect, in_s, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
 test_pxl_draw_rect_outside_scissor(void) {
 	int w = 20, h = 20;
 	fixture_t f;
@@ -634,41 +599,6 @@ test_pxl_fill_rect_basic(void) {
 }
 
 static void
-test_pxl_fill_rect_zero_size(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw rect with zero size - should do nothing */
-	/* Note: only the last call matters for the test since all draw to the same pixbuf */
-	int rx = 5, ry = 5, rw = 0, rh = 10;
-	pxl_fill_rect(&f.cnv, 5, 5, 0, 0);
-	pxl_fill_rect(&f.cnv, 5, 5, 10, 0);
-	pxl_fill_rect(&f.cnv, rx, ry, rw, rh);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool pxl_in_rect = is_drawn_inside_fill_rect(x, y, rx, ry, rw, rh, f.cnv.scissor);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = pxl_in_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): pxl_in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, pxl_in_rect, in_s, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
 test_pxl_fill_rect_outside_scissor(void) {
 	int w = 20, h = 20;
 	fixture_t f;
@@ -850,7 +780,6 @@ main(int argc, char *argv[]) {
 
 		/* Rect tests */
 		ST_T(test_pxl_draw_rect_basic),
-		ST_T(test_pxl_draw_rect_zero_size),
 		ST_T(test_pxl_draw_rect_outside_scissor),
 		ST_T(test_pxl_draw_rect_clip_left_no_false_border),
 		ST_T(test_pxl_draw_rect_clip_right_no_false_border),
@@ -860,7 +789,6 @@ main(int argc, char *argv[]) {
 
 		/* Fill Rect tests */
 		ST_T(test_pxl_fill_rect_basic),
-		ST_T(test_pxl_fill_rect_zero_size),
 		ST_T(test_pxl_fill_rect_outside_scissor),
 		ST_T(test_pxl_fill_rect_fast_path)
 	);

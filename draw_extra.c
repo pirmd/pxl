@@ -8,10 +8,9 @@
 void
 pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	assert(cnv);
-
-	if (r <= 0) {
-		return;
-	}
+	assert(r > 0);
+	assert(x >= -INT_MAX/2 && x <= INT_MAX/2);
+	assert(y >= -INT_MAX/2 && y <= INT_MAX/2);
 
 	/* Assert to prevent integer overflow in bbox calculation (extreme case) */
 	assert(r <= (INT_MAX / 2) - 1);
@@ -88,10 +87,9 @@ pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 void
 pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	assert(cnv);
-
-	if (r <= 0) {
-		return;
-	}
+	assert(r > 0);
+	assert(x >= -INT_MAX/2 && x <= INT_MAX/2);
+	assert(y >= -INT_MAX/2 && y <= INT_MAX/2);
 
 	/* Assert to prevent integer overflow in bbox calculation (extreme case) */
 	assert(r <= (INT_MAX / 2) - 1);

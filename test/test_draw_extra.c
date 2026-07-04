@@ -290,40 +290,6 @@ test_pxl_draw_circle_basic(void) {
 }
 
 static void
-test_pxl_draw_circle_zero_radius(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw circle with zero/negative radius - should do nothing */
-	/* Note: only the last call matters for the test since all draw to the same pixbuf */
-	int cx = 10, cy = 10, r = -1;
-	pxl_draw_circle(&f.cnv, cx, cy, 0);
-	pxl_draw_circle(&f.cnv, cx, cy, r);
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_circle = is_drawn_on_circle(x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_circle && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): on_circle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, on_circle, in_s, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
 test_pxl_draw_circle_outside_scissor(void) {
 	int w = 20, h = 20;
 	fixture_t f;
@@ -396,40 +362,6 @@ test_pxl_fill_circle_basic(void) {
 
 	/* Verify we actually filled some pixels */
 	ST_CHECK(filled_count > 0, "expected at least one pixel filled, got %d", filled_count);
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_fill_circle_zero_radius(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled circle with zero/negative radius - should do nothing */
-	/* Note: only the last call matters for the test since all draw to the same pixbuf */
-	int cx = 10, cy = 10, r = -1;
-	pxl_fill_circle(&f.cnv, cx, cy, 0);
-	pxl_fill_circle(&f.cnv, cx, cy, r);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_circle = is_drawn_inside_fill_circle(x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_circle && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): in_circle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, in_circle, in_s, want, got);
-		}
-	}
 
 	fixture_deinit(&f);
 }
@@ -622,12 +554,10 @@ main(int argc, char *argv[]) {
 	return ST_RUN(
 		/* Circle tests */
 		ST_T(test_pxl_draw_circle_basic),
-		ST_T(test_pxl_draw_circle_zero_radius),
 		ST_T(test_pxl_draw_circle_outside_scissor),
 
 		/* Fill Circle tests */
 		ST_T(test_pxl_fill_circle_basic),
-		ST_T(test_pxl_fill_circle_zero_radius),
 		ST_T(test_pxl_fill_circle_outside_scissor),
 
 		/* Triangle tests */
