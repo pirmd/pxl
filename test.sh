@@ -1,16 +1,8 @@
 #!/bin/sh
 
-set -e
+for backend in x11 sdl; do
+    make clean >/dev/null
+    make lint test BACKEND="$backend" >/dev/null || exit 1
+done
 
-run_test() {
-    backend=$1
-    echo "== TEST CONFIG: BACKEND=$backend"
-    
-    make clean > /dev/null
-    make lint test BACKEND="$backend"
-}
-
-run_test "x11"
-run_test "sdl"
-
-make clean > /dev/null
+make clean >/dev/null

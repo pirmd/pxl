@@ -19,21 +19,19 @@ all: test
 
 test: $(TESTS)
 	@for t in $(TESTS); do \
-		printf "%s" "$${t}... "; \
-		./$${t} >/dev/null 2>/dev/null || { echo "fail"; exit 1; }; \
-		echo "ok"; \
+		./$${t} >/dev/null || { echo "$${t} FAIL"; exit 1; }; \
 		done
 
 .for t in $(TESTS)
 $(t): $(t).c ../libpxl.a stest/libstest.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
+	@$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
 .endfor
 
 stest/libstest.a:
-	$(MAKE) -C stest libstest.a
+	@$(MAKE) -C stest libstest.a
 
 clean:
-	rm -f $(TESTS)
+	@rm -f $(TESTS)
 	$(MAKE) -C stest clean
 
 .PHONY: all test clean
