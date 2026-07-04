@@ -23,14 +23,24 @@ Build:
 
 Quick start:
     pxl_backend_init("Title", 800, 600, false);
-    while (!pxl_input_is_pressed(PXL_WM_QUIT)) {
-        pxl_backend_poll_events(&input);
-        pxl_backend_begin_frame(&pb);
-        pxl_canvas_init(&cnv, &pb);
-        /* drawing: pxl_draw_*(), pxl_canvas_clear() */
-        pxl_backend_end_frame();
+
+    pxl_input_t input;
+    pxl_input_init(&input);
+
+    while (!pxl_input_is_pressed(&input, PXL_KEYB_ESCAPE) &&
+           !pxl_input_is_pressed(&input, PXL_WM_QUIT)) {
+        pxl_input_next_state(&input);
+        pxl_backend_poll_events(&input.cur);
+
+        pxl_buf_t pb;
+        if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
+            pxl_canvas_t cnv;
+            pxl_canvas_init(&cnv, &pb);
+            /* drawing: pxl_draw_*(), pxl_fill_*(), pxl_canvas_clear() */
+            pxl_backend_end_frame();
+        }
     }
-    backend_deinit();
+    pxl_backend_deinit();
 
 Examples:
   - demo_sketch.c - Etch-a-Sketch
