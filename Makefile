@@ -8,7 +8,7 @@ HDR = canvas.h draw.h draw_extra.h buf.h geom.h err.h stepper.h
 -include "config.mk"
 
 CC     ?= cc
-CFLAGS  = -std=c99 -Wall -Wextra
+CFLAGS  = -std=c99 -Wall -Wextra -I.
 
 .if defined(RELEASE)
 CFLAGS += -O2 -DNDEBUG
@@ -40,7 +40,7 @@ invalid_backend:
 all: invalid_backend
 .endif
 
-CFLAGS_LINT  = -Wall -Wextra -Werror -fsyntax-only -Wpedantic
+CFLAGS_LINT  = -Wall -Wextra -Wpedantic -Werror -fsyntax-only
 CFLAGS_LINT += -Wshadow -Wvla
 CFLAGS_LINT += -Wwrite-strings -Wold-style-definition
 CFLAGS_LINT += -Wno-unused-function
@@ -54,8 +54,11 @@ $(LIB): $(OBJ)
 
 ${OBJ}: $(HDR)
 
-lint: $(SRC) $(HDR)
-	$(CC) $(CFLAGS) $(CFLAGS_LINT) $>
+lint:
+	$(CC) $(CFLAGS) $(CFLAGS_LINT) $(SRC) $(HDR)
+	$(CC) $(CFLAGS) $(CFLAGS_LINT) test/*.c
+	$(CC) $(CFLAGS) $(CFLAGS_LINT) -Itest/stest test/stest/*.c test/stest/*.h test/stest/examples/*.c
+	$(CC) $(CFLAGS) $(CFLAGS_LINT) examples/*.c
 
 test: $(LIB)
 	$(MAKE) -C test all
