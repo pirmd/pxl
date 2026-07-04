@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 
 #include "draw_extra.h"
 #include "geom.h"
@@ -11,6 +12,9 @@ pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	if (r <= 0) {
 		return;
 	}
+
+	/* Assert to prevent integer overflow in bbox calculation (extreme case) */
+	assert(r <= (INT_MAX / 2) - 1);
 
 	/* Bounding box and clip to scissor to get valid Y range */
 	pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
@@ -88,6 +92,9 @@ pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	if (r <= 0) {
 		return;
 	}
+
+	/* Assert to prevent integer overflow in bbox calculation (extreme case) */
+	assert(r <= (INT_MAX / 2) - 1);
 
 	pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
 	pxl_rect_t clipped;

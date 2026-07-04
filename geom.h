@@ -2,6 +2,7 @@
 #define PXL_GEOM_H
 
 #include <assert.h>
+#include <limits.h>
 #include <stdbool.h>
 
 typedef struct { int x, y, w, h; } pxl_rect_t;
@@ -19,6 +20,13 @@ pxl_clip_rect(pxl_rect_t in, pxl_rect_t bounds, pxl_rect_t *out) {
 
 	out->x = pxl_max(in.x, bounds.x);
 	out->y = pxl_max(in.y, bounds.y);
+
+	/* Assert to prevent integer overflow in edge calculations */
+	assert(in.x <= INT_MAX - in.w);
+	assert(bounds.x <= INT_MAX - bounds.w);
+	assert(in.y <= INT_MAX - in.h);
+	assert(bounds.y <= INT_MAX - bounds.h);
+
 	out->w = pxl_min(in.x + in.w, bounds.x + bounds.w) - out->x;
 	out->h = pxl_min(in.y + in.h, bounds.y + bounds.h) - out->y;
 
@@ -33,6 +41,11 @@ pxl_clip_span(pxl_span_t in, pxl_span_t bounds, pxl_span_t *out) {
 	assert(out);
 
 	out->x = pxl_max(in.x, bounds.x);
+
+	/* Assert to prevent integer overflow in edge calculations */
+	assert(in.x <= INT_MAX - in.w);
+	assert(bounds.x <= INT_MAX - bounds.w);
+
 	out->w = pxl_min(in.x + in.w, bounds.x + bounds.w) - out->x;
 	
 	return out->w > 0;
@@ -41,7 +54,9 @@ pxl_clip_span(pxl_span_t in, pxl_span_t bounds, pxl_span_t *out) {
 /* Returns true if point (x,y) is inside rect r (inclusive left/top, exclusive right/bottom) */
 static inline bool
 pxl_in_rect(int x, int y, pxl_rect_t r) {
-	return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+	/* Avoid overflow: use subtraction instead of addition */
+	return x >= r.x && r.w > 0 && (x - r.x) < r.w &&
+	       y >= r.y && r.h > 0 && (y - r.y) < r.h;
 }
 
 #endif /* PXL_GEOM_H */

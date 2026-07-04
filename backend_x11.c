@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
@@ -110,6 +111,11 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
 
 	/* ensure we are pixel-aligned */
     if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) goto fail;
+
+	/* Prevent integer overflow in shared memory size calculation */
+	if (h > 0 && g_x11.img->bytes_per_line > INT_MAX / h) {
+		goto fail;
+	}
 
     g_x11.shm.shmid = shmget(IPC_PRIVATE,
                              g_x11.img->bytes_per_line * h,
