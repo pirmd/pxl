@@ -299,17 +299,18 @@ main(void) {
     ts.dt = 1.0f / FPS;
     pxl_stepper_init(&ts, pxl_backend_get_time());
 
-    pxl_input_state_t in;
-    pxl_input_init_state(&in);
+    pxl_input_t in;
+    pxl_input_init(&in);
 
-    while (!pxl_input_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_pressed(&in, PXL_WM_QUIT)) {
+    while (!pxl_input_is_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_is_pressed(&in, PXL_WM_QUIT)) {
         pxl_stepper_sync_time(&ts, pxl_backend_get_time());
-        pxl_backend_poll_events(&in);
+        pxl_input_next_state(&in);
+        pxl_backend_poll_events(&in.cur);
 
-        if (pxl_input_pressed(&in, PXL_KEYB_UP)) {
+        if (pxl_input_was_pressed(&in, PXL_KEYB_K) || pxl_input_was_pressed(&in, PXL_KEYB_UP)) {
             gas_add_particles(&gas, 10);
         }
-        if (pxl_input_pressed(&in, PXL_KEYB_DOWN)) {
+        if (pxl_input_was_pressed(&in, PXL_KEYB_J) || pxl_input_was_pressed(&in, PXL_KEYB_DOWN)) {
             gas_remove_particles(&gas, 10);
         }
 

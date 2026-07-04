@@ -12,6 +12,11 @@
  *     (i.e., out_pb->stride * sizeof(pxl_t) must be a valid memory offset)
  *     This has to be enforced by checks in backend implementations.
  *   . Update Makefile to support compile-time correct dependancies
+ *   . Input: pxl_backend_poll_events() must fill in->pressed[] with key codes
+ *     from input.h (PXL_KEYB_A, PXL_KEYB_1, etc.). Key codes represent
+ *     physical key positions (US layout reference). Backends must handle
+ *     all keyboard layouts (QWERTY, AZERTY, etc.) by mapping native codes
+ *     to these constants.
  */
 
 // Initialize the backend

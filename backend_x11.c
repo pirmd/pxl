@@ -246,9 +246,7 @@ x11_keysym_to_pxl_input_code(KeySym sym) {
         case XK_Super_R: return PXL_KEYB_RSUPER;
 
         case XK_space: return PXL_KEYB_SPACE;
-        case XK_apostrophe: return PXL_KEYB_APOSTROPHE;
         case XK_comma: return PXL_KEYB_COMMA;
-        case XK_minus: return PXL_KEYB_MINUS;
         case XK_period: return PXL_KEYB_PERIOD;
         case XK_slash: return PXL_KEYB_SLASH;
         case XK_semicolon: return PXL_KEYB_SEMICOLON;
@@ -258,20 +256,44 @@ x11_keysym_to_pxl_input_code(KeySym sym) {
         case XK_bracketright: return PXL_KEYB_RIGHT_BRACKET;
         case XK_grave: return PXL_KEYB_GRAVE_ACCENT;
 
-        case XK_0: return PXL_KEYB_0; case XK_1: return PXL_KEYB_1; case XK_2: return PXL_KEYB_2;
-        case XK_3: return PXL_KEYB_3; case XK_4: return PXL_KEYB_4; case XK_5: return PXL_KEYB_5;
-        case XK_6: return PXL_KEYB_6; case XK_7: return PXL_KEYB_7; case XK_8: return PXL_KEYB_8;
-        case XK_9: return PXL_KEYB_9;
+        /* Numbers: 0-9 with AZERTY/US/Shift/AltGr variants */
+        case XK_0: case XK_parenright: case XK_agrave: return PXL_KEYB_0;
+        case XK_1: case XK_exclam: case XK_ampersand: return PXL_KEYB_1;
+        case XK_2: case XK_at: case XK_eacute: return PXL_KEYB_2;
+        case XK_3: case XK_numbersign: case XK_quotedbl: return PXL_KEYB_3;
+        case XK_4: case XK_dollar: case XK_apostrophe: return PXL_KEYB_4;
+        case XK_5: case XK_percent: case XK_parenleft: return PXL_KEYB_5;
+        case XK_6: case XK_asciicircum: case XK_minus: return PXL_KEYB_6;
+        case XK_7: case XK_egrave: return PXL_KEYB_7;
+        case XK_8: case XK_asterisk: case XK_underscore: return PXL_KEYB_8;
+        case XK_9: case XK_ccedilla: return PXL_KEYB_9;
 
-        case XK_a: return PXL_KEYB_A; case XK_b: return PXL_KEYB_B; case XK_c: return PXL_KEYB_C;
-        case XK_d: return PXL_KEYB_D; case XK_e: return PXL_KEYB_E; case XK_f: return PXL_KEYB_F;
-        case XK_g: return PXL_KEYB_G; case XK_h: return PXL_KEYB_H; case XK_i: return PXL_KEYB_I;
-        case XK_j: return PXL_KEYB_J; case XK_k: return PXL_KEYB_K; case XK_l: return PXL_KEYB_L;
-        case XK_m: return PXL_KEYB_M; case XK_n: return PXL_KEYB_N; case XK_o: return PXL_KEYB_O;
-        case XK_p: return PXL_KEYB_P; case XK_q: return PXL_KEYB_Q; case XK_r: return PXL_KEYB_R;
-        case XK_s: return PXL_KEYB_S; case XK_t: return PXL_KEYB_T; case XK_u: return PXL_KEYB_U;
-        case XK_v: return PXL_KEYB_V; case XK_w: return PXL_KEYB_W; case XK_x: return PXL_KEYB_X;
-        case XK_y: return PXL_KEYB_Y; case XK_z: return PXL_KEYB_Z;
+        case XK_a: case XK_A: return PXL_KEYB_A;
+        case XK_b: case XK_B: return PXL_KEYB_B;
+        case XK_c: case XK_C: return PXL_KEYB_C;
+        case XK_d: case XK_D: return PXL_KEYB_D;
+        case XK_e: case XK_E: return PXL_KEYB_E;
+        case XK_f: case XK_F: return PXL_KEYB_F;
+        case XK_g: case XK_G: return PXL_KEYB_G;
+        case XK_h: case XK_H: return PXL_KEYB_H;
+        case XK_i: case XK_I: return PXL_KEYB_I;
+        case XK_j: case XK_J: return PXL_KEYB_J;
+        case XK_k: case XK_K: return PXL_KEYB_K;
+        case XK_l: case XK_L: return PXL_KEYB_L;
+        case XK_m: case XK_M: return PXL_KEYB_M;
+        case XK_n: case XK_N: return PXL_KEYB_N;
+        case XK_o: case XK_O: return PXL_KEYB_O;
+        case XK_p: case XK_P: return PXL_KEYB_P;
+        case XK_q: case XK_Q: return PXL_KEYB_Q;
+        case XK_r: case XK_R: return PXL_KEYB_R;
+        case XK_s: case XK_S: return PXL_KEYB_S;
+        case XK_t: case XK_T: return PXL_KEYB_T;
+        case XK_u: case XK_U: return PXL_KEYB_U;
+        case XK_v: case XK_V: return PXL_KEYB_V;
+        case XK_w: case XK_W: return PXL_KEYB_W;
+        case XK_x: case XK_X: return PXL_KEYB_X;
+        case XK_y: case XK_Y: return PXL_KEYB_Y;
+        case XK_z: case XK_Z: return PXL_KEYB_Z;
 
         case XK_F1: return PXL_KEYB_F1; case XK_F2: return PXL_KEYB_F2; case XK_F3: return PXL_KEYB_F3;
         case XK_F4: return PXL_KEYB_F4; case XK_F5: return PXL_KEYB_F5; case XK_F6: return PXL_KEYB_F6;

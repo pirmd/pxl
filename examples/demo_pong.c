@@ -36,15 +36,15 @@ typedef struct {
 } pong_t;
 
 static void
-handle_input(pong_t *p, pxl_input_state_t *in) {
+handle_input(pong_t *p, pxl_input_t *in) {
     p->paddle_left.vy = 0;
     p->paddle_right.vy = 0;  // Will be set by AI
 
-    // Left paddle: vim keys (k=up, j=down)
-    if (pxl_input_pressed(in, PXL_KEYB_K)) {
+    // Left paddle: vim keys (k=up, j=down) or arrows (up/down)
+    if (pxl_input_is_pressed(in, PXL_KEYB_K) || pxl_input_is_pressed(in, PXL_KEYB_UP)) {
         p->paddle_left.vy = -p->paddle_left.speed;
     }
-    if (pxl_input_pressed(in, PXL_KEYB_J)) {
+    if (pxl_input_is_pressed(in, PXL_KEYB_J) || pxl_input_is_pressed(in, PXL_KEYB_DOWN)) {
         p->paddle_left.vy = p->paddle_left.speed;
     }
 }
@@ -273,12 +273,13 @@ main(void) {
     ts.dt = 1.0f / FPS;
     pxl_stepper_init(&ts, pxl_backend_get_time());
 
-    pxl_input_state_t in;
-    pxl_input_init_state(&in);
+    pxl_input_t in;
+    pxl_input_init(&in);
 
-    while (!pxl_input_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_pressed(&in, PXL_WM_QUIT)) {
+    while (!pxl_input_is_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_is_pressed(&in, PXL_WM_QUIT)) {
         pxl_stepper_sync_time(&ts, pxl_backend_get_time());
-        pxl_backend_poll_events(&in);
+        pxl_input_next_state(&in);
+        pxl_backend_poll_events(&in.cur);
         handle_input(&pong, &in);
 
         while (pxl_stepper_advance(&ts)) {

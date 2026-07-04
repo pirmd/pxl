@@ -172,24 +172,25 @@ main(void) {
     init_square(&state.squares[1], state.start_x, H / 2.0f + state.y_offsets[1], GREEN, LOOP_FIXED_ACCUM);
     init_square(&state.squares[2], state.start_x, H / 2.0f + state.y_offsets[2], BLUE,  LOOP_FIXED_LERP);
 
-    pxl_input_state_t in;
-    pxl_input_init_state(&in);
+    pxl_input_t in;
+    pxl_input_init(&in);
 
-    while (!pxl_input_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_pressed(&in, PXL_WM_QUIT)) {
-        pxl_backend_poll_events(&in);
+    while (!pxl_input_is_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_is_pressed(&in, PXL_WM_QUIT)) {
+        pxl_input_next_state(&in);
+        pxl_backend_poll_events(&in.cur);
         
         // Reset on R key
-        if (pxl_input_pressed(&in, PXL_KEYB_R)) {
+        if (pxl_input_was_pressed(&in, PXL_KEYB_R)) {
             init_square(&state.squares[0], state.start_x, H / 2.0f + state.y_offsets[0], RED,   LOOP_VARIABLE);
             init_square(&state.squares[1], state.start_x, H / 2.0f + state.y_offsets[1], GREEN, LOOP_FIXED_ACCUM);
             init_square(&state.squares[2], state.start_x, H / 2.0f + state.y_offsets[2], BLUE,  LOOP_FIXED_LERP);
         }
         
         // FPS simulation controls
-        if (pxl_input_pressed(&in, PXL_KEYB_1)) state.slowdown_factor = 1.0f;  // Normal (60 FPS)
-        if (pxl_input_pressed(&in, PXL_KEYB_2)) state.slowdown_factor = 2.0f;  // Simulate 30 FPS
-        if (pxl_input_pressed(&in, PXL_KEYB_3)) state.slowdown_factor = 3.0f;  // Simulate 20 FPS
-        if (pxl_input_pressed(&in, PXL_KEYB_4)) state.slowdown_factor = 4.0f;  // Simulate 15 FPS
+        if (pxl_input_was_pressed(&in, PXL_KEYB_1)) state.slowdown_factor = 1.0f;  // Normal (60 FPS)
+        if (pxl_input_was_pressed(&in, PXL_KEYB_2)) state.slowdown_factor = 2.0f;  // Simulate 30 FPS
+        if (pxl_input_was_pressed(&in, PXL_KEYB_3)) state.slowdown_factor = 3.0f;  // Simulate 20 FPS
+        if (pxl_input_was_pressed(&in, PXL_KEYB_4)) state.slowdown_factor = 4.0f;  // Simulate 15 FPS
         
         // Update each square with its own loop type
         for (int i = 0; i < 3; i++) {
