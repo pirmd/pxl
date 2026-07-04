@@ -49,14 +49,14 @@ bool
 st_check(const st_ctx_t *ctx, int expr, const char *fmt, ...) {
 	if (expr) return true;
 
-	if (ctx && ctx->file) printf("%s:%ld: ", ctx->file, ctx->line);
-	if (ctx && ctx->tag)  printf("%s: ", ctx->tag);
+	if (ctx && ctx->file) fprintf(stderr, "%s:%ld: ", ctx->file, ctx->line);
+	if (ctx && ctx->tag)  fprintf(stderr, "%s: ", ctx->tag);
 	if (fmt) {
 		va_list ap; va_start(ap, fmt);
-		vprintf(fmt, ap); va_end(ap);
+		vfprintf(stderr, fmt, ap); va_end(ap);
 	}
-	putchar('\n');
-	fflush(stdout);
+	fputc('\n', stderr);
+	fflush(stderr);
 	g_runner.status = EXIT_FAILURE;
 	return false;
 }
