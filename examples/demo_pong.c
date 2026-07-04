@@ -1,7 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <math.h>
 
 #include "pxl.h"
@@ -54,8 +53,8 @@ static void
 reset_ball(pong_t *p) {
     p->ball.x = W / 2.0f;
     p->ball.y = H / 2.0f;
-    p->ball.vx = (rand() % 2 == 0 ? 1.0f : -1.0f) * p->ball.speed;
-    p->ball.vy = ((float)(rand() % 100) / 100.0f - 0.5f) * p->ball.speed * 1.5f;
+    p->ball.vx = (arc4random() % 2 == 0 ? 1.0f : -1.0f) * p->ball.speed;
+    p->ball.vy = ((float)(arc4random() % 100) / 100.0f - 0.5f) * p->ball.speed * 1.5f;
 }
 
 static void
@@ -236,8 +235,6 @@ log_fps(double now) {
 
 static void
 init_pong(pong_t *p) {
-    srand((unsigned int)time(NULL));
-    
     // Paddles
     p->paddle_left.x = 20;
     p->paddle_left.y = H/2 - 50;

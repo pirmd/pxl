@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <math.h>
 
 #include "pxl.h"
@@ -38,13 +37,13 @@ typedef struct {
 // Initialize a particle with random position and velocity
 static void
 particle_init(particle_t *p, float width, float height) {
-    p->x = (float)(rand() % (int)(width - 2 * PARTICLE_RADIUS)) + PARTICLE_RADIUS;
-    p->y = (float)(rand() % (int)(height - 2 * PARTICLE_RADIUS)) + PARTICLE_RADIUS;
+    p->x = (float)(arc4random() % (int)(width - 2 * PARTICLE_RADIUS)) + PARTICLE_RADIUS;
+    p->y = (float)(arc4random() % (int)(height - 2 * PARTICLE_RADIUS)) + PARTICLE_RADIUS;
     
-    p->vx = (float)(rand() % 300 - 150);
-    p->vy = (float)(rand() % 300 - 150);
+    p->vx = (float)((int)(arc4random() % 300) - 150);
+    p->vy = (float)((int)(arc4random() % 300) - 150);
     
-    p->color = 0xFF000000 | (rand() % 0xFFFFFF);
+    p->color = 0xFF000000 | (arc4random() % 0xFFFFFF);
 }
 
 // Get cell index for a particle
@@ -87,7 +86,6 @@ gas_init(gas_t *gas, size_t initial_count) {
     gas->cell_head = malloc(cell_count * sizeof(int));
     gas->cell_next = malloc(MAX_PARTICLES * sizeof(int));
     
-    srand((unsigned int)time(NULL));
     for (size_t i = 0; i < gas->count; i++) {
         particle_init(&gas->particles[i], gas->width, gas->height);
     }
@@ -139,8 +137,8 @@ gas_handle_collision(particle_t *p1, particle_t *p2) {
     
     float dist = sqrtf(dist2);
     if (dist == 0) {
-        dx = (float)(rand() % 20 - 10);
-        dy = (float)(rand() % 20 - 10);
+        dx = (float)((int)(arc4random() % 20) - 10);
+        dy = (float)((int)(arc4random() % 20) - 10);
         dist = sqrtf(dx * dx + dy * dy);
         if (dist == 0) dist = 1.0f;
     }
