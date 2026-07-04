@@ -64,8 +64,6 @@ select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
 
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
-    (void)fullscreen;        /* TODO */
-
     pxl_backend_deinit();
 
     g_x11.display = XOpenDisplay(NULL);
@@ -132,6 +130,26 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
     g_x11.height = h;
 
     XMapWindow(g_x11.display, g_x11.window);
+
+    /* Fullscreen via EWMH */
+    if (fullscreen) {
+        Atom wm_state = XInternAtom(g_x11.display, "_NET_WM_STATE", False);
+        Atom fullscreen_atom = XInternAtom(g_x11.display, "_NET_WM_STATE_FULLSCREEN", False);
+
+        XEvent e = {.xclient = {
+            .type = ClientMessage,
+            .serial = 0,
+            .send_event = True,
+            .display = g_x11.display,
+            .window = g_x11.window,
+            .message_type = wm_state,
+            .format = 32,
+            .data.l = {1, fullscreen_atom, 0, 0, 0}
+        }};
+        XSendEvent(g_x11.display, RootWindow(g_x11.display, DefaultScreen(g_x11.display)),
+                  False, SubstructureRedirectMask | SubstructureNotifyMask, &e);
+    }
+
     XFlush(g_x11.display);
 
     return PXL_SUCCESS;
