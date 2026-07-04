@@ -29,7 +29,7 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
 	);
 	if (!g_sdl.window) goto fail;
 
-	// No VSYNC for minimal latency, TODO: consider adding an option if really needed.
+	// No VSYNC for minimal latency
 	g_sdl.renderer = SDL_CreateRenderer(
 		g_sdl.window, -1,
 		SDL_RENDERER_ACCELERATED

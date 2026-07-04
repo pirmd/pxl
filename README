@@ -51,7 +51,7 @@ Architecture:
   Backend:
     backend.h     - Backend interface. Only one window is supported at the moment.
     input.h       - Input state handling (keyboard, mouse, window events)
-    backend_sdl.c - SDL2 backend (uses SDL_PIXELFORMAT_ARGB8888)
+    backend_sdl.c - SDL2 backend (uses SDL_PIXELFORMAT_ARGB8888, do not activate VSYNC)
     backend_x11.c - X11 backend (uses ARGB visual)
 
   Loop:
