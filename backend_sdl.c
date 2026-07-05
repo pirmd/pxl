@@ -105,7 +105,7 @@ pxl_backend_get_time(void) {
 }
 
 static pxl_input_code_t
-sdl_keysym_to_pxl_input_code(SDL_Keycode sym) {
+sdl_keysym_to_pxl_input_code(const SDL_Keycode sym) {
     switch (sym) {
         case SDLK_ESCAPE: return PXL_KEYB_ESCAPE;
         case SDLK_RETURN: return PXL_KEYB_ENTER;
@@ -231,7 +231,7 @@ sdl_keysym_to_pxl_input_code(SDL_Keycode sym) {
 }
 
 static pxl_input_code_t
-sdl_button_to_pxl_input_code(Uint8 button) {
+sdl_button_to_pxl_input_code(const Uint8 button) {
     switch (button) {
         case SDL_BUTTON_LEFT:   return PXL_MOUSE_LEFT;
         case SDL_BUTTON_RIGHT:  return PXL_MOUSE_RIGHT;

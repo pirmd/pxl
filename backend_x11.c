@@ -230,7 +230,7 @@ pxl_backend_get_time(void) {
 }
 
 static pxl_input_code_t
-x11_keysym_to_pxl_input_code(KeySym sym) {
+x11_keysym_to_pxl_input_code(const KeySym sym) {
     switch (sym) {
         case XK_Escape: return PXL_KEYB_ESCAPE;
         case XK_Return: return PXL_KEYB_ENTER;
@@ -333,7 +333,7 @@ x11_keysym_to_pxl_input_code(KeySym sym) {
 }
 
 static pxl_input_code_t
-x11_button_to_pxl_input_code(unsigned int button) {
+x11_button_to_pxl_input_code(const unsigned int button) {
     switch (button) {
         case Button1: return PXL_MOUSE_LEFT;
         case Button2: return PXL_MOUSE_MIDDLE;

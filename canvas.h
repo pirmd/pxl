@@ -17,7 +17,7 @@ typedef struct {
 /* Visibility */
 static inline bool
 pxl_canvas_quick_reject(const pxl_canvas_t *cnv, int x, int y, int w, int h) {
-	pxl_rect_t sc = cnv->scissor;
+	const pxl_rect_t sc = cnv->scissor;
 	return x >= sc.x + sc.w || x + w <= sc.x ||
 	       y >= sc.y + sc.h || y + h <= sc.y;
 }

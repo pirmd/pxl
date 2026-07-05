@@ -9,10 +9,10 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 	assert(x0 >= 0 && y0 >= 0 && x1 >= 0 && y1 >= 0);
 
 	/* Bounding box */
-	int min_x = pxl_min(x0, x1);
-	int min_y = pxl_min(y0, y1);
-	int max_x = pxl_max(x0, x1);
-	int max_y = pxl_max(y0, y1);
+	const int min_x = pxl_min(x0, x1);
+	const int min_y = pxl_min(y0, y1);
+	const int max_x = pxl_max(x0, x1);
+	const int max_y = pxl_max(y0, y1);
 
 	/* Quick reject */
 	if (pxl_canvas_quick_reject(cnv, min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)) {
@@ -20,8 +20,8 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 	}
 
 	/* Clip line endpoints to scissor Y bounds */
-	int sc_y1 = cnv->scissor.y;
-	int sc_y2 = cnv->scissor.y + cnv->scissor.h - 1;
+	const int sc_y1 = cnv->scissor.y;
+	const int sc_y2 = cnv->scissor.y + cnv->scissor.h - 1;
 
 	/* Only clip Y if line is not horizontal (y0 != y1) */
 	if (y0 != y1) {
@@ -52,8 +52,8 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 		}
 	}
 
-	int dx = abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
-	int dy = abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
+	const int dx = abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
+	const int dy = abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
 
 	if (dx >= dy) {  /* X-major line */
 		int err = dx / 2;
@@ -95,8 +95,8 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 		return;
 	}
 
-	pxl_t  color = cnv->color;
-	int   stride = cnv->pb->stride;
+	const pxl_t color = cnv->color;
+	const int stride = cnv->pb->stride;
 
 	// Draw top border (if visible)
 	if (r.y == y) {
@@ -109,7 +109,7 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	if (r.h == 1) return;
 
 	// Draw bottom border (if visible)
-	int bottom_y = r.y + r.h;
+	const int bottom_y = r.y + r.h;
 	if (bottom_y == y + h) {
 		pxl_t *row = pxl_buf_ptr(cnv->pb, r.x, bottom_y - 1);
 		for (int dx = 0; dx < r.w; dx++) {
@@ -129,7 +129,7 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	if (r.w == 1) return;
 
 	// Draw right border (if visible)
-	int right_x = r.x + r.w;
+	const int right_x = r.x + r.w;
 	if (right_x == x + w) {
 		pxl_t *row = pxl_buf_ptr(cnv->pb, right_x - 1, r.y);
 		for (int dy = 0; dy < r.h; ++dy) {
@@ -149,9 +149,9 @@ pxl_fill_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 		return;
 	}
 
-	pxl_t color = cnv->color;
+	const pxl_t color = cnv->color;
 	pxl_t *row = pxl_buf_ptr(cnv->pb, r.x, r.y);
-	int stride = cnv->pb->stride;
+	const int stride = cnv->pb->stride;
 
 	for (int dy = 0; dy < r.h; dy++) {
 		for (int dx = 0; dx < r.w; dx++) {

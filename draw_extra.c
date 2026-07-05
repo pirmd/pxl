@@ -16,13 +16,13 @@ pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	assert(r <= (INT_MAX / 2) - 1);
 
 	/* Bounding box and clip to scissor to get valid Y range */
-	pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
+	const pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
 	pxl_rect_t clipped;
 	if (!pxl_clip_rect(bbox, cnv->scissor, &clipped)) {
 		return;
 	}
-	int y_start = clipped.y;
-	int y_end = clipped.y + clipped.h - 1;
+	const int y_start = clipped.y;
+	const int y_end = clipped.y + clipped.h - 1;
 
 	/* Bresenham's circle algorithm drawing 8 symmetric points */
 	int cx = r;
@@ -94,14 +94,14 @@ pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	/* Assert to prevent integer overflow in bbox calculation (extreme case) */
 	assert(r <= (INT_MAX / 2) - 1);
 
-	pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
+	const pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
 	pxl_rect_t clipped;
 	if (!pxl_clip_rect(bbox, cnv->scissor, &clipped)) {
 		return;
 	}
 
-	int y_top = clipped.y;
-	int y_bot = clipped.y + clipped.h - 1;
+	const int y_top = clipped.y;
+	const int y_bot = clipped.y + clipped.h - 1;
 
 	int cx = r;
 	int cy = 0;
@@ -158,13 +158,13 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
 	assert(cnv);
 
 	/* Bounding box */
-	int min_x = pxl_min(pxl_min(x0, x1), x2);
-	int min_y = pxl_min(pxl_min(y0, y1), y2);
-	int max_x = pxl_max(pxl_max(x0, x1), x2);
-	int max_y = pxl_max(pxl_max(y0, y1), y2);
+	const int min_x = pxl_min(pxl_min(x0, x1), x2);
+	const int min_y = pxl_min(pxl_min(y0, y1), y2);
+	const int max_x = pxl_max(pxl_max(x0, x1), x2);
+	const int max_y = pxl_max(pxl_max(y0, y1), y2);
 
 	/* Clip bbox to scissor to get valid Y range */
-	pxl_rect_t bbox = {min_x, min_y, max_x - min_x + 1, max_y - min_y + 1};
+	const pxl_rect_t bbox = {min_x, min_y, max_x - min_x + 1, max_y - min_y + 1};
 	pxl_rect_t clipped;
 	if (!pxl_clip_rect(bbox, cnv->scissor, &clipped)) {
 		return;
