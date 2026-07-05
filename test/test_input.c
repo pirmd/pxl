@@ -1,6 +1,8 @@
 #include "input.h"
 #include "stest/stest.h"
 
+/* State tests --------------------------------------------------------------- */
+
 static void
 test_input_init(void) {
 	pxl_input_t input;
@@ -30,6 +32,8 @@ test_input_press_release(void) {
 	ST_CHECK(!pxl_input_pressed(&input.cur, PXL_KEYB_A), "PXL_KEYB_A should be released");
 }
 
+/* State transition tests -------------------------------------------------- */
+
 static void
 test_input_next_state(void) {
 	pxl_input_t input;
@@ -41,7 +45,7 @@ test_input_next_state(void) {
 	ST_CHECK(pxl_input_pressed(&input.prev, PXL_KEYB_A), "PXL_KEYB_A should be in prev state");
 }
 
-/* Main */
+/* Main ----------------------------------------------------------------------- */
 int
 main(int argc, char *argv[]) {
 	ST_GETOPTS(argc, argv);

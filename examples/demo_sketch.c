@@ -56,7 +56,7 @@ main(void) {
         pxl_input_next_state(&in);
         pxl_backend_poll_events(&in.cur);
 
-        // Clear on Escape
+        /* Clear on Escape */
         if (pxl_input_was_pressed(&in, PXL_KEYB_ESCAPE)) {
             trail_len = 0;
         }
@@ -68,13 +68,13 @@ main(void) {
         if (pxl_input_was_pressed(&in, PXL_KEYB_UP)    || pxl_input_was_pressed(&in, PXL_KEYB_K)) pen.y -= step;
         if (pxl_input_was_pressed(&in, PXL_KEYB_DOWN)  || pxl_input_was_pressed(&in, PXL_KEYB_J)) pen.y += step;
 
-        // Clamp to screen
+        /* Clamp to screen */
         if (pen.x < 0) pen.x = 0;
         if (pen.x + PEN_SIZE > W) pen.x = W - PEN_SIZE;
         if (pen.y < 0) pen.y = 0;
         if (pen.y + PEN_SIZE > H) pen.y = H - PEN_SIZE;
 
-        // Draw line between previous and current pen position
+        /* Draw line between previous and current pen position */
         float dx = pen.x - pen_prev.x;
         float dy = pen.y - pen_prev.y;
 
@@ -101,13 +101,13 @@ main(void) {
             pxl_canvas_set_color(&cnv, BLUE);
             pxl_canvas_clear(&cnv);
 
-            // Draw trail
+            /* Draw trail */
             pxl_canvas_set_color(&cnv, WHITE);
             for (int i = 0; i < trail_len; i++) {
                 pxl_fill_rect(&cnv, (int)trail[i].x, (int)trail[i].y, PEN_SIZE, PEN_SIZE);
             }
 
-            // Current pen position
+            /* Current pen position */
             pxl_canvas_set_color(&cnv, RED);
             pxl_fill_rect(&cnv, (int)pen.x, (int)pen.y, PEN_SIZE, PEN_SIZE);
 

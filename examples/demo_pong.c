@@ -12,9 +12,9 @@
 #define BLUE  0xFF000080
 #define RED   0xFF0000FF
 
-// Pong game state
+/* Pong game state */
 typedef struct {
-    // Paddles
+    /* Paddles */
     struct {
         float x, y;
         int w, h;
@@ -22,7 +22,7 @@ typedef struct {
         float vy;
     } paddle_left, paddle_right;
 
-    // Ball
+    /* Ball */
     struct {
         float x, y;
         int radius;
@@ -30,7 +30,7 @@ typedef struct {
         float speed;
     } ball;
 
-    // Scores
+    /* Scores */
     int score_left;
     int score_right;
 } pong_t;
@@ -38,9 +38,9 @@ typedef struct {
 static void
 handle_input(pong_t *p, pxl_input_t *in) {
     p->paddle_left.vy = 0;
-    p->paddle_right.vy = 0;  // Will be set by AI
+    p->paddle_right.vy = 0;  /* Will be set by AI */
 
-    // Left paddle: vim keys (k=up, j=down) or arrows (up/down)
+    /* Left paddle: vim keys (k=up, j=down) or arrows (up/down) */
     if (pxl_input_is_pressed(in, PXL_KEYB_K) || pxl_input_is_pressed(in, PXL_KEYB_UP)) {
         p->paddle_left.vy = -p->paddle_left.speed;
     }
@@ -80,24 +80,24 @@ pong_interpolate(pong_t *out, const pong_t *prev, const pong_t *cur, float alpha
 
 static void
 ai_decide(pong_t *p) {
-    // Simple AI: predict ball position on right side
+    /* Simple AI: predict ball position on right side */
     float target_y;
     
-    // Ball going right: direct prediction
+    /* Ball going right: direct prediction */
     if (p->ball.vx > 0) {
         float time_to_right = (p->paddle_right.x - p->ball.x) / p->ball.vx;
         target_y = p->ball.y + p->ball.vy * time_to_right;
     }
-    // Ball going left: move to center (simplest reliable strategy)
+    /* Ball going left: move to center (simplest reliable strategy) */
     else {
         target_y = H / 2.0f;
     }
     
-    // Clamp to playable area
+    /* Clamp to playable area */
     target_y = fmaxf(p->paddle_right.h / 2.0f, 
                    fminf(H - p->paddle_right.h / 2.0f, target_y));
     
-    // Calculate required movement
+    /* Calculate required movement */
     float error = target_y - (p->paddle_right.y + p->paddle_right.h / 2.0f);
     
     if (fabsf(error) > 2.0f) {
@@ -109,24 +109,24 @@ ai_decide(pong_t *p) {
 
 static void
 update(pong_t *p, float dt) {
-    // AI decision (separate from physics update)
+    /* AI decision (separate from physics update) */
     ai_decide(p);
 
-    // Update paddles
+    /* Update paddles */
     p->paddle_left.y += p->paddle_left.vy * dt;
     p->paddle_right.y += p->paddle_right.vy * dt;
 
-    // Clamp paddles to screen
+    /* Clamp paddles to screen */
     if (p->paddle_left.y < 0) p->paddle_left.y = 0;
     if (p->paddle_left.y + p->paddle_left.h > H) p->paddle_left.y = H - p->paddle_left.h;
     if (p->paddle_right.y < 0) p->paddle_right.y = 0;
     if (p->paddle_right.y + p->paddle_right.h > H) p->paddle_right.y = H - p->paddle_right.h;
 
-    // Update ball
+    /* Update ball */
     p->ball.x += p->ball.vx * dt;
     p->ball.y += p->ball.vy * dt;
 
-    // Ball collision with top and bottom
+    /* Ball collision with top and bottom */
     if (p->ball.y - p->ball.radius < 0) {
         p->ball.y = p->ball.radius;
         p->ball.vy = -p->ball.vy;
@@ -136,8 +136,8 @@ update(pong_t *p, float dt) {
         p->ball.vy = -p->ball.vy;
     }
 
-    // Ball collision with paddles
-    // Left paddle
+    /* Ball collision with paddles */
+    /* Left paddle */
     if (p->ball.x - p->ball.radius < p->paddle_left.x + p->paddle_left.w &&
         p->ball.y + p->ball.radius > p->paddle_left.y &&
         p->ball.y - p->ball.radius < p->paddle_left.y + p->paddle_left.h) {
@@ -148,7 +148,7 @@ update(pong_t *p, float dt) {
         p->ball.vy = hit_pos * p->ball.speed * 0.8f;
     }
 
-    // Right paddle
+    /* Right paddle */
     if (p->ball.x + p->ball.radius > p->paddle_right.x &&
         p->ball.y + p->ball.radius > p->paddle_right.y &&
         p->ball.y - p->ball.radius < p->paddle_right.y + p->paddle_right.h) {
@@ -159,7 +159,7 @@ update(pong_t *p, float dt) {
         p->ball.vy = hit_pos * p->ball.speed * 0.8f;
     }
 
-    // Ball out of bounds (score)
+    /* Ball out of bounds (score) */
     if (p->ball.x - p->ball.radius < 0) {
         p->score_right++;
         reset_ball(p);
@@ -172,18 +172,18 @@ update(pong_t *p, float dt) {
 
 static void
 draw_score(pxl_canvas_t *cnv, const pong_t *p) {
-    // Draw dash separator
+    /* Draw dash separator */
     pxl_canvas_set_color(cnv, WHITE);
     pxl_fill_rect(cnv, W/2 - 10, 20, 20, 4);
     
-    // Simple score indicators using rectangles
-    // Left score: draw one rect per point
+    /* Simple score indicators using rectangles */
+    /* Left score: draw one rect per point */
     pxl_canvas_set_color(cnv, WHITE);
     for (int i = 0; i < p->score_left; i++) {
         pxl_fill_rect(cnv, W/2 - 40 - i * 15, 10, 8, 20);
     }
     
-    // Right score: draw one rect per point
+    /* Right score: draw one rect per point */
     for (int i = 0; i < p->score_right; i++) {
         pxl_fill_rect(cnv, W/2 + 25 + i * 15, 10, 8, 20);
     }
@@ -191,27 +191,27 @@ draw_score(pxl_canvas_t *cnv, const pong_t *p) {
 
 static void
 render(pxl_canvas_t *cnv, const pong_t *p) {
-    // Clear
+    /* Clear */
     pxl_canvas_set_color(cnv, BLUE);
     pxl_canvas_clear(cnv);
 
-    // Draw score
+    /* Draw score */
     draw_score(cnv, p);
 
-    // Draw center line
+    /* Draw center line */
     pxl_canvas_set_color(cnv, WHITE);
     for (int y = 0; y < H; y += 30) {
         pxl_fill_rect(cnv, W/2 - 2, y, 4, 20);
     }
 
-    // Draw paddles
+    /* Draw paddles */
     pxl_canvas_set_color(cnv, WHITE);
     pxl_fill_rect(cnv, (int)p->paddle_left.x, (int)p->paddle_left.y, 
                      p->paddle_left.w, p->paddle_left.h);
     pxl_fill_rect(cnv, (int)p->paddle_right.x, (int)p->paddle_right.y, 
                      p->paddle_right.w, p->paddle_right.h);
 
-    // Draw ball
+    /* Draw ball */
     pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, p->ball.radius);
 }
 
@@ -235,7 +235,7 @@ log_fps(double now) {
 
 static void
 init_pong(pong_t *p) {
-    // Paddles
+    /* Paddles */
     p->paddle_left.x = 20;
     p->paddle_left.y = H/2 - 50;
     p->paddle_left.w = 15;
@@ -248,12 +248,12 @@ init_pong(pong_t *p) {
     p->paddle_right.h = 100;
     p->paddle_right.speed = 400.0f;
 
-    // Ball
+    /* Ball */
     p->ball.radius = 8;
     p->ball.speed = 300.0f;
     reset_ball(p);
 
-    // Scores
+    /* Scores */
     p->score_left = 0;
     p->score_right = 0;
 }

@@ -11,7 +11,7 @@
 typedef enum {
     PXL_IN_UNKNOWN = 0,
 
-    // Common controls
+    /* Common controls */
     PXL_KEYB_ESCAPE,
     PXL_KEYB_ENTER,
     PXL_KEYB_TAB,
@@ -23,19 +23,19 @@ typedef enum {
     PXL_KEYB_PAGE_UP,
     PXL_KEYB_PAGE_DOWN,
 
-    // Arrows
+    /* Arrows */
     PXL_KEYB_UP,
     PXL_KEYB_DOWN,
     PXL_KEYB_LEFT,
     PXL_KEYB_RIGHT,
 
-    // Modifiers
+    /* Modifiers */
     PXL_KEYB_LSHIFT, PXL_KEYB_RSHIFT,
     PXL_KEYB_LCTRL,  PXL_KEYB_RCTRL,
     PXL_KEYB_LALT,   PXL_KEYB_RALT,
     PXL_KEYB_LSUPER, PXL_KEYB_RSUPER,
 
-    // Punctuation / symbols
+    /* Punctuation / symbols */
     PXL_KEYB_SPACE,
     PXL_KEYB_APOSTROPHE,
     PXL_KEYB_COMMA,
@@ -49,22 +49,22 @@ typedef enum {
     PXL_KEYB_RIGHT_BRACKET,
     PXL_KEYB_GRAVE_ACCENT,
 
-    // Number row
+    /* Number row */
     PXL_KEYB_0, PXL_KEYB_1, PXL_KEYB_2, PXL_KEYB_3, PXL_KEYB_4,
     PXL_KEYB_5, PXL_KEYB_6, PXL_KEYB_7, PXL_KEYB_8, PXL_KEYB_9,
 
-    // Letters
+    /* Letters */
     PXL_KEYB_A, PXL_KEYB_B, PXL_KEYB_C, PXL_KEYB_D, PXL_KEYB_E, PXL_KEYB_F, PXL_KEYB_G, PXL_KEYB_H, PXL_KEYB_I, PXL_KEYB_J,
     PXL_KEYB_K, PXL_KEYB_L, PXL_KEYB_M, PXL_KEYB_N, PXL_KEYB_O, PXL_KEYB_P, PXL_KEYB_Q, PXL_KEYB_R, PXL_KEYB_S, PXL_KEYB_T,
     PXL_KEYB_U, PXL_KEYB_V, PXL_KEYB_W, PXL_KEYB_X, PXL_KEYB_Y, PXL_KEYB_Z,
 
-    // Function keys
+    /* Function keys */
     PXL_KEYB_F1, PXL_KEYB_F2, PXL_KEYB_F3, PXL_KEYB_F4, PXL_KEYB_F5, PXL_KEYB_F6,
     PXL_KEYB_F7, PXL_KEYB_F8, PXL_KEYB_F9, PXL_KEYB_F10, PXL_KEYB_F11, PXL_KEYB_F12,
     PXL_KEYB_F13, PXL_KEYB_F14, PXL_KEYB_F15, PXL_KEYB_F16, PXL_KEYB_F17, PXL_KEYB_F18, PXL_KEYB_F19, PXL_KEYB_F20,
     PXL_KEYB_F21, PXL_KEYB_F22, PXL_KEYB_F23, PXL_KEYB_F24,
 
-    // Numpad
+    /* Numpad */
     PXL_KEYB_KP_0, PXL_KEYB_KP_1, PXL_KEYB_KP_2, PXL_KEYB_KP_3, PXL_KEYB_KP_4,
     PXL_KEYB_KP_5, PXL_KEYB_KP_6, PXL_KEYB_KP_7, PXL_KEYB_KP_8, PXL_KEYB_KP_9,
     PXL_KEYB_KP_DECIMAL,
@@ -75,12 +75,12 @@ typedef enum {
     PXL_KEYB_KP_ENTER,
     PXL_KEYB_KP_EQUAL,
 
-	// Mouse buttons
+	/* Mouse buttons */
     PXL_MOUSE_LEFT,
     PXL_MOUSE_RIGHT,
     PXL_MOUSE_MIDDLE,
 
-	// WM events
+	/* WM events */
 	PXL_WM_QUIT,
 
     PXL_IN_COUNT

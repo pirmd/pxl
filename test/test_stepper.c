@@ -1,6 +1,8 @@
 #include "stepper.h"
 #include "stest/stest.h"
 
+/* Initialization tests ------------------------------------------------------- */
+
 static void
 test_pxl_stepper_init(void) {
 	pxl_time_stepper_t ts = {.dt = 0.016};
@@ -11,6 +13,8 @@ test_pxl_stepper_init(void) {
 	ST_CHECK(ts.lerp_factor == 0.0, "lerp_factor not initialized to 0");
 }
 
+/* Sync time tests ------------------------------------------------------------ */
+
 static void
 test_pxl_stepper_sync_time_basic(void) {
 	pxl_time_stepper_t ts = {.dt = 0.016};
@@ -20,6 +24,8 @@ test_pxl_stepper_sync_time_basic(void) {
 	ST_CHECK(ts.current_time == 0.017, "current_time not updated");
 	ST_CHECK(ts.accumulator == 0.016, "accumulator not updated");
 }
+
+/* Advance tests -------------------------------------------------------------- */
 
 static void
 test_pxl_stepper_advance_trigger(void) {
@@ -50,7 +56,7 @@ test_stepper_lerp_factor(void) {
 	ST_CHECK(ts.lerp_factor == 0.5f, "lerp_factor should be 0.5 (8ms/16ms)");
 }
 
-/* Main */
+/* Main ----------------------------------------------------------------------- */
 int
 main(int argc, char *argv[]) {
 	ST_GETOPTS(argc, argv);

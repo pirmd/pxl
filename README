@@ -60,7 +60,7 @@ Architecture:
 
   Backend:
     input.h       - Input state handling (keyboard, mouse, window events)
-    backend.h     - Backend interface. Shall enforce ARGB8888 format.
+    backend.h     - Backend interface. All backends MUST use ARGB8888 pixel format.
                     Only one window is supported at the moment.
     backend_sdl.c - SDL2 backend (do not activate VSYNC)
     backend_x11.c - X11 backend

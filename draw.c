@@ -98,7 +98,7 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	const pxl_t color = cnv->color;
 	const int stride = cnv->pb->stride;
 
-	// Draw top border (if visible)
+	/* Draw top border (if visible) */
 	if (r.y == y) {
 		pxl_t *row = pxl_buf_ptr(cnv->pb, r.x, r.y);
 		for (int dx = 0; dx < r.w; dx++) {
@@ -108,7 +108,7 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 
 	if (r.h == 1) return;
 
-	// Draw bottom border (if visible)
+	/* Draw bottom border (if visible) */
 	const int bottom_y = r.y + r.h;
 	if (bottom_y == y + h) {
 		pxl_t *row = pxl_buf_ptr(cnv->pb, r.x, bottom_y - 1);
@@ -117,7 +117,7 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 		}
 	}
 
-	// Draw left border (if visible)
+	/* Draw left border (if visible) */
 	if (r.x == x) {
 		pxl_t *row = pxl_buf_ptr(cnv->pb, r.x, r.y);
 		for (int dy = 0; dy < r.h; ++dy) {
@@ -128,7 +128,7 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 
 	if (r.w == 1) return;
 
-	// Draw right border (if visible)
+	/* Draw right border (if visible) */
 	const int right_x = r.x + r.w;
 	if (right_x == x + w) {
 		pxl_t *row = pxl_buf_ptr(cnv->pb, right_x - 1, r.y);

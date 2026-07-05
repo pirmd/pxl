@@ -36,7 +36,7 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
 	);
 	if (!g_sdl.window) goto fail;
 
-	// No VSYNC for minimal latency
+	/* No VSYNC for minimal latency */
 	g_sdl.renderer = SDL_CreateRenderer(
 		g_sdl.window, -1,
 		SDL_RENDERER_ACCELERATED
@@ -45,7 +45,7 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
 
 	g_sdl.texture = SDL_CreateTexture(
 		g_sdl.renderer,
-		SDL_PIXELFORMAT_ARGB8888,  // ARGB8888 to match PXL color native format
+		SDL_PIXELFORMAT_ARGB8888,  /* ARGB8888 to match PXL color native format */
 		SDL_TEXTUREACCESS_STREAMING,
 		w, h
 	);

@@ -16,7 +16,7 @@
 #define GREEN 0xFF00FF00
 #define BLUE  0xFF0000FF
 
-// Loop types
+/* Loop types */
 typedef enum {
     LOOP_VARIABLE,
     LOOP_FIXED_ACCUM,
@@ -24,30 +24,30 @@ typedef enum {
     LOOP_COUNT
 } loop_type_t;
 
-// Square state with its own loop management
+/* Square state with its own loop management */
 typedef struct {
     float x, y;
     int w, h;
     uint32_t color;
     float speed;
     
-    // Loop-specific state
+    /* Loop-specific state */
     loop_type_t loop_type;
     
-    // For fixed timestep modes
+    /* For fixed timestep modes */
     pxl_time_stepper_t stepper;
     
-    // For variable timestep
+    /* For variable timestep */
     double prev_time;
     
-    // For interpolation
+    /* For interpolation */
     float prev_x;
     
-    // Target for movement
+    /* Target for movement */
     float target_x;
 } square_t;
 
-// Demo state
+/* Demo state */
 typedef struct {
     square_t squares[3];
     float slowdown_factor;
@@ -62,12 +62,12 @@ init_square(square_t *s, float x, float y, uint32_t color, loop_type_t loop_type
     s->w = 40;
     s->h = 40;
     s->color = color;
-    s->speed = 200.0f;  // pixels per second
+    s->speed = 200.0f;  /* pixels per second */
     s->target_x = x;
     s->prev_x = x;
     s->loop_type = loop_type;
     
-    // Initialize stepper for fixed timestep modes
+    /* Initialize stepper for fixed timestep modes */
     s->stepper.dt = 1.0f / FPS;
     pxl_stepper_init(&s->stepper, pxl_backend_get_time());
     s->prev_time = pxl_backend_get_time();
@@ -77,7 +77,7 @@ static void
 update_square(square_t *s, float dt) {
     s->prev_x = s->x;
     
-    // Oscillate between 0 and W - s->w
+    /* Oscillate between 0 and W - s->w */
     s->target_x += s->speed * dt;
     if (s->target_x > W - s->w) {
         s->target_x = W - s->w;
@@ -102,13 +102,13 @@ square_update(square_t *s, float slowdown_factor) {
         case LOOP_FIXED_ACCUM: {
             pxl_stepper_sync_time(&s->stepper, pxl_backend_get_time());
             while (pxl_stepper_advance(&s->stepper)) {
-                // For fixed timestep, apply slowdown by modifying effective dt
+                /* For fixed timestep, apply slowdown by modifying effective dt */
                 update_square(s, (float)s->stepper.dt * slowdown_factor);
             }
             break;
         }
         case LOOP_FIXED_LERP: {
-            // Save position before update for interpolation
+            /* Save position before update for interpolation */
             s->prev_x = s->x;
             pxl_stepper_sync_time(&s->stepper, pxl_backend_get_time());
             while (pxl_stepper_advance(&s->stepper)) {
@@ -125,7 +125,7 @@ static void
 render_square(pxl_canvas_t *cnv, const square_t *s, float lerp_factor) {
     float draw_x = s->x;
     
-    // Only interpolate for lerp mode
+    /* Only interpolate for lerp mode */
     if (s->loop_type == LOOP_FIXED_LERP) {
         draw_x = s->prev_x + (s->x - s->prev_x) * lerp_factor;
     }
@@ -167,7 +167,7 @@ main(void) {
     state.y_offsets[2] = 60;
     state.slowdown_factor = 1.0f;
     
-    // Initialize squares
+    /* Initialize squares */
     init_square(&state.squares[0], state.start_x, H / 2.0f + state.y_offsets[0], RED,   LOOP_VARIABLE);
     init_square(&state.squares[1], state.start_x, H / 2.0f + state.y_offsets[1], GREEN, LOOP_FIXED_ACCUM);
     init_square(&state.squares[2], state.start_x, H / 2.0f + state.y_offsets[2], BLUE,  LOOP_FIXED_LERP);
@@ -179,25 +179,25 @@ main(void) {
         pxl_input_next_state(&in);
         pxl_backend_poll_events(&in.cur);
         
-        // Reset on R key
+        /* Reset on R key */
         if (pxl_input_was_pressed(&in, PXL_KEYB_R)) {
             init_square(&state.squares[0], state.start_x, H / 2.0f + state.y_offsets[0], RED,   LOOP_VARIABLE);
             init_square(&state.squares[1], state.start_x, H / 2.0f + state.y_offsets[1], GREEN, LOOP_FIXED_ACCUM);
             init_square(&state.squares[2], state.start_x, H / 2.0f + state.y_offsets[2], BLUE,  LOOP_FIXED_LERP);
         }
         
-        // FPS simulation controls
-        if (pxl_input_was_pressed(&in, PXL_KEYB_1)) state.slowdown_factor = 1.0f;  // Normal (60 FPS)
-        if (pxl_input_was_pressed(&in, PXL_KEYB_2)) state.slowdown_factor = 2.0f;  // Simulate 30 FPS
-        if (pxl_input_was_pressed(&in, PXL_KEYB_3)) state.slowdown_factor = 3.0f;  // Simulate 20 FPS
-        if (pxl_input_was_pressed(&in, PXL_KEYB_4)) state.slowdown_factor = 4.0f;  // Simulate 15 FPS
+        /* FPS simulation controls */
+        if (pxl_input_was_pressed(&in, PXL_KEYB_1)) state.slowdown_factor = 1.0f;  /* Normal (60 FPS) */
+        if (pxl_input_was_pressed(&in, PXL_KEYB_2)) state.slowdown_factor = 2.0f;  /* Simulate 30 FPS */
+        if (pxl_input_was_pressed(&in, PXL_KEYB_3)) state.slowdown_factor = 3.0f;  /* Simulate 20 FPS */
+        if (pxl_input_was_pressed(&in, PXL_KEYB_4)) state.slowdown_factor = 4.0f;  /* Simulate 15 FPS */
         
-        // Update each square with its own loop type
+        /* Update each square with its own loop type */
         for (int i = 0; i < 3; i++) {
             square_update(&state.squares[i], state.slowdown_factor);
         }
         
-        // Get lerp factor from blue square (Fixed Lerp) for rendering
+        /* Get lerp factor from blue square (Fixed Lerp) for rendering */
         float lerp_factor = state.squares[2].stepper.lerp_factor;
 
         pxl_buf_t pb;
@@ -205,11 +205,11 @@ main(void) {
             pxl_canvas_t cnv;
             pxl_canvas_init(&cnv, &pb);
             
-            // Clear
+            /* Clear */
             pxl_canvas_set_color(&cnv, BLACK);
             pxl_canvas_clear(&cnv);
             
-            // Draw all squares
+            /* Draw all squares */
             for (int i = 0; i < 3; i++) {
                 render_square(&cnv, &state.squares[i], lerp_factor);
             }
@@ -219,7 +219,7 @@ main(void) {
         }
     }
 
-    printf("\n");  // Clean up FPS line
+    printf("\n");  /* Clean up FPS line */
     pxl_backend_deinit();
     return 0;
 }

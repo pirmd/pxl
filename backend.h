@@ -24,28 +24,27 @@
  *     to these constants.
  */
 
-// Initialize the backend
+/* Initialize the backend */
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, bool fullscreen);
 
-// Cleanup the backend
+/* Cleanup the backend */
 void
 pxl_backend_deinit(void);
 
-// Begin frame - fill out_pb with drawable memory
+/* Begin frame - fill out_pb with drawable memory */
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb);
 
-// End frame - present to screen
+/* End frame - present to screen */
 void
 pxl_backend_end_frame(void);
 
-// Get time returns monotonically increasing time in seconds since start of
-// backend
+/* Get time returns monotonically increasing time in seconds since start of backend */
 double
 pxl_backend_get_time(void);
 
-// Poll events - drains the event queue
+/* Poll events - drains the event queue */
 void
 pxl_backend_poll_events(pxl_input_state_t *in);
 

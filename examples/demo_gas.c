@@ -16,25 +16,25 @@
 #define PARTICLE_RADIUS 4
 #define CELL_SIZE (2 * PARTICLE_RADIUS + 1)
 
-// Particle definition
+/* Particle definition */
 typedef struct {
     float x, y;
     float vx, vy;
     uint32_t color;
 } particle_t;
 
-// Gas simulation state
+/* Gas simulation state */
 typedef struct {
     particle_t particles[MAX_PARTICLES];
     size_t count;
     float width, height;
-    // Spatial grid for optimized collision detection
+    /* Spatial grid for optimized collision detection */
     int grid_width, grid_height;
     int *cell_head;
     int *cell_next;
 } gas_t;
 
-// Initialize a particle with random position and velocity
+/* Initialize a particle with random position and velocity */
 static void
 particle_init(particle_t *p, float width, float height) {
     p->x = (float)(arc4random() % (int)(width - 2 * PARTICLE_RADIUS)) + PARTICLE_RADIUS;
@@ -46,7 +46,7 @@ particle_init(particle_t *p, float width, float height) {
     p->color = 0xFF000000 | (arc4random() % 0xFFFFFF);
 }
 
-// Get cell index for a particle
+/* Get cell index for a particle */
 static int
 gas_particle_to_cell(const gas_t *gas, const particle_t *p) {
     int cx = (int)(p->x / CELL_SIZE);
@@ -56,7 +56,7 @@ gas_particle_to_cell(const gas_t *gas, const particle_t *p) {
     return cy * gas->grid_width + cx;
 }
 
-// Build spatial grid for collision detection
+/* Build spatial grid for collision detection */
 static void
 gas_build_grid(gas_t *gas) {
     int cell_count = gas->grid_width * gas->grid_height;
@@ -72,7 +72,7 @@ gas_build_grid(gas_t *gas) {
     }
 }
 
-// Initialize gas simulation
+/* Initialize gas simulation */
 static void
 gas_init(gas_t *gas, size_t initial_count) {
     gas->count = initial_count;
@@ -93,7 +93,7 @@ gas_init(gas_t *gas, size_t initial_count) {
     gas_build_grid(gas);
 }
 
-// Free gas simulation
+/* Free gas simulation */
 static void
 gas_free(gas_t *gas) {
     free(gas->cell_head);
@@ -103,7 +103,7 @@ gas_free(gas_t *gas) {
     gas->count = 0;
 }
 
-// Add particles to the simulation
+/* Add particles to the simulation */
 static void
 gas_add_particles(gas_t *gas, size_t n) {
     size_t new_count = gas->count + n;
@@ -115,7 +115,7 @@ gas_add_particles(gas_t *gas, size_t n) {
     gas->count = new_count;
 }
 
-// Remove particles from the simulation
+/* Remove particles from the simulation */
 static void
 gas_remove_particles(gas_t *gas, size_t n) {
     if (gas->count <= n) {
@@ -125,7 +125,7 @@ gas_remove_particles(gas_t *gas, size_t n) {
     }
 }
 
-// Handle collision between two particles
+/* Handle collision between two particles */
 static void
 gas_handle_collision(particle_t *p1, particle_t *p2) {
     float dx = p2->x - p1->x;
@@ -164,17 +164,17 @@ gas_handle_collision(particle_t *p1, particle_t *p2) {
     p2->y += overlap * ny;
 }
 
-// Update particle positions with boundary and particle collisions
+/* Update particle positions with boundary and particle collisions */
 static void
 gas_update(gas_t *gas, float dt) {
-    // Move all particles
+    /* Move all particles */
     for (size_t i = 0; i < gas->count; i++) {
         particle_t *p = &gas->particles[i];
         p->x += p->vx * dt;
         p->y += p->vy * dt;
     }
     
-    // Boundary collisions
+    /* Boundary collisions */
     for (size_t i = 0; i < gas->count; i++) {
         particle_t *p = &gas->particles[i];
         
@@ -195,10 +195,10 @@ gas_update(gas_t *gas, float dt) {
         }
     }
     
-    // Rebuild spatial grid
+    /* Rebuild spatial grid */
     gas_build_grid(gas);
     
-    // Particle-to-particle collisions using spatial grid
+    /* Particle-to-particle collisions using spatial grid */
     for (size_t i = 0; i < gas->count; i++) {
         int cell_idx = gas_particle_to_cell(gas, &gas->particles[i]);
         int cx = cell_idx % gas->grid_width;
@@ -226,7 +226,7 @@ gas_update(gas_t *gas, float dt) {
     }
 }
 
-// Interpolate between previous and current gas state
+/* Interpolate between previous and current gas state */
 static void
 gas_interpolate(gas_t *out, const gas_t *prev, const gas_t *cur, float alpha) {
     out->count = cur->count;
@@ -242,13 +242,13 @@ gas_interpolate(gas_t *out, const gas_t *prev, const gas_t *cur, float alpha) {
     }
 }
 
-// Render gas simulation
+/* Render gas simulation */
 static void
 gas_render(pxl_canvas_t *cnv, const gas_t *gas) {
     pxl_canvas_set_color(cnv, BLACK);
     pxl_canvas_clear(cnv);
     
-    // Particle count indicator (1 white square = 100 particles)
+    /* Particle count indicator (1 white square = 100 particles) */
     pxl_canvas_set_color(cnv, WHITE);
     size_t indicator_count = gas->count / 100;
     if (indicator_count > 30) indicator_count = 30;
@@ -256,7 +256,7 @@ gas_render(pxl_canvas_t *cnv, const gas_t *gas) {
         pxl_fill_rect(cnv, W - 10 - (int)i * 10, 10, 8, 8);
     }
     
-    // Draw all particles
+    /* Draw all particles */
     for (size_t i = 0; i < gas->count; i++) {
         const particle_t *p = &gas->particles[i];
         pxl_canvas_set_color(cnv, p->color);
@@ -264,7 +264,7 @@ gas_render(pxl_canvas_t *cnv, const gas_t *gas) {
     }
 }
 
-// Log FPS to stdout
+/* Log FPS to stdout */
 static void
 log_fps(double now, size_t particle_count) {
     static double t0 = 0;
