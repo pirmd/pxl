@@ -23,6 +23,8 @@ pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	}
 	const int y_start = clipped.y;
 	const int y_end = clipped.y + clipped.h - 1;
+	const int sc_x1 = cnv->scissor.x;
+	const int sc_x2 = cnv->scissor.x + cnv->scissor.w;
 
 	/* Bresenham's circle algorithm drawing 8 symmetric points */
 	int cx = r;
@@ -33,14 +35,15 @@ pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 
 	/* Starting point (r, 0) - all have cy=0 so y+cy = y-cy = y */
 	if (y >= y_start && y <= y_end) {
-		pxl_draw_span(cnv, x + cx, y + cy, 1);
-		pxl_draw_span(cnv, x + cy, y + cx, 1);
-		pxl_draw_span(cnv, x - cx, y + cy, 1);
-		pxl_draw_span(cnv, x - cy, y + cx, 1);
-		pxl_draw_span(cnv, x + cx, y - cy, 1);
-		pxl_draw_span(cnv, x + cy, y - cx, 1);
-		pxl_draw_span(cnv, x - cx, y - cy, 1);
-		pxl_draw_span(cnv, x - cy, y - cx, 1);
+		/* Direct pixel access (y already in scissor) */
+		if (x + cx >= sc_x1 && x + cx < sc_x2) *pxl_buf_ptr(cnv->pb, x + cx, y + cy) = cnv->color;
+		if (x + cy >= sc_x1 && x + cy < sc_x2) *pxl_buf_ptr(cnv->pb, x + cy, y + cx) = cnv->color;
+		if (x - cx >= sc_x1 && x - cx < sc_x2) *pxl_buf_ptr(cnv->pb, x - cx, y + cy) = cnv->color;
+		if (x - cy >= sc_x1 && x - cy < sc_x2) *pxl_buf_ptr(cnv->pb, x - cy, y + cx) = cnv->color;
+		if (x + cx >= sc_x1 && x + cx < sc_x2) *pxl_buf_ptr(cnv->pb, x + cx, y - cy) = cnv->color;
+		if (x + cy >= sc_x1 && x + cy < sc_x2) *pxl_buf_ptr(cnv->pb, x + cy, y - cx) = cnv->color;
+		if (x - cx >= sc_x1 && x - cx < sc_x2) *pxl_buf_ptr(cnv->pb, x - cx, y - cy) = cnv->color;
+		if (x - cy >= sc_x1 && x - cy < sc_x2) *pxl_buf_ptr(cnv->pb, x - cy, y - cx) = cnv->color;
 	}
 
 	cx--;
@@ -56,30 +59,30 @@ pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 		}
 		cy++;
 
-		/* Draw 8 symmetric points - check each y coordinate */
+		/* Draw 8 symmetric points - check each y coordinate (direct pixel access) */
 		if (y + cy >= y_start && y + cy <= y_end) {
-			pxl_draw_span(cnv, x + cx, y + cy, 1);
+			if (x + cx >= sc_x1 && x + cx < sc_x2) *pxl_buf_ptr(cnv->pb, x + cx, y + cy) = cnv->color;
 		}
 		if (y + cx >= y_start && y + cx <= y_end) {
-			pxl_draw_span(cnv, x + cy, y + cx, 1);
+			if (x + cy >= sc_x1 && x + cy < sc_x2) *pxl_buf_ptr(cnv->pb, x + cy, y + cx) = cnv->color;
 		}
 		if (y + cy >= y_start && y + cy <= y_end) {
-			pxl_draw_span(cnv, x - cx, y + cy, 1);
+			if (x - cx >= sc_x1 && x - cx < sc_x2) *pxl_buf_ptr(cnv->pb, x - cx, y + cy) = cnv->color;
 		}
 		if (y + cx >= y_start && y + cx <= y_end) {
-			pxl_draw_span(cnv, x - cy, y + cx, 1);
+			if (x - cy >= sc_x1 && x - cy < sc_x2) *pxl_buf_ptr(cnv->pb, x - cy, y + cx) = cnv->color;
 		}
 		if (y - cy >= y_start && y - cy <= y_end) {
-			pxl_draw_span(cnv, x + cx, y - cy, 1);
+			if (x + cx >= sc_x1 && x + cx < sc_x2) *pxl_buf_ptr(cnv->pb, x + cx, y - cy) = cnv->color;
 		}
 		if (y - cx >= y_start && y - cx <= y_end) {
-			pxl_draw_span(cnv, x + cy, y - cx, 1);
+			if (x + cy >= sc_x1 && x + cy < sc_x2) *pxl_buf_ptr(cnv->pb, x + cy, y - cx) = cnv->color;
 		}
 		if (y - cy >= y_start && y - cy <= y_end) {
-			pxl_draw_span(cnv, x - cx, y - cy, 1);
+			if (x - cx >= sc_x1 && x - cx < sc_x2) *pxl_buf_ptr(cnv->pb, x - cx, y - cy) = cnv->color;
 		}
 		if (y - cx >= y_start && y - cx <= y_end) {
-			pxl_draw_span(cnv, x - cy, y - cx, 1);
+			if (x - cy >= sc_x1 && x - cy < sc_x2) *pxl_buf_ptr(cnv->pb, x - cy, y - cx) = cnv->color;
 		}
 	}
 }
@@ -170,6 +173,11 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
 		return;
 	}
 
+	/* Pre-calculate float inverses for division-to-multiplication optimization */
+	const float inv_dy01 = (y0 != y1) ? 1.0f / (float)(y1 - y0) : 0.0f;
+	const float inv_dy12 = (y1 != y2) ? 1.0f / (float)(y2 - y1) : 0.0f;
+	const float inv_dy20 = (y2 != y0) ? 1.0f / (float)(y0 - y2) : 0.0f;
+
 	/* Scanline algorithm: iterate only over clipped Y range */
 	for (int y = clipped.y; y < clipped.y + clipped.h; y++) {
 		float x_min = (float)max_x + 1.0f;
@@ -178,9 +186,11 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
 		/* Check intersection with each edge */
 		/* Edge 0-1: only if not horizontal */
 		if (y0 != y1) {
-			float y_clamped = (y < pxl_min(y0, y1)) ? (float)pxl_min(y0, y1) :
-			                  (y > pxl_max(y0, y1)) ? (float)pxl_max(y0, y1) : (float)y;
-			float t = (y_clamped - (float)y0) / (float)(y1 - y0);
+			const int y01_min = pxl_min(y0, y1);
+			const int y01_max = pxl_max(y0, y1);
+			float y_clamped = (y < y01_min) ? (float)y01_min :
+			                  (y > y01_max) ? (float)y01_max : (float)y;
+			float t = (y_clamped - (float)y0) * inv_dy01;
 			float x = (float)x0 + (float)(x1 - x0) * t;
 			if (x < x_min) x_min = x;
 			if (x > x_max) x_max = x;
@@ -188,9 +198,11 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
 
 		/* Edge 1-2: only if not horizontal */
 		if (y1 != y2) {
-			float y_clamped = (y < pxl_min(y1, y2)) ? (float)pxl_min(y1, y2) :
-			                  (y > pxl_max(y1, y2)) ? (float)pxl_max(y1, y2) : (float)y;
-			float t = (y_clamped - (float)y1) / (float)(y2 - y1);
+			const int y12_min = pxl_min(y1, y2);
+			const int y12_max = pxl_max(y1, y2);
+			float y_clamped = (y < y12_min) ? (float)y12_min :
+			                  (y > y12_max) ? (float)y12_max : (float)y;
+			float t = (y_clamped - (float)y1) * inv_dy12;
 			float x = (float)x1 + (float)(x2 - x1) * t;
 			if (x < x_min) x_min = x;
 			if (x > x_max) x_max = x;
@@ -198,9 +210,11 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
 
 		/* Edge 2-0: only if not horizontal */
 		if (y2 != y0) {
-			float y_clamped = (y < pxl_min(y2, y0)) ? (float)pxl_min(y2, y0) :
-			                  (y > pxl_max(y2, y0)) ? (float)pxl_max(y2, y0) : (float)y;
-			float t = (y_clamped - (float)y2) / (float)(y0 - y2);
+			const int y20_min = pxl_min(y2, y0);
+			const int y20_max = pxl_max(y2, y0);
+			float y_clamped = (y < y20_min) ? (float)y20_min :
+			                  (y > y20_max) ? (float)y20_max : (float)y;
+			float t = (y_clamped - (float)y2) * inv_dy20;
 			float x = (float)x2 + (float)(x0 - x2) * t;
 			if (x < x_min) x_min = x;
 			if (x > x_max) x_max = x;

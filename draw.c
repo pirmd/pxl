@@ -57,9 +57,13 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 
 	if (dx >= dy) {  /* X-major line */
 		int err = dx / 2;
+		int sc_x1 = cnv->scissor.x;
+		int sc_x2 = cnv->scissor.x + cnv->scissor.w;
 		for (;;) {
-			/* y0 guaranteed in scissor by clipping above */
-			pxl_draw_span(cnv, x0, y0, 1);
+			/* Direct pixel access: y0 guaranteed in scissor by clipping above */
+			if (x0 >= sc_x1 && x0 < sc_x2) {
+				*pxl_buf_ptr(cnv->pb, x0, y0) = cnv->color;
+			}
 			if (x0 == x1 && y0 == y1) break;
 			x0 += sx;
 			err -= dy;
@@ -70,9 +74,13 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 		}
 	} else {  /* Y-major line */
 		int err = dy / 2;
+		int sc_x1 = cnv->scissor.x;
+		int sc_x2 = cnv->scissor.x + cnv->scissor.w;
 		for (;;) {
-			/* y0 guaranteed in scissor by clipping above */
-			pxl_draw_span(cnv, x0, y0, 1);
+			/* Direct pixel access: y0 guaranteed in scissor by clipping above */
+			if (x0 >= sc_x1 && x0 < sc_x2) {
+				*pxl_buf_ptr(cnv->pb, x0, y0) = cnv->color;
+			}
 			if (x0 == x1 && y0 == y1) break;
 			y0 += sy;
 			err -= dx;
