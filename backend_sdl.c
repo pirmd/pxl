@@ -16,6 +16,13 @@ static struct {
 
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
+	pxl_backend_deinit();
+
+	/* Validate parameters */
+	if (!title || w <= 0 || h <= 0) {
+		return PXL_E_INVALID_PARAM;
+	}
+
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		return PXL_E_BACKEND_INIT;
 	}
@@ -63,6 +70,8 @@ pxl_backend_deinit(void) {
 
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
+	assert(out_pb);
+
     void *pixels;
     int pitch;
 

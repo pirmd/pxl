@@ -1,10 +1,10 @@
 # pxl - Unit tests
 
-TESTS = test_buf test_geom test_canvas test_draw test_draw_extra test_stepper test_input
+TESTS = test_buf test_geom test_canvas test_draw test_draw_extra test_stepper test_input test_backend
 
 PXL_SRC  = ../draw.c ../draw_extra.c
 PXL_SRC += ../canvas.h ../draw.h ../draw_extra.h ../buf.h ../geom.h ../err.h
-PXL_SRC += ../stepper.h ../input.h
+PXL_SRC += ../stepper.h ../input.h ../backend.h
 
 -include "../config.mk"
 
@@ -14,6 +14,16 @@ CFLAGS += -I.. -I. -Istest
 
 LDFLAGS += -L.. -lpxl
 LDFLAGS += -Lstest -lstest
+
+X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
+SDL_LIBS   ?= -L/usr/local/lib -lSDL2
+
+BACKEND ?= x11
+.if ${BACKEND} == "x11"
+LDFLAGS += $(X11_LIBS)
+.elif ${BACKEND} == "sdl"
+LDFLAGS += $(SDL_LIBS)
+.endif
 
 all: test
 

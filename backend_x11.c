@@ -67,6 +67,11 @@ pxl_err_t
 pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
     pxl_backend_deinit();
 
+    /* Validate parameters */
+    if (!title || w <= 0 || h <= 0) {
+        return PXL_E_INVALID_PARAM;
+    }
+
     g_x11.display = XOpenDisplay(NULL);
     if (!g_x11.display) return PXL_E_BACKEND_INIT;
 
@@ -195,7 +200,8 @@ pxl_backend_deinit(void) {
 
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
-    assert(g_x11.display && g_x11.img && g_x11.img->data);
+	assert(out_pb);
+	assert(g_x11.display && g_x11.img && g_x11.img->data);
     assert(g_x11.img->bytes_per_line % (int)sizeof(pxl_t) == 0);
 
     out_pb->width  = g_x11.width;

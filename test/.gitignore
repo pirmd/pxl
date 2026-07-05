@@ -5,3 +5,4 @@ test_draw_extra
 test_geom
 test_input
 test_stepper
+test_backend
