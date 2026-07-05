@@ -8,6 +8,9 @@
 
 /*
  * Adding a new backend:
+ *   . All backends MUST use ARGB8888 pixel format (little-endian: A:24-31,
+ *     R:16-23, G:8-15, B:0-7) to be consistent with PXL's native color format
+ *     (see color.h)
  *   . All backends MUST validate parameters in pxl_backend_init() and return
  *     PXL_E_INVALID_PARAM on invalid parameters
  *   . All backends must return pixel-aligned stride in out_pb->stride
