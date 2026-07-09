@@ -6,15 +6,18 @@
 void
 pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 	assert(cnv);
-	assert(x0 >= 0 && y0 >= 0 && x1 >= 0 && y1 >= 0);
 
+	x0 += cnv->offset_x;
+	y0 += cnv->offset_y;
+	x1 += cnv->offset_x;
+	y1 += cnv->offset_y;
+	
 	/* Bounding box */
 	const int min_x = pxl_min(x0, x1);
 	const int min_y = pxl_min(y0, y1);
 	const int max_x = pxl_max(x0, x1);
 	const int max_y = pxl_max(y0, y1);
 
-	/* Quick reject */
 	if (pxl_canvas_quick_reject(cnv, min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)) {
 		return;
 	}
@@ -23,7 +26,6 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 	const int sc_y1 = cnv->scissor.y;
 	const int sc_y2 = cnv->scissor.y + cnv->scissor.h - 1;
 
-	/* Only clip Y if line is not horizontal (y0 != y1) */
 	if (y0 != y1) {
 		if (y0 < sc_y1) {
 			if (y1 < sc_y1) return;  /* Entire line outside */
@@ -94,6 +96,9 @@ pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	assert(cnv);
 	assert(w > 0 && h > 0);
 
+	x += cnv->offset_x;
+	y += cnv->offset_y;
+
 	pxl_rect_t r;
 	if (!pxl_clip_rect((pxl_rect_t){x, y, w, h}, cnv->scissor, &r)) {
 		return;
@@ -147,6 +152,9 @@ void
 pxl_fill_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	assert(cnv);
 	assert(w > 0 && h > 0);
+
+	x += cnv->offset_x;
+	y += cnv->offset_y;
 
 	pxl_rect_t r;
 	if (!pxl_clip_rect((pxl_rect_t){x, y, w, h}, cnv->scissor, &r)) {

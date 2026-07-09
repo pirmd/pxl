@@ -5,7 +5,7 @@ Minimal 2D graphics library in C99.
 
 Features:
   - 2D primitives: line, rect, circle, triangle (outline + filled)
-  - Canvas with scissor clipping, color, clear, blit
+  - Canvas with scissor clipping, translation offset, color, clear, blit
   - ARGB8888 pixel buffer (pixbuf)
   - Backends: SDL2, X11
   - Keyboard/mouse input
@@ -51,9 +51,9 @@ Examples:
 
 Architecture:
   Core:
-    buf.h          - unint32_t pixel buffer with stride alignment
+    buf.h          - uint32_t pixel buffer with stride alignment
     geom.h         - Geometry primitives (rect, span, point) and clipping
-    canvas.h       - Drawing surface with color, scissor, clear, blit
+    canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
     draw.h/c       - Basic 2D primitives (line, rect, span)
     draw_extra.h/c - Advanced 2D primitives (circle, triangle)
     err.h          - Error handling

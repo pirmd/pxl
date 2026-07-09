@@ -165,6 +165,63 @@ test_canvas_reset_scissor(void) {
 	fixture_deinit(&f);
 }
 
+static void
+test_canvas_offset_init_zero(void) {
+	int w = 100, h = 100;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	ST_CHECK(f.cnv.offset_x == 0 && f.cnv.offset_y == 0,
+	         "offsets should be zero by default: got (%d,%d)",
+	         f.cnv.offset_x, f.cnv.offset_y);
+
+	fixture_deinit(&f);
+}
+
+static void
+test_canvas_set_offset(void) {
+	int w = 100, h = 100;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_offset(&f.cnv, 10, 20);
+	ST_CHECK(f.cnv.offset_x == 10 && f.cnv.offset_y == 20,
+	         "offset: want (10,20), got (%d,%d)",
+	         f.cnv.offset_x, f.cnv.offset_y);
+
+	pxl_canvas_set_offset(&f.cnv, -5, -3);
+	ST_CHECK(f.cnv.offset_x == -5 && f.cnv.offset_y == -3,
+	         "offset: want (-5,-3), got (%d,%d)",
+	         f.cnv.offset_x, f.cnv.offset_y);
+
+	fixture_deinit(&f);
+}
+
+static void
+test_canvas_reset_offset(void) {
+	int w = 100, h = 100;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_offset(&f.cnv, 15, 25);
+	ST_CHECK(f.cnv.offset_x == 15 && f.cnv.offset_y == 25,
+	         "offset set: want (15,25), got (%d,%d)",
+	         f.cnv.offset_x, f.cnv.offset_y);
+
+	pxl_canvas_reset_offset(&f.cnv);
+	ST_CHECK(f.cnv.offset_x == 0 && f.cnv.offset_y == 0,
+	         "offset reset: want (0,0), got (%d,%d)",
+	         f.cnv.offset_x, f.cnv.offset_y);
+
+	fixture_deinit(&f);
+}
+
 
 /* Test clear -------------------------------------------------------------- */
 
@@ -253,6 +310,11 @@ main(int argc, char *argv[]) {
 		ST_T(test_canvas_set_scissor),
 		ST_T(test_canvas_set_scissor_clipped),
 		ST_T(test_canvas_reset_scissor),
+		
+		/* offset */
+		ST_T(test_canvas_offset_init_zero),
+		ST_T(test_canvas_set_offset),
+		ST_T(test_canvas_reset_offset),
 
 		/* canvas_clear */
 		ST_T(test_canvas_clear_white),

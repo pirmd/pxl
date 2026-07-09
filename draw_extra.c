@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <limits.h>
 
 #include "draw_extra.h"
 #include "geom.h"
@@ -9,20 +8,16 @@ void
 pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	assert(cnv);
 	assert(r > 0);
-	assert(x >= -INT_MAX/2 && x <= INT_MAX/2);
-	assert(y >= -INT_MAX/2 && y <= INT_MAX/2);
 
-	/* Assert to prevent integer overflow in bbox calculation (extreme case) */
-	assert(r <= (INT_MAX / 2) - 1);
+	x += cnv->offset_x;
+	y += cnv->offset_y;
 
-	/* Bounding box and clip to scissor to get valid Y range */
-	const pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
-	pxl_rect_t clipped;
-	if (!pxl_clip_rect(bbox, cnv->scissor, &clipped)) {
+	pxl_rect_t bbox;
+	if (!pxl_clip_rect((pxl_rect_t){x - r, y - r, 2 * r + 1, 2 * r + 1}, cnv->scissor, &bbox)) {
 		return;
 	}
-	const int y_start = clipped.y;
-	const int y_end = clipped.y + clipped.h - 1;
+	const int y_start = bbox.y;
+	const int y_end = bbox.y + bbox.h - 1;
 	const int sc_x1 = cnv->scissor.x;
 	const int sc_x2 = cnv->scissor.x + cnv->scissor.w;
 
@@ -91,20 +86,17 @@ void
 pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	assert(cnv);
 	assert(r > 0);
-	assert(x >= -INT_MAX/2 && x <= INT_MAX/2);
-	assert(y >= -INT_MAX/2 && y <= INT_MAX/2);
 
-	/* Assert to prevent integer overflow in bbox calculation (extreme case) */
-	assert(r <= (INT_MAX / 2) - 1);
+	x += cnv->offset_x;
+	y += cnv->offset_y;
 
-	const pxl_rect_t bbox = {x - r, y - r, 2 * r + 1, 2 * r + 1};
-	pxl_rect_t clipped;
-	if (!pxl_clip_rect(bbox, cnv->scissor, &clipped)) {
+	pxl_rect_t bbox;
+	if (!pxl_clip_rect((pxl_rect_t){x - r, y - r, 2 * r + 1, 2 * r + 1}, cnv->scissor, &bbox)) {
 		return;
 	}
 
-	const int y_top = clipped.y;
-	const int y_bot = clipped.y + clipped.h - 1;
+	const int y_top = bbox.y;
+	const int y_bot = bbox.y + bbox.h - 1;
 
 	int cx = r;
 	int cy = 0;
@@ -150,7 +142,6 @@ void
 pxl_draw_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int y2) {
 	assert(cnv);
 
-	/* Use lines for triangle outline */
 	pxl_draw_line(cnv, x0, y0, x1, y1);
 	pxl_draw_line(cnv, x1, y1, x2, y2);
 	pxl_draw_line(cnv, x2, y2, x0, y0);
@@ -160,26 +151,29 @@ void
 pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int y2) {
 	assert(cnv);
 
+	x0 += cnv->offset_x;
+	y0 += cnv->offset_y;
+	x1 += cnv->offset_x;
+	y1 += cnv->offset_y;
+	x2 += cnv->offset_x;
+	y2 += cnv->offset_y;
+
 	/* Bounding box */
 	const int min_x = pxl_min(pxl_min(x0, x1), x2);
 	const int min_y = pxl_min(pxl_min(y0, y1), y2);
 	const int max_x = pxl_max(pxl_max(x0, x1), x2);
 	const int max_y = pxl_max(pxl_max(y0, y1), y2);
 
-	/* Clip bbox to scissor to get valid Y range */
-	const pxl_rect_t bbox = {min_x, min_y, max_x - min_x + 1, max_y - min_y + 1};
-	pxl_rect_t clipped;
-	if (!pxl_clip_rect(bbox, cnv->scissor, &clipped)) {
+	pxl_rect_t bbox;
+	if (!pxl_clip_rect((pxl_rect_t){min_x, min_y, max_x - min_x + 1, max_y - min_y + 1}, cnv->scissor, &bbox)) {
 		return;
 	}
 
-	/* Pre-calculate float inverses for division-to-multiplication optimization */
 	const float inv_dy01 = (y0 != y1) ? 1.0f / (float)(y1 - y0) : 0.0f;
 	const float inv_dy12 = (y1 != y2) ? 1.0f / (float)(y2 - y1) : 0.0f;
 	const float inv_dy20 = (y2 != y0) ? 1.0f / (float)(y0 - y2) : 0.0f;
 
-	/* Scanline algorithm: iterate only over clipped Y range */
-	for (int y = clipped.y; y < clipped.y + clipped.h; y++) {
+	for (int y = bbox.y; y < bbox.y + bbox.h; y++) {
 		float x_min = (float)max_x + 1.0f;
 		float x_max = (float)min_x - 1.0f;
 
@@ -225,7 +219,6 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
 		if (y1 == y) { if ((float)x1 < x_min) x_min = (float)x1; if ((float)x1 > x_max) x_max = (float)x1; }
 		if (y2 == y) { if ((float)x2 < x_min) x_min = (float)x2; if ((float)x2 > x_max) x_max = (float)x2; }
 
-		/* Draw the span if valid */
 		if (x_min <= x_max) {
 			/* Round to nearest integer, with bias on right to avoid overdraw */
 			int left = (int)(x_min + 0.5f);

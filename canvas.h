@@ -9,12 +9,14 @@
 #include "geom.h"
 
 typedef struct {
-	pxl_buf_t      *pb;           /* Target (borrowed)  */
-	pxl_rect_t      scissor;      /* Clipping rectangle */
-	pxl_t          color;        /* Current color      */
+	pxl_buf_t      *pb;                 /* Target                */
+	int             offset_x, offset_y; /* Translation offset     */
+	pxl_rect_t      scissor;            /* Drawing clipping area */
+	pxl_t           color;              /* Drawing color         */
+	
 } pxl_canvas_t;
 
-/* Visibility */
+/* Visibility -------------------------------------------------------------- */
 static inline bool
 pxl_canvas_quick_reject(const pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	const pxl_rect_t sc = cnv->scissor;
@@ -22,18 +24,21 @@ pxl_canvas_quick_reject(const pxl_canvas_t *cnv, int x, int y, int w, int h) {
 	       y >= sc.y + sc.h || y + h <= sc.y;
 }
 
-/* Initialization */
+
+/* Initialization ---------------------------------------------------------- */
 static inline void
 pxl_canvas_init(pxl_canvas_t *cnv, pxl_buf_t *pb) {
 	assert(cnv);
 	assert(pb && pb->data);
 
-	cnv->pb      = pb;
-	cnv->scissor = (pxl_rect_t){0, 0, pb->width, pb->height};
-	cnv->color   = 0xFFFFFFFF;
+	cnv->pb       = pb;
+	cnv->offset_x = 0;
+	cnv->offset_y = 0;
+	cnv->scissor  = (pxl_rect_t){0, 0, pb->width, pb->height};
+	cnv->color    = 0xFFFFFFFF;
 }
 
-/* State */
+/* State ------------------------------------------------------------------- */
 static inline void
 pxl_canvas_set_color(pxl_canvas_t *cnv, pxl_t color) {
 	assert(cnv);
@@ -61,7 +66,19 @@ pxl_canvas_reset_scissor(pxl_canvas_t *cnv) {
 	cnv->scissor = (pxl_rect_t){0, 0, cnv->pb->width, cnv->pb->height};
 }
 
-/* Drawing */
+static inline void
+pxl_canvas_set_offset(pxl_canvas_t *cnv, int offset_x, int offset_y) {
+	cnv->offset_x = offset_x;
+	cnv->offset_y = offset_y;
+}
+
+static inline void
+pxl_canvas_reset_offset(pxl_canvas_t *cnv) {
+	cnv->offset_x = 0;
+	cnv->offset_y = 0;
+}
+
+/* Drawing ----------------------------------------------------------------- */
 static inline void
 pxl_canvas_clear(pxl_canvas_t *cnv) {
 	assert(cnv && cnv->pb);
@@ -94,4 +111,4 @@ pxl_canvas_clear(pxl_canvas_t *cnv) {
 	}
 }
 
-#endif /* PXL_CANVAS_H */
+#endif /* PXL_CANVAS_H */	
