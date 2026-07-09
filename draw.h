@@ -4,6 +4,7 @@
 #include "canvas.h"
 #include "buf.h"
 #include "geom.h"
+#include "bitmask.h"
 
 /* draw a horizontal span respecting scissor X (Y must be pre-clipped by caller) */
 static inline void
@@ -38,5 +39,13 @@ void pxl_fill_rect(pxl_canvas_t *cnv, int x, int y, int w, int h);
  */
 void pxl_blit_rect(pxl_canvas_t *cnv, const pxl_buf_t *pb,
 		pxl_rect_t pb_r, int cnv_x, int cnv_y);
+
+/* Bitmask drawing */
+/* Draw a region from bitmask to canvas at (cnv_x, cnv_y).
+ * Pixels where bitmask bit is 1 are drawn with canvas color.
+ * Caller must ensure bm_r is within bm bounds (asserted).
+ * Destination is clipped to canvas scissor. Respects canvas offset. */
+void pxl_draw_bitmask(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
+		pxl_rect_t bm_r, int cnv_x, int cnv_y);
 
 #endif /* PXL_DRAW_H */

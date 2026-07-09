@@ -1,4 +1,5 @@
 #include <string.h>
+#include "bitmask.h"
 #include "canvas.h"
 #include "draw.h"
 #include "geom.h"
@@ -1098,6 +1099,201 @@ test_pxl_blit_rect_partially_clipped(void) {
 	fixture_deinit(&f);
 }
 
+/* Bitmask draw tests ----------------------------------------------------------- */
+static inline uint32_t
+bitmask_get(const pxl_bitmask_t *bm, int x, int y) {
+	assert(bm && bm->data);
+	assert(x >= 0 && x < bm->width);
+	assert(y >= 0 && y < bm->height);
+	assert((bm->stride << 3) >= (size_t)bm->width);
+
+	size_t bit_index = (size_t)y * ((size_t)bm->stride << 3) + (size_t)x;
+	size_t byte_index = bit_index >> 3;
+	unsigned bit_offset = bit_index & 0x7;
+
+	uint8_t byte = bm->data[byte_index];
+
+	return (uint32_t)((byte >> bit_offset) & 0x1U);
+}
+
+static inline bool
+is_drawn_on_bitmask(const pxl_canvas_t *cnv, int x, int y,
+                    const pxl_bitmask_t *bm, pxl_rect_t bm_r, int cnv_x, int cnv_y) {
+	/* Apply offsets */
+	cnv_x += cnv->offset_x;
+	cnv_y += cnv->offset_y;
+
+	/* Calculate source position in bitmask */
+	int bm_x = bm_r.x + x - cnv_x;
+	int bm_y = bm_r.y + y - cnv_y;
+
+	/* Check bounds and get bit */
+	if (bm_x < bm_r.x || bm_x >= bm_r.x + bm_r.w ||                                                                                   
+			bm_y < bm_r.y || bm_y >= bm_r.y + bm_r.h) {                                                                                   
+		return false;                                                                                                                 
+	} 
+
+	return bitmask_get(bm, bm_x, bm_y) == 1;
+}
+
+static void
+test_pxl_draw_bitmask_basic(void) {
+	int w = 16, h = 16;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) return;
+
+	/* Create a bitmask with checkerboard pattern (0xAA = 0b10101010) */
+	uint8_t pattern[] = { 0xAA, 0xAA, 0xAA, 0xAA };
+	pxl_bitmask_t bm = {
+		.data = pattern,
+		.width = 8,
+		.height = 2,
+		.stride = 1
+	};
+
+	pxl_t color = COLOR_RED;
+	pxl_canvas_set_color(&f.cnv, color);
+	pxl_rect_t bm_r = {0, 0, 8, 2};
+	int cnv_x = 2, cnv_y = 2;
+	pxl_draw_bitmask(&f.cnv, &bm, bm_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s       = is_inside_scissor(&f.cnv, x, y);
+			bool on_bitmask = is_drawn_on_bitmask(&f.cnv, x, y, &bm, bm_r, cnv_x, cnv_y);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_bitmask ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_bitmask=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_bitmask, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_draw_bitmask_all_bits_set(void) {
+	int w = 32, h = 16;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) return;
+
+	/* Create a bitmask with all bits set */
+	uint8_t pattern[] = { 0xFF, 0xFF };
+	pxl_bitmask_t bm = {
+		.data = pattern,
+		.width = 16,
+		.height = 1,
+		.stride = 2 
+	};
+
+	pxl_t color = COLOR_GREEN;
+	pxl_canvas_set_color(&f.cnv, color);
+	pxl_rect_t bm_r = {0, 0, 16, 1};
+	int cnv_x = 2, cnv_y = 2;
+	pxl_draw_bitmask(&f.cnv, &bm, bm_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s       = is_inside_scissor(&f.cnv, x, y);
+			bool on_bitmask = is_drawn_on_bitmask(&f.cnv, x, y, &bm, bm_r, cnv_x, cnv_y);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_bitmask ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_bitmask=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_bitmask, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_draw_bitmask_clipped(void) {
+	int w = 32, h = 32;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) return;
+
+	/* Set scissor to clip the bitmask */
+	pxl_canvas_set_scissor(&f.cnv, 4, 4, 8, 8);
+
+	/* Create a bitmask with all bits set, positioned to intersect scissor */
+	uint8_t pattern[16];
+	for (int i = 0; i < 16; i++) pattern[i] = 0xFF;
+	pxl_bitmask_t bm = {
+		.data = pattern,
+		.width = 16,
+		.height = 8,
+		.stride = 2 
+	};
+
+	pxl_t color = COLOR_BLUE;
+	pxl_canvas_set_color(&f.cnv, color);
+	pxl_rect_t bm_r = {0, 0, 16, 8};
+	int cnv_x = 0, cnv_y = 0;
+	pxl_draw_bitmask(&f.cnv, &bm, bm_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s       = is_inside_scissor(&f.cnv, x, y);
+			bool on_bitmask = is_drawn_on_bitmask(&f.cnv, x, y, &bm, bm_r, cnv_x, cnv_y);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_bitmask ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_bitmask=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_bitmask, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_draw_bitmask_with_offset(void) {
+	int w = 16, h = 16;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) return;
+
+	pxl_canvas_set_offset(&f.cnv, 5, 5);
+
+	/* Create a bitmask with all bits set */
+	uint8_t pattern[] = { 0xFF, 0xFF };
+	pxl_bitmask_t bm = {
+		.data = pattern,
+		.width = 8,
+		.height = 1,
+		.stride = 1
+	};
+
+	pxl_t color = COLOR_YELLOW;
+	pxl_canvas_set_color(&f.cnv, color);
+	pxl_rect_t bm_r = {0, 0, 8, 1};
+	int cnv_x = 0, cnv_y = 0;
+	pxl_draw_bitmask(&f.cnv, &bm, bm_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s       = is_inside_scissor(&f.cnv, x, y);
+			bool on_bitmask = is_drawn_on_bitmask(&f.cnv, x, y, &bm, bm_r, cnv_x, cnv_y);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_bitmask ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_bitmask=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_bitmask, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
 /* Main ----------------------------------------------------------------- */
 int
 main(int argc, char *argv[]) {
@@ -1138,6 +1334,12 @@ main(int argc, char *argv[]) {
 		ST_T(test_pxl_blit_rect_with_scissor),
 		ST_T(test_pxl_blit_rect_fully_clipped),
 		ST_T(test_pxl_blit_rect_with_offset),
-		ST_T(test_pxl_blit_rect_partially_clipped)
+		ST_T(test_pxl_blit_rect_partially_clipped),
+
+		/* Bitmask tests */
+		ST_T(test_pxl_draw_bitmask_basic),
+		ST_T(test_pxl_draw_bitmask_all_bits_set),
+		ST_T(test_pxl_draw_bitmask_clipped),
+		ST_T(test_pxl_draw_bitmask_with_offset)
 	);
 }

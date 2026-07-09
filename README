@@ -51,12 +51,13 @@ Examples:
 
 Architecture:
   Core:
-    buf.h          - uint32_t pixel buffer with stride alignment
+    err.h          - Error codes
     geom.h         - Geometry primitives (rect, span, point) and clipping
+    buf.h          - uint32_t pixel buffer with stride alignment
+    bitmask.h      - 1-bit per pixel mask for stencil/clip operations (LSB is bit 0)
     canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
-    draw.h/c       - Basic 2D primitives (line, rect, span)
+    draw.h/c       - Basic 2D primitives (line, rect, span, blit, mask)
     draw_extra.h/c - Advanced 2D primitives (circle, triangle)
-    err.h          - Error handling
 
   Backend:
     input.h       - Input state handling (keyboard, mouse, window events)
