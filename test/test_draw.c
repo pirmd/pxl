@@ -23,6 +23,16 @@ pxl_buf_zero(pxl_buf_t *pb) {
 	memset(pb->data, 0x00, pb->height * pb->stride * sizeof(pxl_t));
 }
 
+static void
+pxl_buf_fill(pxl_buf_t *pb, pxl_t color) {
+	for (int y = 0; y < pb->height; y++) {
+		pxl_t *row = pxl_buf_ptr(pb, 0, y);
+		for (int x = 0; x < pb->width; x++) {
+			row[x] = color;
+		}
+	}
+}
+
 static bool
 fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
 	if (!st_check(ctx, pxl_buf_init(&f->pb, w, h) == PXL_SUCCESS, "pixbuf_init failed")) {
@@ -46,50 +56,25 @@ fixture_deinit(fixture_t *f) {
 
 /* Helpers ----------------------------------------------------------------- */
 static inline bool
-is_inside_scissor(int x, int y, const pxl_canvas_t *cnv) {
+is_inside_scissor(const pxl_canvas_t *cnv, int x, int y) {
 	return pxl_in_rect(x, y, cnv->scissor);
 }
 
-/* Check if point (x,y) would be drawn by pxl_draw_line with given params.
- * This helper EXACTLY reproduces the logic from pxl_draw_line
- * to ensure 100% consistency between drawing and testing. */
+/* Test Line -------------------------------------------------------------- */
 static inline bool
 is_drawn_on_line(const pxl_canvas_t *cnv, int x, int y, int x0, int y0, int x1, int y1) {
-	/* Apply offsets */
 	x0 += cnv->offset_x;
 	y0 += cnv->offset_y;
 	x1 += cnv->offset_x;
 	y1 += cnv->offset_y;
 	
-	const pxl_rect_t *scissor = &cnv->scissor;
-	
-	/* Quick reject with bounding box */
-	int min_x = pxl_min(x0, x1);
-	int min_y = pxl_min(y0, y1);
-	int w = abs(x1 - x0) + 1;
-	int h = abs(y1 - y0) + 1;
-	
-	/* Simulate canvas_quick_reject */
-	if (min_x >= scissor->x + scissor->w || min_x + w <= scissor->x ||
-	    min_y >= scissor->y + scissor->h || min_y + h <= scissor->y) {
-		return false;
-	}
-
 	int dx = abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
 	int dy = abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
 
 	if (dx >= dy) {  /* X-major line */
 		int err = dx / 2;
 		for (;;) {
-			/* Check if this point would be drawn by pxl_draw_span */
-			if (y0 >= scissor->y && y0 < scissor->y + scissor->h) {
-				pxl_span_t span;
-				if (pxl_clip_span((pxl_span_t){x0, 1}, (pxl_span_t){scissor->x, scissor->w}, &span)) {
-					if (x == span.x && y == y0) {
-						return true;
-					}
-				}
-			}
+			if (x == x0 && y == y0) return true;
 			if (x0 == x1 && y0 == y1) break;
 			x0 += sx;
 			err -= dy;
@@ -101,15 +86,7 @@ is_drawn_on_line(const pxl_canvas_t *cnv, int x, int y, int x0, int y0, int x1, 
 	} else {  /* Y-major line */
 		int err = dy / 2;
 		for (;;) {
-			/* Check if this point would be drawn by pxl_draw_span */
-			if (y0 >= scissor->y && y0 < scissor->y + scissor->h) {
-				pxl_span_t span;
-				if (pxl_clip_span((pxl_span_t){x0, 1}, (pxl_span_t){scissor->x, scissor->w}, &span)) {
-					if (x == span.x && y == y0) {
-						return true;
-					}
-				}
-			}
+			if (x == x0 && y == y0) return true;
 			if (x0 == x1 && y0 == y1) break;
 			y0 += sy;
 			err -= dx;
@@ -123,88 +100,6 @@ is_drawn_on_line(const pxl_canvas_t *cnv, int x, int y, int x0, int y0, int x1, 
 	return false;
 }
 
-/* Check if point (x,y) would be drawn by pxl_draw_rect with given params.
- * This helper EXACTLY reproduces the logic from pxl_draw_rect
- * to ensure 100% consistency between drawing and testing. */
-static inline bool
-is_drawn_on_rect(const pxl_canvas_t *cnv, int x, int y, int rx, int ry, int rw, int rh) {
-	rx += cnv->offset_x;
-	ry += cnv->offset_y;
-	
-	const pxl_rect_t *scissor = &cnv->scissor;
-	
-	if (rw <= 0 || rh <= 0) {
-		return false;
-	}
-
-	/* Simulate pxl_clip_rect */
-	pxl_rect_t r;
-	if (!pxl_clip_rect((pxl_rect_t){rx, ry, rw, rh}, *scissor, &r)) {
-		return false;
-	}
-
-	/* Check if point is on top border (original top edge matches) */
-	if (r.y == ry && y == r.y && x >= r.x && x < r.x + r.w) {
-		return true;
-	}
-
-	/* Check if point is on bottom border (original bottom edge matches) */
-	if (r.y + r.h == ry + rh) {
-		int bottom_y = r.y + r.h;
-		if (y == bottom_y - 1 && x >= r.x && x < r.x + r.w) {
-			return true;
-		}
-	}
-
-	/* Check if point is on left border (original left edge matches) */
-	if (r.x == rx && x == r.x && y >= r.y && y < r.y + r.h) {
-		return true;
-	}
-
-	/* Check if point is on right border (original right edge matches) */
-	if (r.x + r.w == rx + rw) {
-		int right_x = r.x + r.w;
-		if (x == right_x - 1 && y >= r.y && y < r.y + r.h) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-/* Check if point (x,y) would be filled by pxl_fill_rect with given params.
- * This helper EXACTLY reproduces the logic from pxl_fill_rect
- * to ensure 100% consistency between drawing and testing. */
-static inline bool
-is_drawn_inside_fill_rect(const pxl_canvas_t *cnv, int x, int y, int rx, int ry, int rw, int rh) {
-	rx += cnv->offset_x;
-	ry += cnv->offset_y;
-	
-	const pxl_rect_t *scissor = &cnv->scissor;
-	
-	if (rw <= 0 || rh <= 0) {
-		return false;
-	}
-
-	/* Simulate pxl_clip_rect */
-	pxl_rect_t r;
-	if (!pxl_clip_rect((pxl_rect_t){rx, ry, rw, rh}, *scissor, &r)) {
-		return false;
-	}
-
-	return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
-}
-
-/* Check if point (x,y) is on a horizontal span at span_y from span_x to span_x+span_w */
-static inline bool
-is_on_span(const pxl_canvas_t *cnv, int x, int y, int span_y, int span_x, int span_w) {
-	span_x += cnv->offset_x;
-	span_y += cnv->offset_y;
-	
-	return y == span_y && x >= span_x && x < span_x + span_w;
-}
-
-/* Test Line -------------------------------------------------------------- */
 static void
 test_pxl_draw_line_horizontal(void) {
 	int w = 20, h = 20;
@@ -220,13 +115,13 @@ test_pxl_draw_line_horizontal(void) {
 	int x0 = 5, y0 = 10, x1 = 14, y1 = 10;
 	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool    in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_line && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+		
+			pxl_t  got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_line ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_line=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -252,13 +147,13 @@ test_pxl_draw_line_vertical(void) {
 	int x0 = 10, y0 = 5, x1 = 10, y1 = 14;
 	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool    in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_line && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+		
+			pxl_t  got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_line ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_line=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -284,13 +179,13 @@ test_pxl_draw_line_diagonal(void) {
 	int x0 = 5, y0 = 5, x1 = 14, y1 = 14;
 	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool    in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_line && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+		
+			pxl_t  got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_line ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_line=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -309,23 +204,120 @@ test_pxl_draw_line_outside_scissor(void) {
 		return;
 	}
 
-	/* Set a small scissor */
 	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw line completely outside scissor */
 	int x0 = 20, y0 = 20, x1 = 30, y1 = 30;
 	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool    in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_line && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+		
+			pxl_t  got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_line ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_line=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_line, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_draw_line_with_offset(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_offset(&f.cnv, 5, 5);
+	pxl_t color = COLOR_RED;
+	pxl_canvas_set_color(&f.cnv, color);
+
+	int x0 = 0, y0 = 0, x1 = 9, y1 = 0;
+	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool    in_s = is_inside_scissor(&f.cnv, x, y);
+			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
+		
+			pxl_t  got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_line ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_line=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_line, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_draw_line_with_offset_and_scissor(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_offset(&f.cnv, 10, 10);
+	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
+	
+	pxl_t color = COLOR_YELLOW;
+	pxl_canvas_set_color(&f.cnv, color);
+
+	int x0 = 0, y0 = 0, x1 = 5, y1 = 0;
+	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool    in_s = is_inside_scissor(&f.cnv, x, y);
+			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
+		
+			pxl_t  got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_line ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_line=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_line, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_draw_line_with_negative_offset(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_offset(&f.cnv, -5, -5);
+	
+	pxl_t color = COLOR_RED;
+	pxl_canvas_set_color(&f.cnv, color);
+
+	int x0 = 0, y0 = 0, x1 = 9, y1 = 0;
+	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool    in_s = is_inside_scissor(&f.cnv, x, y);
+			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
+		
+			pxl_t  got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_line ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_line=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -337,6 +329,31 @@ test_pxl_draw_line_outside_scissor(void) {
 }
 
 /* Test Rect -------------------------------------------------------------- */
+static inline bool
+is_drawn_on_rect(const pxl_canvas_t *cnv, int x, int y, int rx, int ry, int rw, int rh) {
+	assert(rw > 0 && rh > 0);
+
+	rx += cnv->offset_x;
+	ry += cnv->offset_y;
+
+	if (y == ry && x >= rx && x < rx + rw) {
+		return true;
+	}
+
+	if (y == ry + rh - 1 && x >= rx && x < rx + rw) {
+		return true;
+	}
+
+	if (x == rx && y >= ry && y < ry + rh) {
+		return true;
+	}
+
+	if (x == rx + rw - 1 && y >= ry && y < ry + rh) {
+		return true;
+	}
+
+	return false;
+}
 
 static void
 test_pxl_draw_rect_basic(void) {
@@ -349,17 +366,16 @@ test_pxl_draw_rect_basic(void) {
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw a 10x10 rect at (5,5) */
 	int rx = 5, ry = 5, rw = 10, rh = 10;
 	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -384,17 +400,16 @@ test_pxl_draw_rect_outside_scissor(void) {
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw rect completely outside scissor */
 	int rx = 20, ry = 20, rw = 10, rh = 10;
 	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -413,24 +428,21 @@ test_pxl_draw_rect_clip_left_no_false_border(void) {
 		return;
 	}
 
-	/* Set scissor starting at x=5 */
 	pxl_canvas_set_scissor(&f.cnv, 5, 0, 15, 20);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw rect from x=0 (outside scissor left) to x=14 */
-	/* Clipped rect: x=5, w=10. Original left edge at x=0 is outside, so no left border at x=5 */
 	int rx = 0, ry = 5, rw = 15, rh = 10;
 	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -449,24 +461,21 @@ test_pxl_draw_rect_clip_right_no_false_border(void) {
 		return;
 	}
 
-	/* Set scissor ending at x=14 */
 	pxl_canvas_set_scissor(&f.cnv, 0, 0, 15, 20);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw rect from x=5 to x=20 (outside scissor right) */
-	/* Clipped rect: x=5, w=10. Original right edge at x=20 is outside, so no right border at x=14 */
 	int rx = 5, ry = 5, rw = 15, rh = 10;
 	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -485,24 +494,21 @@ test_pxl_draw_rect_clip_both_sides(void) {
 		return;
 	}
 
-	/* Set scissor in the middle */
 	pxl_canvas_set_scissor(&f.cnv, 5, 0, 10, 20);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw rect from x=0 to x=20, clipped to x=5, w=10 */
-	/* Both original edges are outside, so no vertical borders at all */
 	int rx = 0, ry = 5, rw = 20, rh = 10;
 	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -521,24 +527,21 @@ test_pxl_draw_rect_clip_top_no_false_border(void) {
 		return;
 	}
 
-	/* Set scissor starting at y=5 */
 	pxl_canvas_set_scissor(&f.cnv, 0, 5, 20, 15);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw rect from y=0 (outside scissor top) to y=14 */
-	/* Clipped rect: y=5, h=10. Original top edge at y=0 is outside, so no top border at y=5 */
 	int rx = 5, ry = 0, rw = 10, rh = 15;
 	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -557,24 +560,21 @@ test_pxl_draw_rect_clip_bottom_no_false_border(void) {
 		return;
 	}
 
-	/* Set scissor ending at y=14 */
 	pxl_canvas_set_scissor(&f.cnv, 0, 0, 20, 15);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw rect from y=5 to y=20 (outside scissor bottom) */
-	/* Clipped rect: y=5, h=10. Original bottom edge at y=20 is outside, so no bottom border at y=14 */
 	int rx = 5, ry = 5, rw = 10, rh = 15;
 	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
 			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -585,7 +585,50 @@ test_pxl_draw_rect_clip_bottom_no_false_border(void) {
 	fixture_deinit(&f);
 }
 
+static void
+test_pxl_draw_rect_with_offset(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_offset(&f.cnv, 3, 4);
+	pxl_t color = COLOR_GREEN;
+	pxl_canvas_set_color(&f.cnv, color);
+
+	int rx = 0, ry = 0, rw = 5, rh = 5;
+	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s = is_inside_scissor(&f.cnv, x, y);
+			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_rect ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_rect, in_s, want, got);
+		}
+	}
+
+
+	fixture_deinit(&f);
+}
+
+
 /* Test Fill Rect ----------------------------------------------------------- */
+static inline bool
+is_drawn_inside_rect(const pxl_canvas_t *cnv, int x, int y, int rx, int ry, int rw, int rh) {
+	assert(rw > 0 && rh > 0);
+
+	rx += cnv->offset_x;
+	ry += cnv->offset_y;
+
+	return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+}
 
 static void
 test_pxl_fill_rect_basic(void) {
@@ -598,20 +641,19 @@ test_pxl_fill_rect_basic(void) {
 	pxl_t color = COLOR_GREEN;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw a filled 10x10 rect at (5,5) */
 	int rx = 5, ry = 5, rw = 10, rh = 10;
 	pxl_fill_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_rect = is_drawn_inside_rect(&f.cnv, x, y, rx, ry, rw, rh);
+
 			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool pxl_in_rect = is_drawn_inside_fill_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = pxl_in_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+			pxl_t want = in_s && in_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
-			         "pixel (%d,%d): pxl_in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         "pixel (%d,%d): in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
 			         x, y, pxl_in_rect, in_s, want, got);
 		}
 	}
@@ -627,26 +669,24 @@ test_pxl_fill_rect_outside_scissor(void) {
 		return;
 	}
 
-	/* Set a small scissor */
 	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw rect completely outside scissor */
 	int rx = 20, ry = 20, rw = 10, rh = 10;
 	pxl_fill_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_rect = is_drawn_inside_rect(&f.cnv, x, y, rx, ry, rw, rh);
+
 			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool pxl_in_rect = is_drawn_inside_fill_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = pxl_in_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+			pxl_t want = in_s && in_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
-			         "pixel (%d,%d): pxl_in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         "pixel (%d,%d): in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
 			         x, y, pxl_in_rect, in_s, want, got);
 		}
 	}
@@ -665,23 +705,53 @@ test_pxl_fill_rect_fast_path(void) {
 	pxl_t color = COLOR_YELLOW;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Set scissor to full canvas */
 	pxl_canvas_reset_scissor(&f.cnv);
 
-	/* Draw rect covering entire scissor - should use fast path */
 	int rx = 0, ry = 0, rw = w, rh = h;
 	pxl_fill_rect(&f.cnv, rx, ry, rw, rh);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_rect = is_drawn_inside_rect(&f.cnv, x, y, rx, ry, rw, rh);
+
 			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool pxl_in_rect = is_drawn_inside_fill_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = pxl_in_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+			pxl_t want = in_s && in_rect ? color : 0x00;
 
 			ST_CHECK(got == want,
-			         "pixel (%d,%d): pxl_in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         "pixel (%d,%d): in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, pxl_in_rect, in_s, want, got);
+		}
+	}
+
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_fill_rect_with_offset(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_offset(&f.cnv, 2, 3);
+	pxl_t color = COLOR_BLUE;
+	pxl_canvas_set_color(&f.cnv, color);
+
+	int rx = 0, ry = 0, rw = 6, rh = 4;
+	pxl_fill_rect(&f.cnv, rx, ry, rw, rh);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_rect = is_drawn_inside_rect(&f.cnv, x, y, rx, ry, rw, rh);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && in_rect ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): in_rect=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
 			         x, y, pxl_in_rect, in_s, want, got);
 		}
 	}
@@ -690,6 +760,13 @@ test_pxl_fill_rect_fast_path(void) {
 }
 
 /* Test Span -------------------------------------------------------------- */
+static inline bool
+is_on_span(const pxl_canvas_t *cnv, int x, int y, int span_y, int span_x, int span_w) {
+	span_x += cnv->offset_x;
+	span_y += cnv->offset_y;
+	
+	return y == span_y && x >= span_x && x < span_x + span_w;
+}
 
 static void
 test_pxl_draw_span_basic(void) {
@@ -702,17 +779,16 @@ test_pxl_draw_span_basic(void) {
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw a span at y=10, x=5 to 14 */
 	int span_x = 5, span_y = 10, span_w = 10;
 	pxl_draw_span(&f.cnv, span_x, span_y, span_w);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
 			bool on_span = is_on_span(&f.cnv, x, y, span_y, span_x, span_w);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_span && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && on_span ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_span=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -734,15 +810,20 @@ test_pxl_draw_span_zero_width(void) {
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw span with zero width - should do nothing */
-	pxl_draw_span(&f.cnv, 5, 10, 0);
+	int span_x = 5, span_y = 10, span_w = 0;
+	pxl_draw_span(&f.cnv, span_x, span_y, span_w);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool on_span = is_on_span(&f.cnv, x, y, span_y, span_x, span_w);
+
 			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			ST_CHECK(got == 0x00,
-			         "pixel (%d,%d): expected 0x00, got=0x%08X",
-			         x, y, got);
+			pxl_t want = in_s && on_span ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): on_span=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, on_span, in_s, want, got);
 		}
 	}
 
@@ -757,22 +838,21 @@ test_pxl_draw_span_clipped(void) {
 		return;
 	}
 
-	/* Set a small scissor */
 	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
 
 	pxl_t color = COLOR_RED;
 	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw span partially outside scissor */
-	pxl_draw_span(&f.cnv, 3, 7, 10);
+	int span_x = 3, span_y = 7, span_w = 10;
+	pxl_draw_span(&f.cnv, span_x, span_y, span_w);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool on_span = is_on_span(&f.cnv, x, y, span_y, span_x, span_w);
+
 			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_span = is_on_span(&f.cnv, x, y, 7, 3, 10);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_span && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
+			pxl_t want = in_s && on_span ? color : 0x00;
 
 			ST_CHECK(got == want,
 			         "pixel (%d,%d): on_span=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
@@ -780,13 +860,154 @@ test_pxl_draw_span_clipped(void) {
 		}
 	}
 
+
 	fixture_deinit(&f);
 }
 
-/* Test Offset ------------------------------------------------------------- */
+/* Test Blit -------------------------------------------------------------- */
+static inline bool
+is_drawn_in_blit(const pxl_canvas_t *cnv, int x, int y,
+                 pxl_rect_t pb_r, int cnv_x, int cnv_y) {
+	return is_drawn_inside_rect(cnv, x, y, cnv_x, cnv_y, pb_r.w, pb_r.h);
+}
 
 static void
-test_pxl_draw_line_with_offset(void) {
+test_pxl_blit_rect_basic(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	/* Create source buffer filled with red */
+	pxl_buf_t src_pb;
+	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 10, 10) == PXL_SUCCESS, "src pixbuf init failed")) {
+		fixture_deinit(&f);
+		return;
+	}
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
+		pxl_buf_deinit(&src_pb);
+		fixture_deinit(&f);
+		return;
+	}
+	pxl_t color = COLOR_GREEN;
+	pxl_buf_fill(&src_pb, color);
+
+	pxl_rect_t pb_r = {0, 0, 10, 10};
+	int cnv_x = 5, cnv_y = 5;
+	pxl_blit_rect(&f.cnv, &src_pb, pb_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_blit = is_drawn_in_blit(&f.cnv, x, y, pb_r, cnv_x, cnv_y);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && in_blit ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): in_blit=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, in_blit, in_s, want, got);
+		}
+	}
+
+	pxl_buf_deinit(&src_pb);
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_blit_rect_with_scissor(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
+
+	pxl_buf_t src_pb;
+	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 15, 15) == PXL_SUCCESS, "src pixbuf init failed")) {
+		fixture_deinit(&f);
+		return;
+	}
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
+		pxl_buf_deinit(&src_pb);
+		fixture_deinit(&f);
+		return;
+	}
+
+	pxl_t color = COLOR_GREEN;
+	pxl_buf_fill(&src_pb, color);
+
+	pxl_rect_t pb_r = {0, 0, 15, 15};
+	int cnv_x = 0, cnv_y = 0;
+	pxl_blit_rect(&f.cnv, &src_pb, pb_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_blit = is_drawn_in_blit(&f.cnv, x, y, pb_r, cnv_x, cnv_y);
+
+			pxl_t got  = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && in_blit ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): in_blit=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, in_blit, in_s, want, got);
+		}
+	}
+
+	pxl_buf_deinit(&src_pb);
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_blit_rect_fully_clipped(void) {
+	int w = 20, h = 20;
+	fixture_t f;
+	if (!fixture_init(&ST_HERE, &f, w, h)) {
+		return;
+	}
+
+	/* Create source buffer filled with blue */
+	pxl_buf_t src_pb;
+	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 10, 10) == PXL_SUCCESS, "src pixbuf init failed")) {
+		fixture_deinit(&f);
+		return;
+	}
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
+		pxl_buf_deinit(&src_pb);
+		fixture_deinit(&f);
+		return;
+	}
+
+	pxl_t color = COLOR_BLUE;
+	pxl_buf_fill(&src_pb, color);
+
+	pxl_rect_t pb_r = {0, 0, 10, 10};
+	int cnv_x = 30, cnv_y = 30;
+	pxl_blit_rect(&f.cnv, &src_pb, pb_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_blit = is_drawn_in_blit(&f.cnv, x, y, pb_r, cnv_x, cnv_y);
+
+			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
+			pxl_t want = in_s && in_blit ? color : 0x00;
+
+			ST_CHECK(got == want,
+			         "pixel (%d,%d): in_blit=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, in_blit, in_s, want, got);
+		}
+	}
+
+	pxl_buf_deinit(&src_pb);
+	fixture_deinit(&f);
+}
+
+static void
+test_pxl_blit_rect_with_offset(void) {
 	int w = 20, h = 20;
 	fixture_t f;
 	if (!fixture_init(&ST_HERE, &f, w, h)) {
@@ -794,167 +1015,86 @@ test_pxl_draw_line_with_offset(void) {
 	}
 
 	pxl_canvas_set_offset(&f.cnv, 5, 5);
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
 
-	/* Draw line at (0,0) to (9,0) - with offset this becomes (5,5) to (14,5) */
-	int x0 = 0, y0 = 0, x1 = 9, y1 = 0;
-	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_line && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
-		}
+	/* Create source buffer filled with yellow */
+	pxl_buf_t src_pb;
+	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 8, 8) == PXL_SUCCESS, "src pixbuf init failed")) {
+		fixture_deinit(&f);
+		return;
 	}
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_draw_rect_with_offset(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
+		pxl_buf_deinit(&src_pb);
+		fixture_deinit(&f);
 		return;
 	}
 
-	pxl_canvas_set_offset(&f.cnv, 3, 4);
-	pxl_t color = COLOR_GREEN;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw rect at (0,0) with w=5, h=5 - with offset this becomes (3,4) to (7,8) */
-	int rx = 0, ry = 0, rw = 5, rh = 5;
-	pxl_draw_rect(&f.cnv, rx, ry, rw, rh);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_rect = is_drawn_on_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_fill_rect_with_offset(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_canvas_set_offset(&f.cnv, 2, 3);
-	pxl_t color = COLOR_BLUE;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled rect at (0,0) with w=6, h=4 - with offset this becomes (2,3) to (7,6) */
-	int rx = 0, ry = 0, rw = 6, rh = 4;
-	pxl_fill_rect(&f.cnv, rx, ry, rw, rh);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_rect = is_drawn_inside_fill_rect(&f.cnv, x, y, rx, ry, rw, rh);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_rect && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_draw_with_offset_and_scissor(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	/* Set both offset and scissor */
-	pxl_canvas_set_offset(&f.cnv, 10, 10);
-	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
-	
 	pxl_t color = COLOR_YELLOW;
-	pxl_canvas_set_color(&f.cnv, color);
+	pxl_buf_fill(&src_pb, color);
 
-	/* Draw line at (0,0) to (5,0) - with offset becomes (10,10) to (15,10) */
-	/* But scissor is (5,5) to (14,14), so only (10,10) to (14,10) should be visible */
-	int x0 = 0, y0 = 0, x1 = 5, y1 = 0;
-	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
+	pxl_rect_t pb_r = {0, 0, 8, 8};
+	int cnv_x = 0, cnv_y = 0;
+	pxl_blit_rect(&f.cnv, &src_pb, pb_r, cnv_x, cnv_y);
 
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_blit = is_drawn_in_blit(&f.cnv, x, y, pb_r, cnv_x, cnv_y);
+
 			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_line && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
+			pxl_t want = in_s && in_blit ? color : 0x00;
+
 			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
+			         "pixel (%d,%d): in_blit=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, in_blit, in_s, want, got);
 		}
 	}
 
+	pxl_buf_deinit(&src_pb);
 	fixture_deinit(&f);
 }
 
 static void
-test_pxl_draw_with_negative_offset(void) {
+test_pxl_blit_rect_partially_clipped(void) {
 	int w = 20, h = 20;
 	fixture_t f;
 	if (!fixture_init(&ST_HERE, &f, w, h)) {
 		return;
 	}
 
-	/* Set negative offset - draws outside buffer, should be clipped */
-	pxl_canvas_set_offset(&f.cnv, -5, -5);
-	
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
+	/* Create source buffer filled with white */
+	pxl_buf_t src_pb;
+	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 15, 15) == PXL_SUCCESS, "src pixbuf init failed")) {
+		fixture_deinit(&f);
+		return;
+	}
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
+		pxl_buf_deinit(&src_pb);
+		fixture_deinit(&f);
+		return;
+	}
 
-	/* Draw line at (0,0) to (9,0) - with offset becomes (-5,-5) to (4,-5) */
-	/* All should be clipped (y=-5 is outside buffer) */
-	int x0 = 0, y0 = 0, x1 = 9, y1 = 0;
-	pxl_draw_line(&f.cnv, x0, y0, x1, y1);
+	pxl_t color = COLOR_YELLOW;
+	pxl_buf_fill(&src_pb, color);
 
-	/* Buffer should remain empty */
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
+	pxl_rect_t pb_r = {0, 0, 15, 15};
+	int cnv_x = -5, cnv_y = -5;
+	pxl_blit_rect(&f.cnv, &src_pb, pb_r, cnv_x, cnv_y);
+
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			bool in_s    = is_inside_scissor(&f.cnv, x, y);
+			bool in_blit = is_drawn_in_blit(&f.cnv, x, y, pb_r, cnv_x, cnv_y);
+
 			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_line = is_drawn_on_line(&f.cnv, x, y, x0, y0, x1, y1);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_line && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
+			pxl_t want = in_s && in_blit ? color : 0x00;
+
 			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
+			         "pixel (%d,%d): in_blit=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
+			         x, y, in_blit, in_s, want, got);
 		}
 	}
 
+	pxl_buf_deinit(&src_pb);
 	fixture_deinit(&f);
 }
 
@@ -973,6 +1113,9 @@ main(int argc, char *argv[]) {
 		ST_T(test_pxl_draw_line_vertical),
 		ST_T(test_pxl_draw_line_diagonal),
 		ST_T(test_pxl_draw_line_outside_scissor),
+		ST_T(test_pxl_draw_line_with_offset),
+		ST_T(test_pxl_draw_line_with_offset_and_scissor),
+		ST_T(test_pxl_draw_line_with_negative_offset),
 
 		/* Rect tests */
 		ST_T(test_pxl_draw_rect_basic),
@@ -982,17 +1125,19 @@ main(int argc, char *argv[]) {
 		ST_T(test_pxl_draw_rect_clip_both_sides),
 		ST_T(test_pxl_draw_rect_clip_top_no_false_border),
 		ST_T(test_pxl_draw_rect_clip_bottom_no_false_border),
+		ST_T(test_pxl_draw_rect_with_offset),
 
 		/* Fill Rect tests */
 		ST_T(test_pxl_fill_rect_basic),
 		ST_T(test_pxl_fill_rect_outside_scissor),
 		ST_T(test_pxl_fill_rect_fast_path),
-
-		/* Offset tests */
-		ST_T(test_pxl_draw_line_with_offset),
-		ST_T(test_pxl_draw_rect_with_offset),
 		ST_T(test_pxl_fill_rect_with_offset),
-		ST_T(test_pxl_draw_with_offset_and_scissor),
-		ST_T(test_pxl_draw_with_negative_offset)
+
+		/* Blit tests */
+		ST_T(test_pxl_blit_rect_basic),
+		ST_T(test_pxl_blit_rect_with_scissor),
+		ST_T(test_pxl_blit_rect_fully_clipped),
+		ST_T(test_pxl_blit_rect_with_offset),
+		ST_T(test_pxl_blit_rect_partially_clipped)
 	);
 }

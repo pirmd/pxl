@@ -31,4 +31,12 @@ void pxl_draw_rect(pxl_canvas_t *cnv, int x, int y, int w, int h);
 /* Filled primitives */
 void pxl_fill_rect(pxl_canvas_t *cnv, int x, int y, int w, int h);
 
+/* Blitting primitives */
+/* Blit a rectangle from a pixel buffer to the canvas at (cnv_x, cnv_y).
+ * Caller must ensure pb_r is within pb bounds (asserted).
+ * Destination is clipped to canvas scissor. Respects canvas offset.
+ */
+void pxl_blit_rect(pxl_canvas_t *cnv, const pxl_buf_t *pb,
+		pxl_rect_t pb_r, int cnv_x, int cnv_y);
+
 #endif /* PXL_DRAW_H */

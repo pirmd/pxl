@@ -172,3 +172,38 @@ pxl_fill_rect(pxl_canvas_t *cnv, int x, int y, int w, int h) {
 		row += stride;
 	}
 }
+
+void
+pxl_blit_rect(pxl_canvas_t *cnv, const pxl_buf_t *pb,
+              pxl_rect_t pb_r, int cnv_x, int cnv_y) {
+    assert(cnv && cnv->pb);
+    assert(pb && pb->data);
+    assert(pb_r.w >= 0 && pb_r.h >= 0);
+    assert(pb_r.x >= 0 && pb_r.y >= 0);
+    assert(pb_r.x + pb_r.w <= pb->width);
+    assert(pb_r.y + pb_r.h <= pb->height);
+
+    cnv_x += cnv->offset_x;
+    cnv_y += cnv->offset_y;
+
+    pxl_rect_t dst_rect = {cnv_x, cnv_y, pb_r.w, pb_r.h};
+
+    if (!pxl_clip_rect(dst_rect, cnv->scissor, &dst_rect)) {
+        return;
+    }
+
+    int src_x = pb_r.x + (dst_rect.x - cnv_x);
+    int src_y = pb_r.y + (dst_rect.y - cnv_y);
+
+    const pxl_t *pb_row = pxl_buf_ptr(pb, src_x, src_y);
+    int pb_stride = pb->stride;
+    pxl_t *cnv_row = pxl_buf_ptr(cnv->pb, dst_rect.x, dst_rect.y);
+    int cnv_stride = cnv->pb->stride;
+
+    assert(dst_rect.w <= pb_stride);
+    for (int y = 0; y < dst_rect.h; ++y) {
+        memcpy(cnv_row, pb_row, dst_rect.w * sizeof(pxl_t));
+        pb_row += pb_stride;
+        cnv_row += cnv_stride;
+    }
+}
