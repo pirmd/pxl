@@ -6,3 +6,4 @@ test_geom
 test_input
 test_stepper
 test_backend
+test_ascii

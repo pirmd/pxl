@@ -1,9 +1,9 @@
 # pxl - Unit tests
 
-TESTS = test_buf test_geom test_canvas test_draw test_draw_extra test_stepper test_input test_backend
+TESTS = test_buf test_geom test_canvas test_draw test_draw_extra test_stepper test_input test_backend test_ascii 
 
-PXL_SRC  = ../draw.c ../draw_extra.c
-PXL_SRC += ../canvas.h ../draw.h ../draw_extra.h ../buf.h ../geom.h ../err.h
+PXL_SRC  = ../draw.c ../ascii.c ../draw_extra.c
+PXL_SRC += ../canvas.h ../draw.h ../ascii.h ../draw_extra.h ../buf.h ../geom.h ../err.h
 PXL_SRC += ../stepper.h ../input.h ../backend.h
 
 -include "../config.mk"

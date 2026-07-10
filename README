@@ -6,7 +6,6 @@ Minimal 2D graphics library in C99.
 Features:
   - 2D primitives: line, rect, circle, triangle (outline + filled)
   - Canvas with scissor clipping, translation offset, color, clear, blit
-  - ARGB8888 pixel buffer (pixbuf)
   - Backends: SDL2, X11
   - Keyboard/mouse input
 
@@ -20,6 +19,8 @@ Build:
   Backend selection via BACKEND=sdl or BACKEND=x11 (default)
   Changing Backends requires manual make clean.
   Test and demo will work only if main lib use the same BACKEND. Use make clean as needed.
+
+  Simple test.sh scripts that run test with the different available backends.
 
 Quick start:
     pxl_backend_init("Title", 800, 600, false);
@@ -57,6 +58,7 @@ Architecture:
     bitmask.h      - 1-bit per pixel mask for stencil/clip operations (LSB is bit 0)
     canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
     draw.h/c       - Basic 2D primitives (line, rect, span, blit, mask)
+    ascii.h/c      - ASCII text rendering with built-in font (char, string, bounds)
     draw_extra.h/c - Advanced 2D primitives (circle, triangle)
 
   Backend:

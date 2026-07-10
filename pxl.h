@@ -12,6 +12,9 @@
 #include "draw.h"
 #include "draw_extra.h"
 
+/* Simple message */
+#include "ascii.h"
+
 /* Input and time */
 #include "input.h"
 #include "stepper.h"

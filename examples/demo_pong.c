@@ -108,7 +108,7 @@ ai_decide(pong_t *p) {
 }
 
 static void
-update(pong_t *p, float dt) {
+update_pong(pong_t *p, float dt) {
     /* AI decision (separate from physics update) */
     ai_decide(p);
 
@@ -190,7 +190,7 @@ draw_score(pxl_canvas_t *cnv, const pong_t *p) {
 }
 
 static void
-render(pxl_canvas_t *cnv, const pong_t *p) {
+render_pong(pxl_canvas_t *cnv, const pong_t *p) {
     /* Clear */
     pxl_canvas_set_color(cnv, BLUE);
     pxl_canvas_clear(cnv);
@@ -216,7 +216,26 @@ render(pxl_canvas_t *cnv, const pong_t *p) {
 }
 
 static void
-log_fps(double now) {
+render_debug_hud(pxl_canvas_t *cnv, int fps, pxl_input_state_t *in) {
+	pxl_buf_t *pb = cnv->pb;
+	int m_x = in->mouse_x, m_y = in->mouse_y;
+
+    char hud_str[64];
+	
+	if (m_x >= 0 && m_x < pb->width && m_y >= 0 && m_y < pb->height) {
+		pxl_t color = *pxl_buf_ptr(pb, m_x, m_y);
+		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Mouse: %d,%d | Pixel: #%06X",
+				fps, m_x, m_y, color & 0x00FFFFFF);
+	} else {
+		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Mouse: n/a | Pixel: n/a", fps);
+	}
+
+    pxl_canvas_set_color(cnv, WHITE);
+    pxl_draw_str(cnv, 10, H - 15, hud_str);
+}
+
+static void
+update_fps(double now, int *current_fps) {
     static double t0 = 0;
     static int n = 0;
     if (t0 == 0) {
@@ -225,9 +244,7 @@ log_fps(double now) {
     }
     n++;
     if (now - t0 >= 1.0) {
-        float fps = (float)n / (float)(now - t0);
-        printf("FPS: %d\r", (int)fps);
-        fflush(stdout);
+        *current_fps = (int)((float)n / (float)(now - t0));
         n = 0;
         t0 = now;
     }
@@ -263,7 +280,7 @@ main(void) {
     if (pxl_backend_init("PXL Pong", W, H, false) != PXL_SUCCESS)
         return 1;
 
-    printf("Pong game. Vim keys: J=down, K=up. R=reset, ESC=quit\n");
+    printf("Pong game. Vim keys: J=down, K=up. CTRL=show debug HUD, ESC=quit\n");
 
     pong_t pong, pong_prev;
     init_pong(&pong);
@@ -276,6 +293,8 @@ main(void) {
     pxl_input_t in;
     pxl_input_init(&in);
 
+    int current_fps = 0;
+
     while (!pxl_input_is_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_is_pressed(&in, PXL_WM_QUIT)) {
         pxl_stepper_sync_time(&ts, pxl_backend_get_time());
         pxl_input_next_state(&in);
@@ -284,7 +303,7 @@ main(void) {
 
         while (pxl_stepper_advance(&ts)) {
             pong_prev = pong;
-            update(&pong, (float)ts.dt);
+            update_pong(&pong, (float)ts.dt);
         }
 
         pxl_buf_t pb;
@@ -292,16 +311,22 @@ main(void) {
             pxl_canvas_t cnv;
             pxl_canvas_init(&cnv, &pb);
             
-            pong_t interpolated;
-            pong_interpolate(&interpolated, &pong_prev, &pong, ts.lerp_factor);
-            render(&cnv, &interpolated);
+            pong_t pong_interpolated;
+            pong_interpolate(&pong_interpolated, &pong_prev, &pong, ts.lerp_factor);
+            render_pong(&cnv, &pong_interpolated);
             
-            log_fps(pxl_backend_get_time());
+			/* Show HUD when CTRL is pressed */
+			if (pxl_input_is_pressed(&in, PXL_KEYB_LCTRL) || pxl_input_is_pressed(&in, PXL_KEYB_RCTRL)) {
+				render_debug_hud(&cnv, current_fps, &in.cur);
+			}
+
             pxl_backend_end_frame();
         }
+
+		update_fps(pxl_backend_get_time(), &current_fps);
     }
 
-    printf("\nFinal Score: %d - %d\n", pong.score_left, pong.score_right);
+    printf("Final Score: %d - %d\n", pong.score_left, pong.score_right);
     pxl_backend_deinit();
     return 0;
 }
