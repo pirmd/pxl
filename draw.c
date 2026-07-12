@@ -28,26 +28,22 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 		if (y0 < sc_y1) {
 			if (y1 < sc_y1) return;  /* Entire line outside */
 			/* Interpolate x0 at y = sc_y1 */
-			float t = (float)(sc_y1 - y0) / (float)(y1 - y0);
-			x0 = x0 + (int)((float)(x1 - x0) * t + 0.5f);
+			x0 += ((x1 - x0) * (sc_y1 - y0) + (y1 - y0) / 2) / (y1 - y0);
 			y0 = sc_y1;
 		}
 		if (y0 > sc_y2) {
 			if (y1 > sc_y2) return;
-			float t = (float)(sc_y2 - y0) / (float)(y1 - y0);
-			x0 = x0 + (int)((float)(x1 - x0) * t + 0.5f);
+			x0 += ((x1 - x0) * (sc_y2 - y0) + (y1 - y0) / 2) / (y1 - y0);
 			y0 = sc_y2;
 		}
 		if (y1 < sc_y1) {
 			/* y0 >= sc_y1 guaranteed by above */
-			float t = (float)(sc_y1 - y1) / (float)(y0 - y1);
-			x1 = x1 + (int)((float)(x0 - x1) * t + 0.5f);
+			x1 += ((x0 - x1) * (sc_y1 - y1) + (y0 - y1) / 2) / (y0 - y1);
 			y1 = sc_y1;
 		}
 		if (y1 > sc_y2) {
 			/* y0 <= sc_y2 guaranteed by above */
-			float t = (float)(sc_y2 - y1) / (float)(y0 - y1);
-			x1 = x1 + (int)((float)(x0 - x1) * t + 0.5f);
+			x1 += ((x0 - x1) * (sc_y2 - y1) + (y0 - y1) / 2) / (y0 - y1);
 			y1 = sc_y2;
 		}
 	}
