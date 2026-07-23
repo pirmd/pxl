@@ -60,6 +60,7 @@ Architecture:
     draw.h/c       - Basic 2D primitives (line, rect, span, blit, mask)
     ascii.h/c      - ASCII text rendering with built-in font (char, string, bounds)
     draw_extra.h/c - Advanced 2D primitives (circle, triangle)
+    text.h/text.c  - Basic text displaying helpers with mono or proportional font
 
   Backend:
     input.h       - Input state handling (keyboard, mouse, window events)

@@ -12,8 +12,9 @@
 #include "draw.h"
 #include "draw_extra.h"
 
-/* Simple message */
+/* Text */
 #include "ascii.h"
+#include "text.h"
 
 /* Input and time */
 #include "input.h"

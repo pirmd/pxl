@@ -1,6 +1,6 @@
 # pxl - Examples
 
-DEMOS = demo_sketch demo_pong demo_loops demo_gas
+DEMOS = demo_sketch demo_pong demo_loops demo_gas demo_typewriter
 
 -include "../config.mk"
 
