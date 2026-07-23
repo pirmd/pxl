@@ -324,7 +324,7 @@ typedef enum {
 
 /* Common input handling (control keys, navigation) */
 static void
-handle_input_common(typewriter_t *tw, pxl_input_t *in, double now) {
+handle_input_common(typewriter_t *tw, pxl_input_t *in) {
     /* Backspace */
     if (pxl_input_was_pressed(in, PXL_KEYB_BACKSPACE)) {
         delete_char(tw);
@@ -365,7 +365,7 @@ handle_input_common(typewriter_t *tw, pxl_input_t *in, double now) {
 /* QWERTY layout input handler */
 static void
 handle_input_qwerty(typewriter_t *tw, pxl_input_t *in, double now) {
-    handle_input_common(tw, in, now);
+    handle_input_common(tw, in);
     
     /* Symbols (punctuation) */
     if (pxl_input_was_pressed(in, PXL_KEYB_SPACE))        { insert_char(tw, ' ', now); }
@@ -436,7 +436,7 @@ handle_input_qwerty(typewriter_t *tw, pxl_input_t *in, double now) {
 /* AZERTY layout input handler */
 static void
 handle_input_azerty(typewriter_t *tw, pxl_input_t *in, double now) {
-    handle_input_common(tw, in, now);
+    handle_input_common(tw, in);
     
     bool shift_pressed = pxl_input_is_pressed(in, PXL_KEYB_LSHIFT) || pxl_input_is_pressed(in, PXL_KEYB_RSHIFT);
     bool altgr_pressed = pxl_input_is_pressed(in, PXL_KEYB_RALT);
@@ -598,7 +598,6 @@ draw_text_with_cursor(pxl_canvas_t *cnv, typewriter_t *tw, double now) {
     int cursor_line = 0;
     int cursor_x = tw->margin_left;
     bool cursor_on_visible_line = false;
-    int chars_on_line = 0;
     
     /* First, find cursor line */
     for (int i = 0; i < tw->cursor_pos && i < tw->length; i++) {
@@ -613,7 +612,6 @@ draw_text_with_cursor(pxl_canvas_t *cnv, typewriter_t *tw, double now) {
         if (tw->needs_carriage_return && line_count == cursor_line) {
             pxl_text_set_cursor(&w, tw->margin_left, w.y);
             tw->needs_carriage_return = false;
-            chars_on_line = 0;
         }
         
         if (tw->buffer[i] == '\n' || tw->buffer[i] == '\0') {
@@ -622,7 +620,6 @@ draw_text_with_cursor(pxl_canvas_t *cnv, typewriter_t *tw, double now) {
             if (line_count >= tw->scroll_line && line_count < tw->scroll_line + visible_lines) {
                 int y_pos = MARGIN_Y + (line_count - tw->scroll_line) * pxl_font_typewriter.leading;
                 pxl_text_set_cursor(&w, tw->margin_left, y_pos);
-                chars_on_line = 0;
                 
                 for (int j = line_char_start; j < line_end; j++) {
                     /* Typewriter effect: only draw characters that have appeared */
@@ -636,7 +633,6 @@ draw_text_with_cursor(pxl_canvas_t *cnv, typewriter_t *tw, double now) {
                         /* Use text color */
                         pxl_canvas_set_color(cnv, TEXT_COLOR);
                         pxl_draw_rune(&w, tw->buffer[j]);
-                        chars_on_line++;
                     }
                 }
                 

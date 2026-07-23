@@ -2,8 +2,8 @@
 
 LIB = libpxl.a
 
-SRC = draw.c draw_extra.c ascii.c text.c
-HDR = buf.h bitmask.h geom.h err.h canvas.h draw.h draw_extra.h ascii.h stepper.h text.h
+SRC = draw.c draw_extra.c ascii.c text.c tileset.c
+HDR = buf.h bitmask.h geom.h err.h canvas.h draw.h draw_extra.h ascii.h stepper.h text.h tileset.h
 
 -include "config.mk"
 

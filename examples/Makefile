@@ -1,6 +1,6 @@
 # pxl - Examples
 
-DEMOS = demo_sketch demo_pong demo_loops demo_gas demo_typewriter
+DEMOS = demo_sketch demo_pong demo_loops demo_gas demo_typewriter demo_fountain
 
 -include "../config.mk"
 
@@ -8,7 +8,7 @@ CC      ?= cc
 CFLAGS  ?= -O0 -g -std=c99 -Wall -Wextra
 CFLAGS  += -I.. -I.
 
-LDFLAGS += -L.. -lpxl
+LDFLAGS += -L.. -lpxl -lm
 
 X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
 SDL_LIBS   ?= -L/usr/local/lib -lSDL2

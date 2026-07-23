@@ -16,6 +16,9 @@
 #include "ascii.h"
 #include "text.h"
 
+/* Tileset */
+#include "tileset.h"
+
 /* Input and time */
 #include "input.h"
 #include "stepper.h"
