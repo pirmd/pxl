@@ -4,6 +4,40 @@
 #include "geom.h"
 #include "text.h"
 
+/* UTF-8 decoder: returns bytes consumed (1-4), outputs Unicode codepoint.
+ * On invalid sequences, returns 1 and outputs fallback '?'.
+ */
+static int
+pxl_utf8_decode(const char *text, uint32_t *out_codepoint) {
+	unsigned char c = (unsigned char)text[0];
+
+	/* ASCII (1 byte) */
+	if (c < 0x80) {
+		*out_codepoint = c;
+		return 1;
+	}
+	/* 2-byte sequence */
+	if ((c & 0xE0) == 0xC0) {
+		*out_codepoint = ((c & 0x1F) << 6) | (text[1] & 0x3F);
+		return 2;
+	}
+	/* 3-byte sequence */
+	if ((c & 0xF0) == 0xE0) {
+		*out_codepoint = ((c & 0x0F) << 12) | ((text[1] & 0x3F) << 6) | (text[2] & 0x3F);
+		return 3;
+	}
+	/* 4-byte sequence */
+	if ((c & 0xF8) == 0xF0) {
+		*out_codepoint = ((c & 0x07) << 18) | ((text[1] & 0x3F) << 12) |
+		                 ((text[2] & 0x3F) << 6) | (text[3] & 0x3F);
+		return 4;
+	}
+
+	/* Invalid or desynced character */
+	*out_codepoint = '?';
+	return 1;
+}
+
 void
 pxl_text_ctx_init(pxl_text_ctx_t *ctx, pxl_canvas_t *cnv, const pxl_font_t *font) {
 	assert(ctx && cnv);
@@ -78,9 +112,10 @@ pxl_draw_text(pxl_text_ctx_t *ctx, const char *txt) {
 	assert(ctx && ctx->cnv && ctx->font);
 	assert(txt);
 
+	uint32_t codepoint;
 	while (*txt) {
-		pxl_draw_rune(ctx, (uint32_t)(unsigned char)*txt);
-		++txt;
+		txt += pxl_utf8_decode(txt, &codepoint);
+		pxl_draw_rune(ctx, codepoint);
 	}
 }
 
@@ -96,8 +131,10 @@ pxl_text_bounds(const pxl_text_ctx_t *ctx, const char *txt) {
 	pxl_rect_t b = {0};
 	int w = 0;
 
+	uint32_t codepoint;
 	while (*txt) {
-		uint32_t rune = (uint32_t)(unsigned char)*txt++;
+		txt += pxl_utf8_decode(txt, &codepoint);
+		uint32_t rune = codepoint;
 
 		switch (rune) {
 			case '\n':
