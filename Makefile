@@ -58,18 +58,18 @@ lint:
 	$(CC) $(CFLAGS) $(CFLAGS_LINT) $(SRC) $(HDR)
 	$(CC) $(CFLAGS) $(CFLAGS_LINT) test/*.c
 	$(CC) $(CFLAGS) $(CFLAGS_LINT) -Itest/stest test/stest/*.c test/stest/*.h test/stest/examples/*.c
-	$(CC) $(CFLAGS) $(CFLAGS_LINT) examples/*.c
+	$(CC) $(CFLAGS) $(CFLAGS_LINT) demo/*.c
 
 test: $(LIB)
 	$(MAKE) -C test all
-	$(MAKE) -C examples clean all BACKEND=$(BACKEND)
+	$(MAKE) -C demo clean all BACKEND=$(BACKEND)
 
-examples: $(LIB)
-	$(MAKE) -C examples BACKEND=$(BACKEND)
+demo: $(LIB)
+	$(MAKE) -C demo BACKEND=$(BACKEND)
 
 clean:
 	rm -f *.o $(LIB)
 	$(MAKE) -C test clean
-	$(MAKE) -C examples clean
+	$(MAKE) -C demo clean
 
-.PHONY: all lint test clean examples
+.PHONY: all lint test clean demo
