@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 #include "pxl.h"
@@ -61,7 +62,10 @@ typedef struct {
 
 static void
 init_atlas(pxl_buf_t *atlas) {
-    pxl_buf_init(atlas, ATLAS_WIDTH, ATLAS_HEIGHT);
+    atlas->width = ATLAS_WIDTH;
+    atlas->height = ATLAS_HEIGHT;
+    atlas->stride = pxl_calc_stride(ATLAS_WIDTH);
+    atlas->data = malloc(atlas->stride * atlas->height * sizeof(pxl_t));
 
     for (int row = 0; row < ATLAS_ROWS; row++) {
         for (int col = 0; col < ATLAS_COLS; col++) {
@@ -402,7 +406,8 @@ main(void) {
         update_fps(now, &current_fps);
     }
 
-    pxl_buf_deinit(&fountain.atlas);
+    free(fountain.atlas.data);
+    fountain.atlas.data = NULL;
     pxl_backend_deinit();
     return 0;
 }

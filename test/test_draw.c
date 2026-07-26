@@ -1,6 +1,7 @@
 #include <string.h>
 #include "bitmask.h"
 #include "canvas.h"
+#include "buf.h"
 #include "draw.h"
 #include "geom.h"
 #include "stest/stest.h"
@@ -36,11 +37,12 @@ pxl_buf_fill(pxl_buf_t *pb, pxl_t color) {
 
 static bool
 fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
-	if (!st_check(ctx, pxl_buf_init(&f->pb, w, h) == PXL_SUCCESS, "pixbuf_init failed")) {
-		return false;
-	}
+	f->pb.width = w;
+	f->pb.height = h;
+	f->pb.stride = pxl_calc_stride(w);
+	f->pb.data = malloc(f->pb.stride * f->pb.height * sizeof(pxl_t));
 
-	if (!st_check(ctx, f->pb.data != NULL, "pixbuf data is NULL")) {
+	if (!st_check(ctx, f->pb.data != NULL, "malloc failed")) {
 		return false;
 	}
 
@@ -52,7 +54,8 @@ fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
 
 static void
 fixture_deinit(fixture_t *f) {
-	pxl_buf_deinit(&f->pb);
+	free(f->pb.data);
+	f->pb.data = NULL;
 }
 
 /* Helpers ----------------------------------------------------------------- */
@@ -880,14 +883,13 @@ test_pxl_blit_rect_basic(void) {
 		return;
 	}
 
-	/* Create source buffer filled with red */
+	/* Create source buffer filled with green */
 	pxl_buf_t src_pb;
-	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 10, 10) == PXL_SUCCESS, "src pixbuf init failed")) {
-		fixture_deinit(&f);
-		return;
-	}
-	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
-		pxl_buf_deinit(&src_pb);
+	src_pb.width = 10;
+	src_pb.height = 10;
+	src_pb.stride = pxl_calc_stride(10);
+	src_pb.data = malloc(src_pb.stride * src_pb.height * sizeof(pxl_t));
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src malloc failed")) {
 		fixture_deinit(&f);
 		return;
 	}
@@ -912,7 +914,7 @@ test_pxl_blit_rect_basic(void) {
 		}
 	}
 
-	pxl_buf_deinit(&src_pb);
+	free(src_pb.data); src_pb.data = NULL;
 	fixture_deinit(&f);
 }
 
@@ -927,12 +929,11 @@ test_pxl_blit_rect_with_scissor(void) {
 	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
 
 	pxl_buf_t src_pb;
-	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 15, 15) == PXL_SUCCESS, "src pixbuf init failed")) {
-		fixture_deinit(&f);
-		return;
-	}
-	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
-		pxl_buf_deinit(&src_pb);
+	src_pb.width = 15;
+	src_pb.height = 15;
+	src_pb.stride = pxl_calc_stride(15);
+	src_pb.data = malloc(src_pb.stride * src_pb.height * sizeof(pxl_t));
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src malloc failed")) {
 		fixture_deinit(&f);
 		return;
 	}
@@ -958,7 +959,7 @@ test_pxl_blit_rect_with_scissor(void) {
 		}
 	}
 
-	pxl_buf_deinit(&src_pb);
+	free(src_pb.data); src_pb.data = NULL;
 	fixture_deinit(&f);
 }
 
@@ -972,12 +973,11 @@ test_pxl_blit_rect_fully_clipped(void) {
 
 	/* Create source buffer filled with blue */
 	pxl_buf_t src_pb;
-	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 10, 10) == PXL_SUCCESS, "src pixbuf init failed")) {
-		fixture_deinit(&f);
-		return;
-	}
-	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
-		pxl_buf_deinit(&src_pb);
+	src_pb.width = 10;
+	src_pb.height = 10;
+	src_pb.stride = pxl_calc_stride(10);
+	src_pb.data = malloc(src_pb.stride * src_pb.height * sizeof(pxl_t));
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src malloc failed")) {
 		fixture_deinit(&f);
 		return;
 	}
@@ -1003,7 +1003,7 @@ test_pxl_blit_rect_fully_clipped(void) {
 		}
 	}
 
-	pxl_buf_deinit(&src_pb);
+	free(src_pb.data); src_pb.data = NULL;
 	fixture_deinit(&f);
 }
 
@@ -1019,12 +1019,11 @@ test_pxl_blit_rect_with_offset(void) {
 
 	/* Create source buffer filled with yellow */
 	pxl_buf_t src_pb;
-	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 8, 8) == PXL_SUCCESS, "src pixbuf init failed")) {
-		fixture_deinit(&f);
-		return;
-	}
-	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
-		pxl_buf_deinit(&src_pb);
+	src_pb.width = 8;
+	src_pb.height = 8;
+	src_pb.stride = pxl_calc_stride(8);
+	src_pb.data = malloc(src_pb.stride * src_pb.height * sizeof(pxl_t));
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src malloc failed")) {
 		fixture_deinit(&f);
 		return;
 	}
@@ -1050,7 +1049,7 @@ test_pxl_blit_rect_with_offset(void) {
 		}
 	}
 
-	pxl_buf_deinit(&src_pb);
+	free(src_pb.data); src_pb.data = NULL;
 	fixture_deinit(&f);
 }
 
@@ -1064,12 +1063,11 @@ test_pxl_blit_rect_partially_clipped(void) {
 
 	/* Create source buffer filled with white */
 	pxl_buf_t src_pb;
-	if (!st_check(&ST_HERE, pxl_buf_init(&src_pb, 15, 15) == PXL_SUCCESS, "src pixbuf init failed")) {
-		fixture_deinit(&f);
-		return;
-	}
-	if (!st_check(&ST_HERE, src_pb.data != NULL, "src pixbuf data is NULL")) {
-		pxl_buf_deinit(&src_pb);
+	src_pb.width = 15;
+	src_pb.height = 15;
+	src_pb.stride = pxl_calc_stride(15);
+	src_pb.data = malloc(src_pb.stride * src_pb.height * sizeof(pxl_t));
+	if (!st_check(&ST_HERE, src_pb.data != NULL, "src malloc failed")) {
 		fixture_deinit(&f);
 		return;
 	}
@@ -1095,7 +1093,7 @@ test_pxl_blit_rect_partially_clipped(void) {
 		}
 	}
 
-	pxl_buf_deinit(&src_pb);
+	free(src_pb.data); src_pb.data = NULL;
 	fixture_deinit(&f);
 }
 

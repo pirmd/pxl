@@ -25,7 +25,11 @@ fixture_init_atlas(fixture_t *f, int tile_w, int tile_h, int cols, int rows) {
 	int atlas_w = cols * tile_w;
 	int atlas_h = rows * tile_h;
 
-	if (pxl_buf_init(&f->atlas, atlas_w, atlas_h) != PXL_SUCCESS) {
+	f->atlas.width = atlas_w;
+	f->atlas.height = atlas_h;
+	f->atlas.stride = pxl_calc_stride(atlas_w);
+	f->atlas.data = malloc(f->atlas.stride * f->atlas.height * sizeof(pxl_t));
+	if (f->atlas.data == NULL) {
 		return false;
 	}
 
@@ -57,11 +61,11 @@ fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h, int tile_w, int ti
 	              "Failed to initialize atlas")) {
 		return false;
 	}
-	if (!st_check(ctx, pxl_buf_init(&f->pb, w, h) == PXL_SUCCESS,
-	              "Failed to initialize pixel buffer")) {
-		return false;
-	}
-	if (!st_check(ctx, f->pb.data != NULL, "Pixel buffer data is NULL")) {
+	f->pb.width = w;
+	f->pb.height = h;
+	f->pb.stride = pxl_calc_stride(w);
+	f->pb.data = malloc(f->pb.stride * f->pb.height * sizeof(pxl_t));
+	if (!st_check(ctx, f->pb.data != NULL, "malloc failed")) {
 		return false;
 	}
 	pxl_canvas_init(&f->cnv, &f->pb);
@@ -71,8 +75,10 @@ fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h, int tile_w, int ti
 
 static void
 fixture_deinit(fixture_t *f) {
-	pxl_buf_deinit(&f->atlas);
-	pxl_buf_deinit(&f->pb);
+	free(f->atlas.data);
+	f->atlas.data = NULL;
+	free(f->pb.data);
+	f->pb.data = NULL;
 }
 
 /* Helpers ----------------------------------------------------------------- */

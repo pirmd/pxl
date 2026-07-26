@@ -1,5 +1,6 @@
 #include <string.h>
 #include "canvas.h"
+#include "buf.h"
 #include "ascii.h"
 #include "stest/stest.h"
 
@@ -19,10 +20,12 @@ pxl_buf_zero(pxl_buf_t *pb) {
 
 static bool
 fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
-	if (!st_check(ctx, pxl_buf_init(&f->pb, w, h) == PXL_SUCCESS, "pixbuf_init failed")) {
-		return false;
-	}
-	if (!st_check(ctx, f->pb.data != NULL, "pixbuf data is NULL")) {
+	f->pb.width = w;
+	f->pb.height = h;
+	f->pb.stride = pxl_calc_stride(w);
+	f->pb.data = malloc(f->pb.stride * f->pb.height * sizeof(pxl_t));
+
+	if (!st_check(ctx, f->pb.data != NULL, "malloc failed")) {
 		return false;
 	}
 	pxl_canvas_init(&f->cnv, &f->pb);
@@ -32,7 +35,8 @@ fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
 
 static void
 fixture_deinit(fixture_t *f) {
-	pxl_buf_deinit(&f->pb);
+	free(f->pb.data);
+	f->pb.data = NULL;
 }
 
 /* Helpers ----------------------------------------------------------------- */

@@ -101,7 +101,7 @@ test_pxl_backend_frame_flow(void) {
 	ST_CHECK(pb.width == w, "frame width should match init width, got %d, want %d", pb.width, w);
 	ST_CHECK(pb.height == h, "frame height should match init height, got %d, want %d", pb.height, h);
 	ST_CHECK(pb.stride > 0, "frame stride should be positive, got %d", pb.stride);
-	ST_CHECK(pb.stride % PXL_ALIGN == 0, "stride must be pixel-aligned (%d not divisible by %d)", pb.stride, PXL_ALIGN);
+	ST_CHECK(pb.stride % PXL_BUF_ALIGN == 0, "stride must be pixel-aligned (%d not divisible by %d)", pb.stride, PXL_BUF_ALIGN);
 	ST_CHECK(pb.data != NULL, "frame data should not be NULL");
 
 	pxl_backend_end_frame();
