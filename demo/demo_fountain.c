@@ -440,7 +440,7 @@ main(void) {
     printf("Controls: 1/2/3=type, Left/Right click=cycle type, Up/Down=rate, P=pause, CTRL=show HUD, ESC=quit\n");
     printf("Particle fountain follows mouse cursor\n\n");
 
-    if (pxl_backend_init("PXL Fountain", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("PXL Fountain", W, H, 0) != PXL_SUCCESS)
         return 1;
 
     init_fountain(&app.fountain);

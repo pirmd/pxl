@@ -568,7 +568,7 @@ render_debug_hud(pxl_canvas_t *cnv, int fps, pxl_input_t *in) {
 
 int
 main(void) {
-    if (pxl_backend_init("PXL Pong", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("PXL Pong", W, H, 0) != PXL_SUCCESS)
         return 1;
 
     printf("Pong game. Vim keys: J=down, K=up. CTRL=HUD, P=pause, ESC=quit\n");

@@ -15,7 +15,7 @@ static struct {
 } g_sdl;
 
 pxl_err_t
-pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
+pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	pxl_backend_deinit();
 
 	/* Validate parameters */
@@ -27,19 +27,39 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
 		return PXL_E_BACKEND_INIT;
 	}
 
-	uint32_t flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0;
+	/* Build window flags */
+	uint32_t window_flags = 0;
+	if (flags & PXL_BACKEND_FULLSCREEN) {
+		window_flags |= SDL_WINDOW_FULLSCREEN;
+	}
+	if (flags & PXL_BACKEND_HIDDEN) {
+		window_flags |= SDL_WINDOW_HIDDEN;
+	}
+
+	/* Calculate position for centered window */
+	int x = SDL_WINDOWPOS_UNDEFINED, y = SDL_WINDOWPOS_UNDEFINED;
+	if (flags & PXL_BACKEND_CENTERED) {
+		x = SDL_WINDOWPOS_CENTERED;
+		y = SDL_WINDOWPOS_CENTERED;
+	}
+
 	g_sdl.window = SDL_CreateWindow(
 		title,
-		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+		x, y,
 		w, h,
-		flags
+		window_flags
 	);
 	if (!g_sdl.window) goto fail;
 
-	/* No VSYNC for minimal latency */
+	/* Build renderer flags */
+	uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
+	if (flags & PXL_BACKEND_VSYNC) {
+		renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
+	}
+
 	g_sdl.renderer = SDL_CreateRenderer(
 		g_sdl.window, -1,
-		SDL_RENDERER_ACCELERATED
+		renderer_flags
 	);
 	if (!g_sdl.renderer) goto fail;
 

@@ -317,7 +317,7 @@ log_fps(double now, size_t particle_count, float speed_factor) {
 
 int
 main(void) {
-    if (pxl_backend_init("PXL Gas Demo (Spatial Grid)", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("PXL Gas Demo (Spatial Grid)", W, H, 0) != PXL_SUCCESS)
         return 1;
 
     printf("Gas simulation. Up/Down: add/remove particles, 1-4: speed, P=pause, ESC=quit\n");

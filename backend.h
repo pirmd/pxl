@@ -8,16 +8,37 @@
 
 /*
  * When adding a new backend, ensure that:
- *   . All backends MUST use ARGB8888 pixel format (little-endian: A:24-31,
- *     R:16-23, G:8-15, B:0-7) to be consistent with PXL's native color format
+ *   . All backends MUST use ARGB8888 pixel format (A: bits 24-31, R: 16-23,
+ *     G: 8-15, B: 0-7) to be consistent with PXL's native color format.
+ *     Memory layout depends on endianness:
+ *       - Little-endian: [B, G, R, A] (byte 0 = B, byte 1 = G, byte 2 = R, byte 3 = A)
+ *       - Big-endian:   [A, R, G, B] (byte 0 = A, byte 1 = R, byte 2 = G, byte 3 = B)
+ *     Use pxl_argb/pxl_a/pxl_r/pxl_g/pxl_b from color.h to ensure portability.
  *   . All backends must return pixel-aligned stride in out_pb->stride
  *     (i.e., out_pb->stride * sizeof(pxl_t) must be a valid memory offset)
  *     This has to be enforced by checks in backend implementations.
  */
 
+/* Backend initialization flags.
+ *
+ * Usage:
+ *   pxl_backend_init("Window", 800, 600, PXL_BACKEND_CENTERED | PXL_BACKEND_VSYNC);
+ *
+ * Notes:
+ *   - PXL_BACKEND_VSYNC: May be ignored by some backends (e.g., X11).
+ *   - PXL_BACKEND_HIDDEN: Useful for testing (no window visible).
+ *   - Flags can be combined using bitwise OR (|).
+ */
+typedef enum {
+	PXL_BACKEND_FULLSCREEN = (1 << 0),  /* Fullscreen mode */
+	PXL_BACKEND_HIDDEN     = (1 << 1),  /* Hidden window (for headless testing) */
+	PXL_BACKEND_VSYNC      = (1 << 2),  /* Enable vertical sync */
+	PXL_BACKEND_CENTERED   = (1 << 3),  /* Center window on screen */
+} pxl_backend_flags_t;
+
 /* Initialize the backend */
 pxl_err_t
-pxl_backend_init(const char *title, int w, int h, bool fullscreen);
+pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags);
 
 /* Cleanup the backend */
 void

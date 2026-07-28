@@ -26,16 +26,11 @@ Build:
   environment variables.
 
 Quick start:
-    pxl_backend_init("Title", 800, 600, false);
-
-    struct {
-        pxl_input_t in_prev, in_curr;
-    } app = {0};
-
-    while (!pxl_input_state(&app.in_curr, PXL_KEYB_ESCAPE) &&
-           !pxl_input_state(&app.in_curr, PXL_WM_QUIT)) {
-        app.in_prev = app.in_curr;
-        pxl_backend_poll_events(&app.in_curr);
+    pxl_input_t in = {0};
+    pxl_backend_init("Title", 800, 600, 0);
+    while (pxl_input_state(&in, PXL_KEYB_ESCAPE) == 0 &&
+           pxl_input_state(&in, PXL_WM_QUIT) == 0) {
+        pxl_backend_poll_events(&in);
 
         pxl_buf_t pb;
         if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
@@ -63,7 +58,9 @@ Architecture:
 
   Backend:
     input.h       - Input state handling (keyboard, mouse, window events)
-    backend.h     - Backend interface. All backends MUST use ARGB8888 pixel format.
+    backend.h     - Backend interface. All backends MUST use ARGB8888 pixel format
+                    (A:24-31, R:16-23, G:8-15, B:0-7). Supports both little-endian and
+                    big-endian architectures via color.h helpers (pxl_argb, pxl_a, etc.).
                     Only one window is supported at the moment.
     backend_sdl.c - SDL2 backend (do not activate VSYNC)
     backend_x11.c - X11 backend

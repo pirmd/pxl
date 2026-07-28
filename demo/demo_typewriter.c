@@ -658,7 +658,7 @@ handle_input(double now) {
 
 int
 main(void) {
-    if (pxl_backend_init("PXL Typewriter", W, H, false) != PXL_SUCCESS)
+    if (pxl_backend_init("PXL Typewriter", W, H, 0) != PXL_SUCCESS)
         return 1;
 
     printf("Typewriter demo. Type text, use arrows to navigate, Backspace/Delete to edit.\n");

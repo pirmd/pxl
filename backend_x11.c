@@ -16,11 +16,6 @@
 #include "input.h"
 #include "buf.h"
 
-/* Only little-endian is supported - X11 uses ARGB8888 in memory */
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__)
-#error "X11 backend only supports little-endian architectures"
-#endif
-
 #define ARGB32_DEPTH    32
 #define ARGB_RED_MASK   0x00ff0000
 #define ARGB_GREEN_MASK 0x0000ff00
@@ -64,7 +59,7 @@ select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
 }
 
 pxl_err_t
-pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
+pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     pxl_backend_deinit();
 
     /* Validate parameters */
@@ -89,9 +84,16 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
         .border_pixel = 0,
     };
 
+    /* Calculate position for centered window */
+    int x = 0, y = 0;
+    if (flags & PXL_BACKEND_CENTERED) {
+        x = (DisplayWidth(g_x11.display, scr) - w) / 2;
+        y = (DisplayHeight(g_x11.display, scr) - h) / 2;
+    }
+
     g_x11.window = XCreateWindow(
         g_x11.display, root,
-        0, 0, w, h, 0,
+        x, y, w, h, 0,
         depth, InputOutput, visual,
         CWColormap | CWBackPixel | CWBorderPixel,
         &attrs
@@ -109,6 +111,10 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
 
     g_x11.wm_delete = XInternAtom(g_x11.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(g_x11.display, g_x11.window, &g_x11.wm_delete, 1);
+
+    /* Map window temporarily for XShmAttach to work */
+    XMapWindow(g_x11.display, g_x11.window);
+    XSync(g_x11.display, False);
 
     g_x11.img = XShmCreateImage(g_x11.display, visual, depth, ZPixmap, NULL,
                                 &g_x11.shm, w, h);
@@ -140,10 +146,14 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
     g_x11.width = w;
     g_x11.height = h;
 
-    XMapWindow(g_x11.display, g_x11.window);
+    /* Unmap if hidden flag is set */
+    if (flags & PXL_BACKEND_HIDDEN) {
+        XUnmapWindow(g_x11.display, g_x11.window);
+        XSync(g_x11.display, False);
+    }
 
     /* Fullscreen via EWMH */
-    if (fullscreen) {
+    if (flags & PXL_BACKEND_FULLSCREEN) {
         Atom wm_state = XInternAtom(g_x11.display, "_NET_WM_STATE", False);
         Atom fullscreen_atom = XInternAtom(g_x11.display, "_NET_WM_STATE_FULLSCREEN", False);
 
