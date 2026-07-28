@@ -1,19 +1,21 @@
 #include "stepper.h"
-#include "stest/stest.h"
+#include "test.h"
 
-/* Initialization tests ------------------------------------------------------- */
+/* Initialization tests */
 
 static void
 test_pxl_stepper_init(void) {
 	pxl_time_stepper_t ts = {.dt = 0.016};
 	pxl_stepper_init(&ts, 0.001);
 
-	ST_CHECK(ts.current_time == 0.001, "current_time not initialized");
-	ST_CHECK(ts.accumulator == 0.0, "accumulator not initialized to 0");
-	ST_CHECK(ts.lerp_factor == 0.0, "lerp_factor not initialized to 0");
+	ASSERT(ts.current_time == 0.001);
+	ASSERT(ts.accumulator == 0.0);
+	ASSERT(ts.lerp_factor == 0.0);
+	ASSERT(ts.paused == false);
+	ASSERT(ts.time_scale == 1.0f);
 }
 
-/* Sync time tests ------------------------------------------------------------ */
+/* Sync time tests */
 
 static void
 test_pxl_stepper_sync_time_basic(void) {
@@ -21,11 +23,21 @@ test_pxl_stepper_sync_time_basic(void) {
 	pxl_stepper_init(&ts, 0.001);
 
 	pxl_stepper_sync_time(&ts, 0.017);
-	ST_CHECK(ts.current_time == 0.017, "current_time not updated");
-	ST_CHECK(ts.accumulator == 0.016, "accumulator not updated");
+	ASSERT(ts.current_time == 0.017);
+	ASSERT(ts.accumulator == 0.016);
 }
 
-/* Advance tests -------------------------------------------------------------- */
+static void
+test_pxl_stepper_sync_time_clamp(void) {
+	pxl_time_stepper_t ts = {.dt = 0.016};
+	pxl_stepper_init(&ts, 0.0);
+
+	pxl_stepper_sync_time(&ts, 10.0);
+	ASSERT(ts.current_time == 10.0);
+	ASSERT(ts.accumulator == PXL_STEPPER_MAX_FRAME_TIME);
+}
+
+/* Advance tests */
 
 static void
 test_pxl_stepper_advance_trigger(void) {
@@ -33,8 +45,8 @@ test_pxl_stepper_advance_trigger(void) {
 	pxl_stepper_init(&ts, 0.001);
 
 	pxl_stepper_sync_time(&ts, 0.017);
-	ST_CHECK(pxl_stepper_advance(&ts) == true, "should advance (accumulator >= dt)");
-	ST_CHECK(ts.accumulator == 0.0, "accumulator not reset after advance");
+	ASSERT(pxl_stepper_advance(&ts) == true);
+	ASSERT(ts.accumulator == 0.0);
 }
 
 static void
@@ -43,28 +55,85 @@ test_pxl_stepper_advance_no_trigger(void) {
 	pxl_stepper_init(&ts, 0.001);
 
 	pxl_stepper_sync_time(&ts, 0.009);
-	ST_CHECK(pxl_stepper_advance(&ts) == false, "should not advance (accumulator < dt)");
+	ASSERT(pxl_stepper_advance(&ts) == false);
 }
 
 static void
-test_stepper_lerp_factor(void) {
+test_pxl_stepper_lerp_factor(void) {
 	pxl_time_stepper_t ts = {.dt = 0.016};
 	pxl_stepper_init(&ts, 0.001);
 
 	pxl_stepper_sync_time(&ts, 0.009);
 	pxl_stepper_advance(&ts);
-	ST_CHECK(ts.lerp_factor == 0.5f, "lerp_factor should be 0.5 (8ms/16ms)");
+	ASSERT(ts.lerp_factor == 0.5f);
 }
 
-/* Main ----------------------------------------------------------------------- */
+/* Paused tests */
+
+static void
+test_pxl_stepper_paused(void) {
+	pxl_time_stepper_t ts = {.dt = 0.016};
+	pxl_stepper_init(&ts, 0.0);
+	ts.paused = true;
+
+	pxl_stepper_sync_time(&ts, 0.1);
+	ASSERT(ts.current_time == 0.1);
+	ASSERT(ts.accumulator == 0.0);
+
+	ASSERT(pxl_stepper_advance(&ts) == false);
+	ASSERT(ts.accumulator == 0.0);
+}
+
+/* Time scale tests */
+
+static void
+test_pxl_stepper_time_scale(void) {
+	pxl_time_stepper_t ts = {.dt = 0.016};
+	pxl_stepper_init(&ts, 0.0);
+	ts.time_scale = 2.0f;
+
+	pxl_stepper_sync_time(&ts, 0.01);
+	ASSERT(ts.accumulator == 0.02);
+
+	pxl_stepper_init(&ts, 0.0);
+	ts.time_scale = 0.5f;
+	pxl_stepper_sync_time(&ts, 0.04);
+	ASSERT(ts.accumulator == 0.02);
+}
+
+/* Reinit test */
+
+static void
+test_pxl_stepper_reinit(void) {
+	pxl_time_stepper_t ts = {.dt = 0.016};
+	pxl_stepper_init(&ts, 0.1);
+
+	ts.current_time = 100.0;
+	ts.accumulator = 50.0;
+	ts.lerp_factor = 0.75f;
+	ts.paused = true;
+	ts.time_scale = 2.0f;
+
+	pxl_stepper_reinit(&ts, 0.2);
+	ASSERT(ts.current_time == 0.2);
+	ASSERT(ts.accumulator == 0.0);
+	ASSERT(ts.lerp_factor == 0.0);
+	ASSERT(ts.paused == false);
+	ASSERT(ts.time_scale == 1.0f);
+}
+
+/* Main */
+
 int
-main(int argc, char *argv[]) {
-	ST_GETOPTS(argc, argv);
-	return ST_RUN(
-		ST_T(test_pxl_stepper_init),
-		ST_T(test_pxl_stepper_sync_time_basic),
-		ST_T(test_pxl_stepper_advance_trigger),
-		ST_T(test_pxl_stepper_advance_no_trigger),
-		ST_T(test_stepper_lerp_factor)
-	);
+main(void) {
+	test_pxl_stepper_init();
+	test_pxl_stepper_sync_time_basic();
+	test_pxl_stepper_sync_time_clamp();
+	test_pxl_stepper_advance_trigger();
+	test_pxl_stepper_advance_no_trigger();
+	test_pxl_stepper_lerp_factor();
+	test_pxl_stepper_paused();
+	test_pxl_stepper_time_scale();
+	test_pxl_stepper_reinit();
+	return 0;
 }
