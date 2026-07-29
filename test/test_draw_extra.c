@@ -51,7 +51,8 @@ fixture_deinit(fixture_t *f) {
 /* Helpers ----------------------------------------------------------------- */
 static inline bool
 is_inside_scissor(int x, int y, const pxl_canvas_t *cnv) {
-	return pxl_in_rect(x, y, cnv->scissor);
+	return (x >= cnv->scissor.x && x < cnv->scissor.x + cnv->scissor.w &&
+			y >= cnv->scissor.y && y < cnv->scissor.y + cnv->scissor.h);
 }
 
 /* Check if point (x,y) is on the circle outline drawn by pxl_draw_circle.
