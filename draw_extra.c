@@ -2,6 +2,7 @@
 
 #include "draw_extra.h"
 #include "geom.h"
+#include "draw.h"
 
 /* Circle -------------------------------------------------------------- */
 void

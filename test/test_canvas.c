@@ -6,7 +6,7 @@
 /* Fixture ----------------------------------------------------------------- */
 #define FIXTURE_W 101
 #define FIXTURE_H 128
-#define FIXTURE_STRIDE pxl_calc_stride(FIXTURE_W)
+#define FIXTURE_STRIDE 104  /* pxl_calc_stride(101) = 104 */
 
 static pxl_t g_buf_data[FIXTURE_STRIDE * FIXTURE_H];
 static pxl_buf_t g_buf = {

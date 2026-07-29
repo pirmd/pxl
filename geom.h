@@ -51,11 +51,11 @@ pxl_clip_span(pxl_span_t in, pxl_span_t bounds, pxl_span_t *out) {
 	return out->w > 0;
 }
 
-/* Returns true if point (x,y) is inside rect r (inclusive left/top, exclusive right/bottom) */
+/* Returns true if point (x,y) is inside rect r */
 static inline bool
 pxl_in_rect(int x, int y, pxl_rect_t r) {
 	assert(r.w >= 0 && r.h >= 0);
-	/* Avoid overflow: use subtraction instead of addition */
+
 	return x >= r.x && r.w > 0 && (x - r.x) < r.w &&
 	       y >= r.y && r.h > 0 && (y - r.y) < r.h;
 }
