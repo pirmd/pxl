@@ -86,6 +86,10 @@ pxl_canvas_clear(pxl_canvas_t *cnv) {
 	
 	/* Fast path: scissor covers entire buffer (implies sc.x==0 && sc.y==0 due to clipping) */
 	if (sc.w == pb->width && sc.h == pb->height) {
+		/* Prevent integer overflow in memset size calculation */
+		assert(pb->stride <= INT_MAX / (int)sizeof(pxl_t));
+		assert(pb->height <= INT_MAX / pb->stride / (int)sizeof(pxl_t));
+
 		if (cnv->color == 0) {
 			memset(pb->data, 0x00, pb->height * pb->stride * sizeof(pxl_t));
 			return;
