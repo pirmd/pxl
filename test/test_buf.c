@@ -1,10 +1,7 @@
 #include "test.h"
 #include "buf.h"
 
-#include <stddef.h>  /* for ptrdiff_t */
-#include <stdlib.h>
-
-/* pxl_calc_stride tests */
+/* pxl_calc_stride tests ------------------------------------------------------ */
 
 static void
 test_pxl_calc_stride_exact_multiples(void) {
@@ -33,94 +30,87 @@ test_pxl_calc_stride_alignment_guarantee(void) {
 	}
 }
 
-/* pxl_buf_ptr tests */
+/* Fixture for pxl_buf_ptr tests -------------------------------------------- */
+#define FIXTURE_W 101
+#define FIXTURE_H 10
+#define FIXTURE_STRIDE pxl_calc_stride(FIXTURE_W)
+
+static pxl_t g_buf_data[FIXTURE_STRIDE * FIXTURE_H];
+static pxl_buf_t g_buf = {
+	.data = g_buf_data,
+	.width = FIXTURE_W,
+	.height = FIXTURE_H,
+	.stride = FIXTURE_STRIDE
+};
+
+static inline void
+fixture_reset(void) {
+	memset(g_buf_data, 0x00, sizeof(g_buf_data));
+}
+
+/* pxl_buf_ptr tests -------------------------------------------------------- */
 
 static void
 test_pxl_buf_ptr_basic_access(void) {
-	pxl_buf_t pb;
-	pb.width = 10;
-	pb.height = 10;
-	pb.stride = pxl_calc_stride(10);
-	pb.data = malloc(pb.stride * pb.height * sizeof(pxl_t));
-
+	fixture_reset();
+	
 	pxl_t value = 0xCAFEBABE;
-	pxl_t *ptr = pxl_buf_ptr(&pb, 3, 4);
+	pxl_t *ptr = pxl_buf_ptr(&g_buf, 3, 4);
 	*ptr = value;
-	ASSERT(*pxl_buf_ptr(&pb, 3, 4) == value);
-
-	free(pb.data);
+	ASSERT(*pxl_buf_ptr(&g_buf, 3, 4) == value);
 }
 
 static void
 test_pxl_buf_ptr_corners(void) {
-	pxl_buf_t pb;
-	pb.width = 100;
-	pb.height = 50;
-	pb.stride = pxl_calc_stride(100);
-	pb.data = malloc(pb.stride * pb.height * sizeof(pxl_t));
-
+	fixture_reset();
+	
 	/* Test all four corners */
-	*pxl_buf_ptr(&pb, 0, 0) = 1;
-	ASSERT(*pxl_buf_ptr(&pb, 0, 0) == 1);
+	*pxl_buf_ptr(&g_buf, 0, 0) = 1;
+	ASSERT(*pxl_buf_ptr(&g_buf, 0, 0) == 1);
 
-	*pxl_buf_ptr(&pb, pb.width - 1, 0) = 2;
-	ASSERT(*pxl_buf_ptr(&pb, pb.width - 1, 0) == 2);
+	*pxl_buf_ptr(&g_buf, g_buf.width - 1, 0) = 2;
+	ASSERT(*pxl_buf_ptr(&g_buf, g_buf.width - 1, 0) == 2);
 
-	*pxl_buf_ptr(&pb, 0, pb.height - 1) = 3;
-	ASSERT(*pxl_buf_ptr(&pb, 0, pb.height - 1) == 3);
+	*pxl_buf_ptr(&g_buf, 0, g_buf.height - 1) = 3;
+	ASSERT(*pxl_buf_ptr(&g_buf, 0, g_buf.height - 1) == 3);
 
-	*pxl_buf_ptr(&pb, pb.width - 1, pb.height - 1) = 4;
-	ASSERT(*pxl_buf_ptr(&pb, pb.width - 1, pb.height - 1) == 4);
-
-	free(pb.data);
+	*pxl_buf_ptr(&g_buf, g_buf.width - 1, g_buf.height - 1) = 4;
+	ASSERT(*pxl_buf_ptr(&g_buf, g_buf.width - 1, g_buf.height - 1) == 4);
 }
 
 static void
 test_pxl_buf_ptr_stride_calculation(void) {
-	/* Test that pxl_buf_ptr correctly accounts for stride (not just width) */
-	pxl_buf_t pb;
-	pb.width = 101;  /* Not a multiple of PXL_BUF_ALIGN */
-	pb.height = 10;
-	pb.stride = pxl_calc_stride(101);  /* Will be 104 */
-	pb.data = malloc(pb.stride * pb.height * sizeof(pxl_t));
-
+	fixture_reset();
+	
 	/* Verify row pointer difference equals stride */
-	pxl_t *ptr_row0 = pxl_buf_ptr(&pb, 0, 0);
-	pxl_t *ptr_row1 = pxl_buf_ptr(&pb, 0, 1);
+	pxl_t *ptr_row0 = pxl_buf_ptr(&g_buf, 0, 0);
+	pxl_t *ptr_row1 = pxl_buf_ptr(&g_buf, 0, 1);
 	ptrdiff_t diff = (char *)ptr_row1 - (char *)ptr_row0;
-	ASSERT(diff == (ptrdiff_t)(pb.stride * sizeof(pxl_t)));
-
-	free(pb.data);
+	ASSERT(diff == (ptrdiff_t)(g_buf.stride * sizeof(pxl_t)));
 }
 
 static void
 test_pxl_buf_ptr_grid_access(void) {
-	int W = 101, H = 10;
-	pxl_buf_t pb;
-	pb.width = W;
-	pb.height = H;
-	pb.stride = pxl_calc_stride(W);
-	pb.data = malloc(pb.stride * pb.height * sizeof(pxl_t));
-
+	fixture_reset();
+	
 	/* Fill all pixels with unique values */
-	for (int y = 0; y < H; y++) {
-		for (int x = 0; x < W; x++) {
-			pxl_t *ptr = pxl_buf_ptr(&pb, x, y);
-			*ptr = (pxl_t)(x + y * W);
+	for (int y = 0; y < g_buf.height; y++) {
+		for (int x = 0; x < g_buf.width; x++) {
+			pxl_t *ptr = pxl_buf_ptr(&g_buf, x, y);
+			*ptr = (pxl_t)(x + y * g_buf.width);
 		}
 	}
 
 	/* Verify all pixels */
-	for (int y = 0; y < H; y++) {
-		for (int x = 0; x < W; x++) {
-			ASSERT(*pxl_buf_ptr(&pb, x, y) == (pxl_t)(x + y * W));
+	for (int y = 0; y < g_buf.height; y++) {
+		for (int x = 0; x < g_buf.width; x++) {
+			ASSERT(*pxl_buf_ptr(&g_buf, x, y) == (pxl_t)(x + y * g_buf.width));
 		}
 	}
-
-	free(pb.data);
 }
 
-/* Main */
+/* Main -------------------------------------------------------------------- */
+
 int
 main(void) {
 	test_pxl_calc_stride_exact_multiples();

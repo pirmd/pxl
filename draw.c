@@ -18,7 +18,10 @@ pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1) {
 	const int max_x = pxl_max(x0, x1);
 	const int max_y = pxl_max(y0, y1);
 
-	if (pxl_canvas_quick_reject(cnv, min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)) {
+	/* Quick reject: bounding box completely outside scissor */
+	const pxl_rect_t *sc = &cnv->scissor;
+	if (min_x >= sc->x + sc->w || max_x < sc->x ||
+	    min_y >= sc->y + sc->h || max_y < sc->y) {
 		return;
 	}
 

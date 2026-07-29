@@ -8,6 +8,12 @@
 #include "buf.h"
 #include "geom.h"
 
+/*
+ * Canvas: Drawing context wrapping a pixel buffer.
+ * Stores offset, scissor clipping area, and drawing color as state.
+ * Users must apply offset and scissor manually in their drawing code.
+ */
+
 typedef struct {
 	pxl_buf_t      *pb;                 /* Target                */
 	int             offset_x, offset_y; /* Translation offset     */
@@ -15,15 +21,6 @@ typedef struct {
 	pxl_t           color;              /* Drawing color         */
 	
 } pxl_canvas_t;
-
-/* Visibility -------------------------------------------------------------- */
-static inline bool
-pxl_canvas_quick_reject(const pxl_canvas_t *cnv, int x, int y, int w, int h) {
-	const pxl_rect_t sc = cnv->scissor;
-	return x >= sc.x + sc.w || x + w <= sc.x ||
-	       y >= sc.y + sc.h || y + h <= sc.y;
-}
-
 
 /* Initialization ---------------------------------------------------------- */
 static inline void
@@ -83,7 +80,7 @@ static inline void
 pxl_canvas_clear(pxl_canvas_t *cnv) {
 	assert(cnv && cnv->pb);
 	
-	pxl_rect_t sc  = cnv->scissor;
+	pxl_rect_t sc = cnv->scissor;
 	pxl_buf_t *pb = cnv->pb;
 	
 	/* Fast path: scissor covers entire buffer (implies sc.x==0 && sc.y==0 due to clipping) */
