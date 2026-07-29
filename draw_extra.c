@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 
 #include "draw_extra.h"
 #include "geom.h"
@@ -8,7 +9,7 @@
 void
 pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	assert(cnv);
-	assert(r > 0);
+	assert(r > 0 && r <= (INT_MAX - 1) / 2);
 
 	x += cnv->offset_x;
 	y += cnv->offset_y;
@@ -86,7 +87,7 @@ pxl_draw_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 void
 pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 	assert(cnv);
-	assert(r > 0);
+	assert(r > 0 && r <= (INT_MAX - 1) / 2);
 
 	x += cnv->offset_x;
 	y += cnv->offset_y;
@@ -115,7 +116,7 @@ pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 		if (yy1 >= y_top && yy1 <= y_bot) {
 			pxl_draw_span(cnv, x - cx, yy1, w1);
 		}
-		if (cy != 0 && yy2 >= y_top && yy2 <= y_bot) {
+		if (yy2 >= y_top && yy2 <= y_bot) {
 			pxl_draw_span(cnv, x - cx, yy2, w1);
 		}
 
@@ -123,7 +124,7 @@ pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 			if (yy3 >= y_top && yy3 <= y_bot) {
 				pxl_draw_span(cnv, x - cy, yy3, w2);
 			}
-			if (cx != 0 && yy4 >= y_top && yy4 <= y_bot) {
+			if (yy4 >= y_top && yy4 <= y_bot) {
 				pxl_draw_span(cnv, x - cy, yy4, w2);
 			}
 		}
@@ -140,15 +141,6 @@ pxl_fill_circle(pxl_canvas_t *cnv, int x, int y, int r) {
 
 /* Triangle ------------------------------------------------------------- */
 void
-pxl_draw_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int y2) {
-	assert(cnv);
-
-	pxl_draw_line(cnv, x0, y0, x1, y1);
-	pxl_draw_line(cnv, x1, y1, x2, y2);
-	pxl_draw_line(cnv, x2, y2, x0, y0);
-}
-
-void
 pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int y2) {
 	assert(cnv);
 
@@ -164,6 +156,8 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
 	const int min_y = pxl_min(pxl_min(y0, y1), y2);
 	const int max_x = pxl_max(pxl_max(x0, x1), x2);
 	const int max_y = pxl_max(pxl_max(y0, y1), y2);
+	assert(max_x >= min_x && max_x - min_x <= INT_MAX - 1);
+	assert(max_y >= min_y && max_y - min_y <= INT_MAX - 1);
 
 	pxl_rect_t bbox;
 	if (!pxl_clip_rect((pxl_rect_t){min_x, min_y, max_x - min_x + 1, max_y - min_y + 1}, cnv->scissor, &bbox)) {

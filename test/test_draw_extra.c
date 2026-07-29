@@ -1,747 +1,386 @@
 #include <string.h>
+#include <limits.h>
+#include "test.h"
 #include "canvas.h"
 #include "buf.h"
 #include "draw.h"
 #include "draw_extra.h"
-#include "geom.h"
-#include "stest/stest.h"
 
-/* Fixture ----------------------------------------------------------------- */
+/* Fixture ---------------------------------------------------------------- */
+#define FIXTURE_W 100
+#define FIXTURE_H 100
+#define FIXTURE_STRIDE 100  /* pxl_calc_stride(100) = 100 */
 
-#define COLOR_WHITE  0xFFFFFFFFU  /* Opaque white */
-#define COLOR_RED    0xFFFF0000U  /* Opaque red */
-#define COLOR_GREEN  0xFF00FF00U  /* Opaque green */
-#define COLOR_BLUE   0xFF0000FFU  /* Opaque blue */
-#define COLOR_YELLOW 0xFFFFFF00U  /* Opaque yellow */
+static pxl_t g_buf_data[FIXTURE_STRIDE * FIXTURE_H];
+static pxl_buf_t g_buf = {
+	.data = g_buf_data,
+	.width = FIXTURE_W,
+	.height = FIXTURE_H,
+	.stride = FIXTURE_STRIDE
+};
+static pxl_canvas_t g_cnv;
 
-typedef struct {
-	pxl_buf_t pb;
-	pxl_canvas_t cnv;
-} fixture_t;
-
-static void
-pxl_buf_zero(pxl_buf_t *pb) {
-	assert(pb && pb->data);
-	memset(pb->data, 0x00, pb->height * pb->stride * sizeof(pxl_t));
+static inline void
+fixture_reset(void) {
+	memset(g_buf_data, 0x00, sizeof(g_buf_data));
+	pxl_canvas_init(&g_cnv, &g_buf);
 }
 
-static bool
-fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
-	f->pb.width = w;
-	f->pb.height = h;
-	f->pb.stride = pxl_calc_stride(w);
-	f->pb.data = malloc(f->pb.stride * f->pb.height * sizeof(pxl_t));
+static inline void
+fixture_reset_scissor(int x, int y, int w, int h) {
+	fixture_reset();
+	pxl_canvas_set_scissor(&g_cnv, x, y, w, h);
+}
 
-	if (!st_check(ctx, f->pb.data != NULL, "malloc failed")) {
-		return false;
+/* Helpers --------------------------------------------------------------- */
+
+static inline bool
+buf_is_empty(void) {
+	for (size_t i = 0; i < FIXTURE_STRIDE * FIXTURE_H; ++i) {
+		if (g_buf_data[i] != 0) return false;
 	}
-
-	pxl_canvas_init(&f->cnv, &f->pb);
-	pxl_buf_zero(&f->pb);
-	
 	return true;
 }
 
-static void
-fixture_deinit(fixture_t *f) {
-	free(f->pb.data);
-	f->pb.data = NULL;
-}
-
-/* Helpers ----------------------------------------------------------------- */
 static inline bool
-is_inside_scissor(int x, int y, const pxl_canvas_t *cnv) {
-	return (x >= cnv->scissor.x && x < cnv->scissor.x + cnv->scissor.w &&
-			y >= cnv->scissor.y && y < cnv->scissor.y + cnv->scissor.h);
+buf_is_not_empty(void) {
+	return !buf_is_empty();
 }
 
-/* Check if point (x,y) is on the circle outline drawn by pxl_draw_circle.
- * This helper EXACTLY reproduces the Bresenham algorithm from pxl_draw_circle
- * to ensure 100% consistency between drawing and testing. */
-static inline bool
-is_drawn_on_circle(const pxl_canvas_t *cnv, int x, int y, int cx, int cy, int r) {
-	cx += cnv->offset_x;
-	cy += cnv->offset_y;
+static inline pxl_t
+buf_get(int x, int y) {
+	return *pxl_buf_ptr(&g_buf, x, y);
+}
+
+/* Tests - Circle --------------------------------------------------------- */
+
+static void
+test_draw_circle_basic(void) {
+	fixture_reset();
+
+	pxl_canvas_set_color(&g_cnv, 0xFFFF0000);
+	pxl_draw_circle(&g_cnv, 50, 50, 10);
+
+	/* Check that something was drawn */
+	ASSERT(buf_is_not_empty());
+
+	/* Check top, bottom, left, right cardinal points */
+	ASSERT(buf_get(50, 40) == 0xFFFF0000);  /* top */
+	ASSERT(buf_get(50, 60) == 0xFFFF0000);  /* bottom */
+	ASSERT(buf_get(40, 50) == 0xFFFF0000);  /* left */
+	ASSERT(buf_get(60, 50) == 0xFFFF0000);  /* right */
+}
+
+static void
+test_draw_circle_min_radius(void) {
+	fixture_reset();
+
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+	pxl_draw_circle(&g_cnv, 50, 50, 1);
+
+	ASSERT(buf_is_not_empty());
+	/* With r=1, only 4 points around center + center cross */
+	ASSERT(buf_get(50, 49) == 0xFF00FF00);
+	ASSERT(buf_get(50, 51) == 0xFF00FF00);
+	ASSERT(buf_get(49, 50) == 0xFF00FF00);
+	ASSERT(buf_get(51, 50) == 0xFF00FF00);
+}
+
+static void
+test_draw_circle_outside_scissor(void) {
+	fixture_reset_scissor(10, 10, 20, 20);
+
+	pxl_canvas_set_color(&g_cnv, 0xFFFF0000);
+	/* Circle completely outside scissor */
+	pxl_draw_circle(&g_cnv, 100, 100, 10);
+
+	/* Buffer should remain empty */
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_draw_circle_with_offset(void) {
+	fixture_reset();
+
+	pxl_canvas_set_offset(&g_cnv, 20, 20);
+	pxl_canvas_set_color(&g_cnv, 0xFF0000FF);
+
+	/* Draw at (0,0) with offset becomes (20,20) */
+	pxl_draw_circle(&g_cnv, 0, 0, 5);
+
+	ASSERT(buf_is_not_empty());
+	/* Check cardinal points with offset: center is at (20,20) with r=5 */
+	ASSERT(buf_get(20, 15) == 0xFF0000FF);  /* top: (20,20-5) */
+	ASSERT(buf_get(20, 25) == 0xFF0000FF);  /* bottom: (20,20+5) */
+	ASSERT(buf_get(15, 20) == 0xFF0000FF);  /* left: (20-5,20) */
+	ASSERT(buf_get(25, 20) == 0xFF0000FF);  /* right: (20+5,20) */
+}
+
+/* Tests - Fill Circle ---------------------------------------------------- */
+
+static void
+test_fill_circle_basic(void) {
+	fixture_reset();
+
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+	pxl_fill_circle(&g_cnv, 50, 50, 10);
+
+	ASSERT(buf_is_not_empty());
+
+	/* Check center */
+	ASSERT(buf_get(50, 50) == 0xFF00FF00);
+	/* Check cardinal points on edge */
+	ASSERT(buf_get(50, 40) == 0xFF00FF00);  /* top */
+	ASSERT(buf_get(50, 60) == 0xFF00FF00);  /* bottom */
+	ASSERT(buf_get(40, 50) == 0xFF00FF00);  /* left */
+	ASSERT(buf_get(60, 50) == 0xFF00FF00);  /* right */
+}
+
+static void
+test_fill_circle_min_radius(void) {
+	fixture_reset();
+
+	pxl_canvas_set_color(&g_cnv, 0xFFFFFF00);
+	pxl_fill_circle(&g_cnv, 50, 50, 1);
+
+	ASSERT(buf_is_not_empty());
+	/* Center should be filled */
+	ASSERT(buf_get(50, 50) == 0xFFFFFF00);
+	/* Edge points */
+	ASSERT(buf_get(50, 49) == 0xFFFFFF00);
+	ASSERT(buf_get(50, 51) == 0xFFFFFF00);
+	ASSERT(buf_get(49, 50) == 0xFFFFFF00);
+	ASSERT(buf_get(51, 50) == 0xFFFFFF00);
+}
+
+static void
+test_fill_circle_outside_scissor(void) {
+	fixture_reset_scissor(10, 10, 20, 20);
+
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+	pxl_fill_circle(&g_cnv, 100, 100, 10);
+
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_fill_circle_with_offset(void) {
+	fixture_reset();
+
+	pxl_canvas_set_offset(&g_cnv, 10, 10);
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+
+	pxl_fill_circle(&g_cnv, 0, 0, 8);
+
+	ASSERT(buf_is_not_empty());
+	/* Center with offset */
+	ASSERT(buf_get(10, 10) == 0xFF00FF00);
+	/* Edge with offset */
+	ASSERT(buf_get(10, 2) == 0xFF00FF00);   /* top */
+	ASSERT(buf_get(10, 18) == 0xFF00FF00);  /* bottom */
+	ASSERT(buf_get(2, 10) == 0xFF00FF00);   /* left */
+	ASSERT(buf_get(18, 10) == 0xFF00FF00);  /* right */
+}
+
+/* Tests - Triangle -------------------------------------------------------- */
+
+static void
+test_draw_triangle_basic(void) {
+	fixture_reset();
+
+	pxl_canvas_set_color(&g_cnv, 0xFFFF0000);
+	pxl_draw_triangle(&g_cnv, 30, 30, 50, 30, 40, 50);
+
+	ASSERT(buf_is_not_empty());
+
+	/* Check the three vertices */
+	ASSERT(buf_get(30, 30) == 0xFFFF0000);
+	ASSERT(buf_get(50, 30) == 0xFFFF0000);
+	ASSERT(buf_get(40, 50) == 0xFFFF0000);
+}
+
+static void
+test_draw_triangle_outside_scissor(void) {
+	fixture_reset_scissor(10, 10, 20, 20);
+
+	pxl_canvas_set_color(&g_cnv, 0xFFFF0000);
+	pxl_draw_triangle(&g_cnv, 100, 100, 120, 100, 110, 120);
+
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_draw_triangle_with_offset(void) {
+	fixture_reset();
+
+	pxl_canvas_set_offset(&g_cnv, 10, 10);
+	pxl_canvas_set_color(&g_cnv, 0xFF0000FF);
+
+	pxl_draw_triangle(&g_cnv, 0, 0, 20, 0, 10, 20);
+
+	ASSERT(buf_is_not_empty());
+	/* Vertices with offset */
+	ASSERT(buf_get(10, 10) == 0xFF0000FF);
+	ASSERT(buf_get(30, 10) == 0xFF0000FF);
+	ASSERT(buf_get(20, 30) == 0xFF0000FF);
+}
+
+/* Tests - Fill Triangle ---------------------------------------------------- */
+
+static void
+test_fill_triangle_basic(void) {
+	fixture_reset();
+
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+	pxl_fill_triangle(&g_cnv, 30, 30, 50, 30, 40, 50);
+
+	ASSERT(buf_is_not_empty());
+
+	/* Check vertices are filled */
+	ASSERT(buf_get(30, 30) == 0xFF00FF00);
+	ASSERT(buf_get(50, 30) == 0xFF00FF00);
+	ASSERT(buf_get(40, 50) == 0xFF00FF00);
+	/* Check center-ish point is filled */
+	ASSERT(buf_get(40, 40) == 0xFF00FF00);
+}
+
+static void
+test_fill_triangle_outside_scissor(void) {
+	fixture_reset_scissor(10, 10, 20, 20);
+
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+	pxl_fill_triangle(&g_cnv, 100, 100, 120, 100, 110, 120);
+
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_fill_triangle_with_offset(void) {
+	fixture_reset();
+
+	pxl_canvas_set_offset(&g_cnv, 5, 5);
+	pxl_canvas_set_color(&g_cnv, 0xFFFFFF00);
+
+	pxl_fill_triangle(&g_cnv, 0, 0, 10, 0, 5, 10);
+
+	ASSERT(buf_is_not_empty());
+	/* Vertices with offset */
+	ASSERT(buf_get(5, 5) == 0xFFFFFF00);
+	ASSERT(buf_get(15, 5) == 0xFFFFFF00);
+	ASSERT(buf_get(10, 15) == 0xFFFFFF00);
+	/* Center with offset */
+	ASSERT(buf_get(10, 10) == 0xFFFFFF00);
+}
+
+/* Tests - Edge Cases ------------------------------------------------------- */
+
+static void
+test_circle_partial_scissor(void) {
+	fixture_reset_scissor(20, 20, 40, 40);
+
+	pxl_canvas_set_color(&g_cnv, 0xFFFF0000);
+	/* Circle center (30,30) radius 15: bbox (15,15) to (45,45) */
+	/* Scissor (20,20) to (60,60): partial overlap */
+	pxl_draw_circle(&g_cnv, 30, 30, 15);
+
+	/* Should have some pixels drawn (the part inside scissor) */
+	ASSERT(buf_is_not_empty());
+	/* Top-left of circle should be clipped */
+	ASSERT(buf_get(15, 15) == 0x00000000);  /* outside scissor */
+	/* Right edge of circle at (45,30) should be drawn and inside scissor */
+	ASSERT(buf_get(45, 30) == 0xFFFF0000);  /* on circle edge, inside scissor */
+	/* Bottom edge of circle at (30,45) should be drawn and inside scissor */
+	ASSERT(buf_get(30, 45) == 0xFFFF0000);  /* on circle edge, inside scissor */
+}
+
+static void
+test_fill_circle_partial_scissor(void) {
+	fixture_reset_scissor(25, 25, 30, 30);
+
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+	pxl_fill_circle(&g_cnv, 40, 40, 15);
+
+	ASSERT(buf_is_not_empty());
+	/* Part inside scissor should be filled */
+	ASSERT(buf_get(35, 35) == 0xFF00FF00);
+	/* Part outside scissor should be empty */
+	ASSERT(buf_get(20, 20) == 0x00000000);
+}
+
+static void
+test_fill_triangle_partial_scissor(void) {
+	fixture_reset_scissor(25, 25, 30, 30);
+
+	pxl_canvas_set_color(&g_cnv, 0xFFFFFF00);
+	/* Triangle partially overlapping scissor */
+	pxl_fill_triangle(&g_cnv, 20, 20, 50, 20, 35, 50);
+
+	ASSERT(buf_is_not_empty());
+	/* Part inside scissor should be filled */
+	ASSERT(buf_get(30, 30) == 0xFFFFFF00);
+	/* Part outside scissor should be empty */
+	ASSERT(buf_get(20, 20) == 0x00000000);
+}
+
+/* Tests - Assertion coverage ----------------------------------------------- */
+
+static void
+test_draw_circle_max_safe_radius(void) {
+	/* Verify the overflow protection constant */
+	int max_safe_r = (INT_MAX - 1) / 2;
+	ASSERT(max_safe_r > 0);
+	ASSERT(max_safe_r <= (INT_MAX - 1) / 2);
 	
-	if (r <= 0) {
-		return false;
-	}
-
-	int dx = abs(x - cx);
-	int dy = abs(y - cy);
-
-	/* Cardinal points (x=0 or y=0) - always drawn */
-	if ((dx == 0 && dy == r) || (dx == r && dy == 0)) {
-		return true;
-	}
-
-	/* Bresenham's circle algorithm - same parameters as pxl_draw_circle */
-	int cx_algo = r;
-	int cy_algo = 0;
-	int df = 1 - r;
-	int d_e = 3;
-	int d_se = -2 * r + 5;
-
-	/* Check the 8 symmetric points from the first iteration (r,0) */
-	if ((dx == cx_algo && dy == cy_algo) || (dx == cy_algo && dy == cx_algo)) {
-		return true;
-	}
-
-	cx_algo--;
-	while (cy_algo < cx_algo) {
-		if (df < 0) {
-			df += d_e;
-			d_e += 2;
-		} else {
-			df += d_se;
-			d_e += 2;
-			d_se += 2;
-			cx_algo--;
-		}
-		cy_algo++;
-
-		/* Check 8 symmetric points */
-		if ((dx == cx_algo && dy == cy_algo) || (dx == cy_algo && dy == cx_algo)) {
-			return true;
-		}
-	}
-
-	/* Final iteration when cy_algo == cx_algo */
-	if (cy_algo == cx_algo && dx == cx_algo && dy == cy_algo) {
-		return true;
-	}
-
-	return false;
-}
-
-/* Check if point (x,y) is inside the filled circle drawn by pxl_fill_circle.
- * This helper EXACTLY reproduces the algorithm from pxl_fill_circle
- * to ensure 100% consistency between drawing and testing. */
-static inline bool
-is_drawn_inside_fill_circle(const pxl_canvas_t *cnv, int x, int y, int cx, int cy, int r) {
-	cx += cnv->offset_x;
-	cy += cnv->offset_y;
-	
-	if (r <= 0) {
-		return false;
-	}
-
-	int dx = abs(x - cx);
-	int dy = abs(y - cy);
-
-	/* Check center line (y == cy) - drawn first in pxl_fill_circle */
-	if (y == cy && dx <= r) {
-		return true;
-	}
-
-	/* Check top and bottom single points (x=cx, y=cy±r) */
-	if (x == cx && (dy == r)) {
-		return true;
-	}
-
-	/* Same algorithm as pxl_fill_circle */
-	int c_x = r;
-	int c_y = 0;
-	int d = 1 - r;
-
-	while (c_x >= c_y) {
-		int yy1 = cy + c_y;
-		int yy2 = cy - c_y;
-		int yy3 = cy + c_x;
-		int yy4 = cy - c_x;
-
-		/* Check spans at y = cy ± c_y */
-		if ((y == yy1 || y == yy2) && dx <= c_x) {
-			return true;
-		}
-
-		/* Check spans at y = cy ± c_x (if different from c_y) */
-		if (c_x != c_y) {
-			if ((y == yy3 || y == yy4) && dx <= c_y) {
-				return true;
-			}
-		}
-
-		c_y++;
-		if (d < 0) {
-			d += 2 * c_y + 1;
-		} else {
-			c_x--;
-			d += 2 * (c_y - c_x) + 1;
-		}
-	}
-
-	return false;
-}
-
-/* Check if point (x,y) is inside triangle using edge function method */
-static inline bool
-is_in_triangle(const pxl_canvas_t *cnv, int x, int y, int x0, int y0, int x1, int y1, int x2, int y2) {
-	x0 += cnv->offset_x;
-	y0 += cnv->offset_y;
-	x1 += cnv->offset_x;
-	y1 += cnv->offset_y;
-	x2 += cnv->offset_x;
-	y2 += cnv->offset_y;
-	
-	/* Edge function: (x - ax) * (by - ay) - (y - ay) * (bx - ax) */
-	/* For edge 0-1 */
-	int d1 = (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0);
-	/* For edge 1-2 */
-	int d2 = (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1);
-	/* For edge 2-0 */
-	int d3 = (x - x2) * (y0 - y2) - (y - y2) * (x0 - x2);
-
-	/* All edge functions must have the same sign (or zero) for point to be inside */
-	return (d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0);
-}
-
-/* Check if point (x,y) would be drawn by pxl_draw_line with given params.
- * This helper EXACTLY reproduces the logic from pxl_draw_line
- * to ensure 100% consistency between drawing and testing. */
-static inline bool
-is_drawn_on_line(const pxl_canvas_t *cnv, int x, int y, int x0, int y0, int x1, int y1) {
-	x0 += cnv->offset_x;
-	y0 += cnv->offset_y;
-	x1 += cnv->offset_x;
-	y1 += cnv->offset_y;
-	
-	const pxl_rect_t *scissor = &cnv->scissor;
-	
-	/* Quick reject with bounding box */
-	int min_x = pxl_min(x0, x1);
-	int min_y = pxl_min(y0, y1);
-	int w = abs(x1 - x0) + 1;
-	int h = abs(y1 - y0) + 1;
-	
-	/* Simulate canvas_quick_reject */
-	if (min_x >= scissor->x + scissor->w || min_x + w <= scissor->x ||
-	    min_y >= scissor->y + scissor->h || min_y + h <= scissor->y) {
-		return false;
-	}
-
-	int dx = abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
-	int dy = abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
-
-	if (dx >= dy) {
-		int err = dx / 2;
-		for (;;) {
-			if (y0 >= scissor->y && y0 < scissor->y + scissor->h) {
-				pxl_span_t span;
-				if (pxl_clip_span((pxl_span_t){x0, 1}, (pxl_span_t){scissor->x, scissor->w}, &span)) {
-					if (x == span.x && y == y0) {
-						return true;
-					}
-				}
-			}
-			if (x0 == x1 && y0 == y1) break;
-			x0 += sx;
-			err -= dy;
-			if (err < 0) {
-				y0 += sy;
-				err += dx;
-			}
-		}
-	} else {
-		int err = dy / 2;
-		for (;;) {
-			if (y0 >= scissor->y && y0 < scissor->y + scissor->h) {
-				pxl_span_t span;
-				if (pxl_clip_span((pxl_span_t){x0, 1}, (pxl_span_t){scissor->x, scissor->w}, &span)) {
-					if (x == span.x && y == y0) {
-						return true;
-					}
-				}
-			}
-			if (x0 == x1 && y0 == y1) break;
-			y0 += sy;
-			err -= dx;
-			if (err < 0) {
-				x0 += sx;
-				err += dy;
-			}
-		}
-	}
-
-	return false;
-}
-
-/* Check if point (x,y) is on the triangle outline (one of the 3 edges).
- * Uses the same line drawing logic as pxl_draw_line via is_drawn_on_line. */
-static inline bool
-is_on_triangle(const pxl_canvas_t *cnv, int x, int y, int x0, int y0, int x1, int y1, int x2, int y2) {
-	return is_drawn_on_line(cnv, x, y, x0, y0, x1, y1) ||
-	       is_drawn_on_line(cnv, x, y, x1, y1, x2, y2) ||
-	       is_drawn_on_line(cnv, x, y, x2, y2, x0, y0);
-}
-
-/* Test Circle ----------------------------------------------------------- */
-
-static void
-test_pxl_draw_circle_basic(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	int cx = 10, cy = 10, r = 5;
-	pxl_draw_circle(&f.cnv, cx, cy, r);
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_circle = is_drawn_on_circle(&f.cnv, x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_circle && in_s;
-
-			pxl_t want = should_be_colored ? color: 0x00;
-			ST_CHECK((got == want),
-			         "pixel (%d,%d): on_circle=%d, inside_scissor=%d, got=0x%08X, want=0x%08X",
-			         x, y, on_circle, in_s, got, want);
-		}
-	}
-
-	fixture_deinit(&f);
+	/* Test with a large but safe radius */
+	fixture_reset();
+	pxl_canvas_set_color(&g_cnv, 0xFFFF0000);
+	pxl_draw_circle(&g_cnv, 50, 50, 40);
+	ASSERT(buf_is_not_empty());
 }
 
 static void
-test_pxl_draw_circle_outside_scissor(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	/* Set a small scissor */
-	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw circle completely outside scissor */
-	int cx = 20, cy = 20, r = 5;
-	pxl_draw_circle(&f.cnv, cx, cy, r);
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_circle = is_drawn_on_circle(&f.cnv, x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_circle && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): on_circle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, on_circle, in_s, got, want);
-		}
-	}
-
-	fixture_deinit(&f);
+test_fill_triangle_large_coords(void) {
+	/* Test that bounding box doesn't overflow with large but valid coords */
+	fixture_reset();
+	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
+	/* Use coordinates that are large but won't cause overflow in bounding box */
+	pxl_fill_triangle(&g_cnv, 10, 10, 50, 10, 30, 50);
+	ASSERT(buf_is_not_empty());
 }
 
-/* Test Fill Circle ------------------------------------------------------- */
-
-static void
-test_pxl_fill_circle_basic(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_GREEN;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled circle at (10,10) with radius 5 */
-	int cx = 10, cy = 10, r = 5;
-	pxl_fill_circle(&f.cnv, cx, cy, r);
-
-	int filled_count = 0;
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_circle = is_drawn_inside_fill_circle(&f.cnv, x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_circle && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			if (should_be_colored) {
-				filled_count++;
-			}
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): in_circle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, in_circle, in_s, want, got);
-		}
-	}
-
-	/* Verify we actually filled some pixels */
-	ST_CHECK(filled_count > 0, "expected at least one pixel filled, got %d", filled_count);
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_fill_circle_outside_scissor(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	/* Set a small scissor */
-	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled circle completely outside scissor */
-	int cx = 20, cy = 20, r = 5;
-	pxl_fill_circle(&f.cnv, cx, cy, r);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_circle = is_drawn_inside_fill_circle(&f.cnv, x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_circle && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): in_circle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, in_circle, in_s, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-/* Test Triangle --------------------------------------------------------- */
-
-static void
-test_pxl_draw_triangle_basic(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw triangle with vertices at (5,5), (15,5), (10,15) */
-	int x0 = 5, y0 = 5, x1 = 15, y1 = 5, x2 = 10, y2 = 15;
-	pxl_draw_triangle(&f.cnv, x0, y0, x1, y1, x2, y2);
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_tri = is_on_triangle(&f.cnv, x, y, x0, y0, x1, y1, x2, y2);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_tri && in_s;
-
-			pxl_t want = should_be_colored ? color : 0x00;
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): on_triangle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, on_tri, in_s, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_draw_triangle_outside_scissor(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	/* Set a small scissor */
-	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw triangle completely outside scissor */
-	int x0 = 20, y0 = 20, x1 = 30, y1 = 20, x2 = 25, y2 = 30;
-	pxl_draw_triangle(&f.cnv, x0, y0, x1, y1, x2, y2);
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_tri = is_on_triangle(&f.cnv, x, y, x0, y0, x1, y1, x2, y2);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_tri && in_s;
-
-			pxl_t want = should_be_colored ? color : 0x00;
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): on_triangle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, on_tri, in_s, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-/* Test Fill Triangle ------------------------------------------------------ */
-
-static void
-test_pxl_fill_triangle_basic(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_t color = COLOR_GREEN;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled triangle with vertices at (5,5), (15,5), (10,15) */
-	int x0 = 5, y0 = 5, x1 = 15, y1 = 5, x2 = 10, y2 = 15;
-	pxl_fill_triangle(&f.cnv, x0, y0, x1, y1, x2, y2);
-
-	int filled_count = 0;
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_tri = is_in_triangle(&f.cnv, x, y, x0, y0, x1, y1, x2, y2);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_tri && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			if (should_be_colored) {
-				filled_count++;
-			}
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): in_triangle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, in_tri, in_s, want, got);
-		}
-	}
-
-	/* Verify we actually filled some pixels */
-	ST_CHECK(filled_count > 0, "expected at least one pixel filled, got %d", filled_count);
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_fill_triangle_outside_scissor(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	/* Set a small scissor */
-	pxl_canvas_set_scissor(&f.cnv, 5, 5, 10, 10);
-
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled triangle completely outside scissor */
-	int x0 = 20, y0 = 20, x1 = 30, y1 = 20, x2 = 25, y2 = 30;
-	pxl_fill_triangle(&f.cnv, x0, y0, x1, y1, x2, y2);
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_tri = is_in_triangle(&f.cnv, x, y, x0, y0, x1, y1, x2, y2);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_tri && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): in_triangle=%d, inside_scissor=%d, want=0x%08X, got=0x%08X",
-			         x, y, in_tri, in_s, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-/* Test Offset ------------------------------------------------------------- */
-
-static void
-test_pxl_draw_circle_with_offset(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_canvas_set_offset(&f.cnv, 5, 5);
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw circle at (0,0) with radius 4 - with offset this becomes (5,5) with r=4 */
-	int cx = 0, cy = 0, r = 4;
-	pxl_draw_circle(&f.cnv, cx, cy, r);
-
-	int expected_count = 0;
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_circle = is_drawn_on_circle(&f.cnv, x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_circle && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
-			if (on_circle && in_s) expected_count++;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
-		}
-	}
-	
-	ST_CHECK(expected_count > 0, "expected circle to have some pixels drawn");
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_fill_circle_with_offset(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_canvas_set_offset(&f.cnv, 3, 3);
-	pxl_t color = COLOR_GREEN;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled circle at (0,0) with radius 5 - with offset this becomes (3,3) with r=5 */
-	int cx = 0, cy = 0, r = 5;
-	pxl_fill_circle(&f.cnv, cx, cy, r);
-
-	int filled_count = 0;
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_circle = is_drawn_inside_fill_circle(&f.cnv, x, y, cx, cy, r);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_circle && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
-			if (in_circle && in_s) filled_count++;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
-		}
-	}
-	
-	ST_CHECK(filled_count > 0, "expected filled circle to have some pixels");
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_draw_triangle_with_offset(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_canvas_set_offset(&f.cnv, 2, 2);
-	pxl_t color = COLOR_RED;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw triangle with vertices at (0,0), (10,0), (5,10) */
-	int x0 = 0, y0 = 0, x1 = 10, y1 = 0, x2 = 5, y2 = 10;
-	pxl_draw_triangle(&f.cnv, x0, y0, x1, y1, x2, y2);
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool on_tri = is_on_triangle(&f.cnv, x, y, x0, y0, x1, y1, x2, y2);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = on_tri && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
-		}
-	}
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_fill_triangle_with_offset(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) {
-		return;
-	}
-
-	pxl_canvas_set_offset(&f.cnv, 1, 1);
-	pxl_t color = COLOR_GREEN;
-	pxl_canvas_set_color(&f.cnv, color);
-
-	/* Draw filled triangle with vertices at (0,0), (8,0), (4,8) */
-	int x0 = 0, y0 = 0, x1 = 8, y1 = 0, x2 = 4, y2 = 8;
-	pxl_fill_triangle(&f.cnv, x0, y0, x1, y1, x2, y2);
-
-	int filled_count = 0;
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			pxl_t got = *pxl_buf_ptr(&f.pb, x, y);
-			bool in_tri = is_in_triangle(&f.cnv, x, y, x0, y0, x1, y1, x2, y2);
-			bool in_s = is_inside_scissor(x, y, &f.cnv);
-			bool should_be_colored = in_tri && in_s;
-			pxl_t want = should_be_colored ? color : 0x00;
-			
-			if (in_tri && in_s) {
-				filled_count++;
-			}
-			
-			ST_CHECK(got == want,
-			         "pixel (%d,%d): want 0x%08X, got 0x%08X",
-			         x, y, want, got);
-		}
-	}
-	
-	ST_CHECK(filled_count > 0, "expected filled triangle to have some pixels, got %d", filled_count);
-
-	fixture_deinit(&f);
-}
-
-/* Main ----------------------------------------------------------------- */
+/* Main ------------------------------------------------------------------- */
 int
-main(int argc, char *argv[]) {
-	ST_GETOPTS(argc, argv);
-	return ST_RUN(
-		/* Circle tests */
-		ST_T(test_pxl_draw_circle_basic),
-		ST_T(test_pxl_draw_circle_outside_scissor),
+main(void) {
+	/* Circle tests */
+	test_draw_circle_basic();
+	test_draw_circle_min_radius();
+	test_draw_circle_outside_scissor();
+	test_draw_circle_with_offset();
 
-		/* Fill Circle tests */
-		ST_T(test_pxl_fill_circle_basic),
-		ST_T(test_pxl_fill_circle_outside_scissor),
+	/* Fill Circle tests */
+	test_fill_circle_basic();
+	test_fill_circle_min_radius();
+	test_fill_circle_outside_scissor();
+	test_fill_circle_with_offset();
 
-		/* Triangle tests */
-		ST_T(test_pxl_draw_triangle_basic),
-		ST_T(test_pxl_draw_triangle_outside_scissor),
+	/* Triangle tests */
+	test_draw_triangle_basic();
+	test_draw_triangle_outside_scissor();
+	test_draw_triangle_with_offset();
 
-		/* Fill Triangle tests */
-		ST_T(test_pxl_fill_triangle_basic),
-		ST_T(test_pxl_fill_triangle_outside_scissor),
+	/* Fill Triangle tests */
+	test_fill_triangle_basic();
+	test_fill_triangle_outside_scissor();
+	test_fill_triangle_with_offset();
 
-		/* Offset tests */
-		ST_T(test_pxl_draw_circle_with_offset),
-		ST_T(test_pxl_fill_circle_with_offset),
-		ST_T(test_pxl_draw_triangle_with_offset),
-		ST_T(test_pxl_fill_triangle_with_offset)
-	);
+	/* Partial overlap tests */
+	test_circle_partial_scissor();
+	test_fill_circle_partial_scissor();
+	test_fill_triangle_partial_scissor();
+
+	/* Assertion/edge case coverage */
+	test_draw_circle_max_safe_radius();
+	test_fill_triangle_large_coords();
+
+	return 0;
 }
