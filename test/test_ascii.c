@@ -1,251 +1,228 @@
-#include <string.h>
+#include "test.h"
 #include "canvas.h"
 #include "buf.h"
 #include "ascii.h"
-#include "stest/stest.h"
 
 #define COLOR_WHITE 0xFFFFFFFFU
+#define FIXTURE_W 40
+#define FIXTURE_H 40
 
-/* Fixture ----------------------------------------------------------------- */
-typedef struct {
-	pxl_buf_t pb;
-	pxl_canvas_t cnv;
-} fixture_t;
+/* Fixture */
+static pxl_buf_t g_pb;
+static pxl_canvas_t g_cnv;
+static pxl_t g_buf_data[FIXTURE_H][FIXTURE_W];
 
 static void
-pxl_buf_zero(pxl_buf_t *pb) {
-	assert(pb && pb->data);
-	memset(pb->data, 0x00, pb->height * pb->stride * sizeof(pxl_t));
+setup_fixture(void) {
+	g_pb.width = FIXTURE_W;
+	g_pb.height = FIXTURE_H;
+	g_pb.stride = FIXTURE_W;
+	g_pb.data = &g_buf_data[0][0];
+	pxl_canvas_init(&g_cnv, &g_pb);
+	memset(g_buf_data, 0, sizeof(g_buf_data));
 }
 
+/* Helpers */
 static bool
-fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
-	f->pb.width = w;
-	f->pb.height = h;
-	f->pb.stride = pxl_calc_stride(w);
-	f->pb.data = malloc(f->pb.stride * f->pb.height * sizeof(pxl_t));
-
-	if (!st_check(ctx, f->pb.data != NULL, "malloc failed")) {
-		return false;
-	}
-	pxl_canvas_init(&f->cnv, &f->pb);
-	pxl_buf_zero(&f->pb);
-	return true;
-}
-
-static void
-fixture_deinit(fixture_t *f) {
-	free(f->pb.data);
-	f->pb.data = NULL;
-}
-
-/* Helpers ----------------------------------------------------------------- */
-static inline bool
-has_pixels_in_rect(const pxl_buf_t *pb, pxl_rect_t rect) {
+has_pixels_in_rect(pxl_rect_t rect) {
 	for (int y = rect.y; y < rect.y + rect.h; y++) {
 		for (int x = rect.x; x < rect.x + rect.w; x++) {
-			if (*pxl_buf_ptr(pb, x, y) != 0) return true;
+			if (g_buf_data[y][x] != 0) return true;
 		}
 	}
 	return false;
 }
 
-/* Tests ----------------------------------------------------------------- */
+/* Tests for pxl_draw_char */
 static void
 test_pxl_draw_char_basic(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 2, y = 2;
-	pxl_draw_char(&f.cnv, x, y, 'A');
+	pxl_draw_char(&g_cnv, x, y, 'A');
 
-	/* Check bounding box */
 	pxl_rect_t expected = pxl_char_bounds('A');
 	expected.x += x;
 	expected.y += y;
 
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in 'A' bounding box");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
 static void
 test_pxl_draw_char_with_scissor(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_scissor(&f.cnv, 8, 8, 6, 6);
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	setup_fixture();
+	pxl_canvas_set_scissor(&g_cnv, 8, 8, 6, 6);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 5, y = 5;
-	pxl_draw_char(&f.cnv, x, y, 'X');
+	pxl_draw_char(&g_cnv, x, y, 'X');
 
-	/* Check that part of the char is drawn in scissor area */
-	ST_CHECK(has_pixels_in_rect(&f.pb, (pxl_rect_t){8, 8, 6, 6}),
-	         "No pixels drawn in scissor area");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect((pxl_rect_t){8, 8, 6, 6}));
 }
 
 static void
 test_pxl_draw_char_non_printable(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 5, y = 5;
-	pxl_draw_char(&f.cnv, x, y, '\a');  /* Non-printable */
+	pxl_draw_char(&g_cnv, x, y, '\a');
 
-	/* Should be replaced by space (no pixels drawn) */
 	pxl_rect_t expected = pxl_char_bounds(' ');
 	expected.x += x;
 	expected.y += y;
 
-	ST_CHECK(!has_pixels_in_rect(&f.pb, expected),
-	         "Non-printable char drew pixels");
-
-	fixture_deinit(&f);
+	ASSERT(!has_pixels_in_rect(expected));
 }
 
 static void
 test_pxl_draw_char_out_of_range(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 5, y = 5;
-	pxl_draw_char(&f.cnv, x, y, 128);  /* > 127 */
+	pxl_draw_char(&g_cnv, x, y, 128);
 
-	/* Should be replaced by '?' */
 	pxl_rect_t expected = pxl_char_bounds('?');
 	expected.x += x;
 	expected.y += y;
 
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "Char 128 not replaced by '?'");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
+/* Tests for pxl_draw_str */
 static void
 test_pxl_draw_str_basic(void) {
-	int w = 40, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 5, y = 5;
-	pxl_draw_str(&f.cnv, x, y, "HI");
+	pxl_draw_str(&g_cnv, x, y, "HI");
 
-	/* Check global bounding box */
 	pxl_rect_t expected = pxl_str_bounds("HI");
 	expected.x += x;
 	expected.y += y;
 
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in 'HI' bounding box");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
 static void
 test_pxl_draw_str_empty(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	pxl_draw_str(&g_cnv, 5, 5, "");
 
-	pxl_draw_str(&f.cnv, 5, 5, "");  /* Empty string */
-
-	/* No pixels should be modified */
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			ST_CHECK(*pxl_buf_ptr(&f.pb, x, y) == 0,
-			         "Pixel (%d,%d) modified by empty string", x, y);
+	for (int y = 0; y < FIXTURE_H; y++) {
+		for (int x = 0; x < FIXTURE_W; x++) {
+			ASSERT(g_buf_data[y][x] == 0);
 		}
 	}
-
-	fixture_deinit(&f);
 }
 
 static void
 test_pxl_draw_str_with_newline(void) {
-	int w = 20, h = 30;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 5, y = 5;
-	pxl_draw_str(&f.cnv, x, y, "A\nB");
+	pxl_draw_str(&g_cnv, x, y, "A\nB");
 
-	/* Check global bounding box */
 	pxl_rect_t expected = pxl_str_bounds("A\nB");
 	expected.x += x;
 	expected.y += y;
 
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in 'A\\nB' bounding box");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
 static void
 test_pxl_draw_str_with_offset(void) {
-	int w = 30, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_offset(&f.cnv, 5, 3);
-	pxl_t color = COLOR_WHITE;
-	pxl_canvas_set_color(&f.cnv, color);
+	setup_fixture();
+	pxl_canvas_set_offset(&g_cnv, 5, 3);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 0, y = 0;
-	pxl_draw_str(&f.cnv, x, y, "PXL");
+	pxl_draw_str(&g_cnv, x, y, "PXL");
 
-	/* Should appear at (5,3) due to offset */
 	pxl_rect_t expected = pxl_str_bounds("PXL");
 	expected.x += 5;
 	expected.y += 3;
 
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "Offset not applied to draw_str");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
-/* Main ----------------------------------------------------------------- */
+static void
+test_pxl_draw_str_with_tab(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_draw_str(&g_cnv, x, y, "A\tB");
+
+	pxl_rect_t expected = pxl_str_bounds("A\tB");
+	expected.x += x;
+	expected.y += y;
+
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+/* Tests for pxl_char_bounds */
+static void
+test_pxl_char_bounds_basic(void) {
+	pxl_rect_t bounds = pxl_char_bounds('A');
+	ASSERT(bounds.w == 8 && bounds.h == 8);
+}
+
+static void
+test_pxl_char_bounds_special(void) {
+	pxl_rect_t tab_bounds = pxl_char_bounds('\t');
+	ASSERT(tab_bounds.w == 36 && tab_bounds.h == 8);
+
+	pxl_rect_t space_bounds = pxl_char_bounds(' ');
+	ASSERT(space_bounds.w == 8 && space_bounds.h == 8);
+
+	pxl_rect_t question_bounds = pxl_char_bounds(128);
+	ASSERT(question_bounds.w == 8 && question_bounds.h == 8);
+}
+
+/* Tests for pxl_str_bounds */
+static void
+test_pxl_str_bounds_basic(void) {
+	pxl_rect_t bounds = pxl_str_bounds("HI");
+	ASSERT(bounds.w == 18 && bounds.h == 8);
+}
+
+static void
+test_pxl_str_bounds_empty(void) {
+	pxl_rect_t bounds = pxl_str_bounds("");
+	ASSERT(bounds.w == 0 && bounds.h == 0);
+}
+
+static void
+test_pxl_str_bounds_with_newline(void) {
+	pxl_rect_t bounds = pxl_str_bounds("A\nB");
+	ASSERT(bounds.w == 9 && bounds.h == 18);
+}
+
 int
-main(int argc, char *argv[]) {
-	ST_GETOPTS(argc, argv);
-	return ST_RUN(
-		/* Char tests */
-		ST_T(test_pxl_draw_char_basic),
-		ST_T(test_pxl_draw_char_with_scissor),
-		ST_T(test_pxl_draw_char_non_printable),
-		ST_T(test_pxl_draw_char_out_of_range),
-		/* String tests */
-		ST_T(test_pxl_draw_str_basic),
-		ST_T(test_pxl_draw_str_empty),
-		ST_T(test_pxl_draw_str_with_newline),
-		ST_T(test_pxl_draw_str_with_offset)
-	);
+main(void) {
+	test_pxl_draw_char_basic();
+	test_pxl_draw_char_with_scissor();
+	test_pxl_draw_char_non_printable();
+	test_pxl_draw_char_out_of_range();
+
+	test_pxl_draw_str_basic();
+	test_pxl_draw_str_empty();
+	test_pxl_draw_str_with_newline();
+	test_pxl_draw_str_with_offset();
+	test_pxl_draw_str_with_tab();
+
+	test_pxl_char_bounds_basic();
+	test_pxl_char_bounds_special();
+	test_pxl_str_bounds_basic();
+	test_pxl_str_bounds_empty();
+	test_pxl_str_bounds_with_newline();
+
+	return 0;
 }

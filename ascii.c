@@ -2,6 +2,13 @@
 #include "draw.h"
 #include "geom.h"
 
+/* Font metrics for the built-in 8x8 ASCII font */
+#define ASCII_CHAR_W     8  // Glyph width in pixels
+#define ASCII_CHAR_H     8  // Glyph height in pixels
+#define ASCII_ADVANCE_X  9  // Horizontal space between characters (pixels)
+#define ASCII_ADVANCE_Y 10  // Vertical space between lines (pixels)
+#define ASCII_TAB_WIDTH 36  // Total width of a tab stop (4 * ASCII_ADVANCE_X)
+
 /*
  * 8x8 bitmap fonts for rendering unicode points U+0000 - U+007F (basic latin)
  * Author: Daniel Hepper <daniel@hepper.net>
@@ -138,25 +145,11 @@ static const char font8x8_basic[128][8] = {
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}    // U+007F
 };
 
-static const struct {
-	pxl_bitmask_t bitmask;
-	int8_t char_w;
-	int8_t char_h;
-	int8_t advance_x;
-	int8_t advance_y;
-	int8_t tab_width;
-} sysfont = {
-	.bitmask = {
-		.data = (const uint8_t *)font8x8_basic,
-		.width = 8,
-		.height = 128 * 8,
-		.stride = 1,
-	},
-	.char_w = 8,
-	.char_h = 8,
-	.advance_x = 9,
-	.advance_y = 10,
-	.tab_width = 4
+static const pxl_bitmask_t ascii_font = {
+	.data = (const uint8_t *)font8x8_basic,
+	.width = ASCII_CHAR_W,
+	.height = 128 * ASCII_CHAR_H,
+	.stride = 1,
 };
 
 void
@@ -166,8 +159,8 @@ pxl_draw_char(pxl_canvas_t *cnv, int x, int y, unsigned char c) {
 	if (c < 32)  c = ' ';
 	if (c > 127) c = '?';
 
-	pxl_rect_t char_rect = {0, (int)c * sysfont.char_h, sysfont.char_w, sysfont.char_h};
-	pxl_draw_bitmask(cnv, &sysfont.bitmask, char_rect, x, y);
+	pxl_rect_t char_rect = {0, (int)c * ASCII_CHAR_H, ASCII_CHAR_W, ASCII_CHAR_H};
+	pxl_draw_bitmask(cnv, &ascii_font, char_rect, x, y);
 }
 
 void
@@ -178,15 +171,15 @@ pxl_draw_str(pxl_canvas_t *cnv, int x, int y, const char *str) {
 	int cur_x = x;
 	while (*str) {
 		if (*str == '\n') {
-			y += sysfont.advance_y;
+			y += ASCII_ADVANCE_Y;
 			cur_x = x;
 		} else if (*str == '\t') {
-			int tab_stop = sysfont.tab_width * sysfont.advance_x;
+			int tab_stop = ASCII_TAB_WIDTH;
 			int remainder = cur_x % tab_stop;
 			cur_x += tab_stop - remainder;
 		} else {
 			pxl_draw_char(cnv, cur_x, y, *str);
-			cur_x += sysfont.advance_x;
+			cur_x += ASCII_ADVANCE_X;
 		}
 
 		++str;
@@ -197,11 +190,11 @@ pxl_rect_t
 pxl_char_bounds(unsigned char c) {
 	/* Handle special cases (same as pxl_draw_char) */
 	if (c == '\t') {
-		return (pxl_rect_t){0, 0, sysfont.tab_width * sysfont.advance_x, sysfont.char_h};
+		return (pxl_rect_t){0, 0, ASCII_TAB_WIDTH, ASCII_CHAR_H};
 	}
 	if (c < 32)  c = ' ';
 	if (c > 127) c = '?';
-	return (pxl_rect_t){0, 0, sysfont.char_w, sysfont.char_h};
+	return (pxl_rect_t){0, 0, ASCII_CHAR_W, ASCII_CHAR_H};
 }
 
 pxl_rect_t
@@ -212,21 +205,21 @@ pxl_str_bounds(const char *str) {
 
 	int max_x = 0;
 	int cur_x = 0;
-	int height = sysfont.char_h;  /* Initial height = 1 line */
+	int height = ASCII_CHAR_H;  /* Initial height = 1 line */
 
 	while (*str) {
 		if (*str == '\n') {
 			cur_x = 0;
-			height += sysfont.advance_y;
+			height += ASCII_ADVANCE_Y;
 		} else if (*str == '\t') {
-			int tab_stop = sysfont.tab_width * sysfont.advance_x;
+			int tab_stop = ASCII_TAB_WIDTH;
 			int remainder = cur_x % tab_stop;
 			cur_x += tab_stop - remainder;
 		} else {
-			if (cur_x + sysfont.char_w > max_x) {
-				max_x = cur_x + sysfont.char_w;
+			if (cur_x + ASCII_ADVANCE_X > max_x) {
+				max_x = cur_x + ASCII_ADVANCE_X;
 			}
-			cur_x += sysfont.advance_x;
+			cur_x += ASCII_ADVANCE_X;
 		}
 		str++;
 	}
