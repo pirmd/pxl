@@ -240,8 +240,8 @@ init_typewriter(void) {
 
 static void
 draw_text_with_cursor(pxl_canvas_t *cnv, double now) {
-    pxl_text_ctx_t w;
-    pxl_text_ctx_init(&w, cnv, &pxl_font_typewriter);
+    pxl_writer_t w;
+    pxl_writer_init(&w, cnv, &pxl_font_typewriter);
 
     int visible_lines = (H - MARGIN_Y * 2) / pxl_font_typewriter.leading;
     int char_h = pxl_font_typewriter.glyph_height;
@@ -260,7 +260,7 @@ draw_text_with_cursor(pxl_canvas_t *cnv, double now) {
 
     for (int i = 0; i <= app.tw.length; i++) {
         if (app.tw.needs_carriage_return && line_count == cursor_line) {
-            pxl_text_set_cursor(&w, app.tw.margin_left, w.y);
+            pxl_writer_set_cursor(&w, app.tw.margin_left, w.y);
             app.tw.needs_carriage_return = false;
         }
 
@@ -269,7 +269,7 @@ draw_text_with_cursor(pxl_canvas_t *cnv, double now) {
 
             if (line_count >= app.tw.scroll_line && line_count < app.tw.scroll_line + visible_lines) {
                 int y_pos = MARGIN_Y + (line_count - app.tw.scroll_line) * pxl_font_typewriter.leading;
-                pxl_text_set_cursor(&w, app.tw.margin_left, y_pos);
+                pxl_writer_set_cursor(&w, app.tw.margin_left, y_pos);
 
                 for (int j = line_char_start; j < line_end; j++) {
                     if (now >= app.tw.char_appear_time[j]) {

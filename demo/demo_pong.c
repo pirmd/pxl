@@ -417,8 +417,8 @@ interpolate_pong(pong_t *out, const pong_t *prev, const pong_t *cur, float alpha
 
 static void
 draw_score(pxl_canvas_t *cnv, const pong_t *p) {
-    pxl_text_ctx_t w;
-    pxl_text_ctx_init(&w, cnv, &pxl_font_pong);
+    pxl_writer_t w;
+    pxl_writer_init(&w, cnv, &pxl_font_pong);
 
 	/* Use text_bounds to calculate width for a typical score (e.g., "999") */
 	pxl_rect_t max_score_bounds = pxl_text_bounds(&w, "999");
@@ -429,11 +429,11 @@ draw_score(pxl_canvas_t *cnv, const pong_t *p) {
     
     char score_str[8];
     snprintf(score_str, sizeof(score_str), "%d", p->score_left);
-    pxl_text_set_cursor(&w, W/4 - score_half_width, score_y);
+    pxl_writer_set_cursor(&w, W/4 - score_half_width, score_y);
     pxl_draw_text(&w, score_str);
 
     snprintf(score_str, sizeof(score_str), "%d", p->score_right);
-    pxl_text_set_cursor(&w, 3 * W / 4 - score_half_width, score_y);
+    pxl_writer_set_cursor(&w, 3 * W / 4 - score_half_width, score_y);
     pxl_draw_text(&w, score_str);
 }
 

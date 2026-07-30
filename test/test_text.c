@@ -1,18 +1,17 @@
 #include <string.h>
 
+#include "test.h"
 #include "buf.h"
 #include "canvas.h"
 #include "geom.h"
 #include "text.h"
 
-#include "stest/stest.h"
+#define COLOR_WHITE  0xFFFFFFFFU
+#define FIXTURE_W    40
+#define FIXTURE_H    40
 
-#define COLOR_WHITE  0xFFFFFFFFU  /* Opaque white */
-
-/* Test font ----------------------------------------------------------------- */
-
-/* Simple 5x5 monospace font for characters 'A' (65), 'B' (66), 'C' (67), 'D' (68, used as fallback) */
-static const uint8_t test_font_data[20] = {
+/* Test font - 5x5 monospace for 'A' (65), 'B' (66), 'C' (67), 'D' (68, fallback) */
+static const uint8_t g_test_font_data[20] = {
 	/* 'A' at row 0: 5x5 */
 	0x07, /* 0b00000111 */
 	0x15, /* 0b00010101 */
@@ -39,18 +38,18 @@ static const uint8_t test_font_data[20] = {
 	0x1F  /* 0b00011111 */
 };
 
-static const pxl_bitmask_t test_bitmask = {
-	.data = test_font_data,
+static const pxl_bitmask_t g_test_bitmask = {
+	.data = g_test_font_data,
 	.width = 5,
 	.height = 20,
 	.stride = 1
 };
 
-static const pxl_font_t test_font = {
-	.bitmask = test_bitmask,
+static const pxl_font_t g_test_font = {
+	.bitmask = g_test_bitmask,
 	.rune_start = 65,   /* 'A' */
 	.rune_end = 68,     /* 'D' */
-	.fallback_rune = 68,/* 'D' used as fallback */
+	.fallback_rune = 68,/* 'D' */
 	.tracking = 1,
 	.leading = 6,
 	.glyph_height = 5,
@@ -60,405 +59,301 @@ static const pxl_font_t test_font = {
 	.glyph_offsets_y = NULL
 };
 
-/* Fixture ----------------------------------------------------------------- */
-
-typedef struct {
-	pxl_buf_t      pb;
-	pxl_canvas_t   cnv;
-	pxl_text_ctx_t text_ctx;
-} fixture_t;
+/* Fixture */
+static pxl_buf_t g_pb;
+static pxl_canvas_t g_cnv;
+static pxl_writer_t g_w;
+static pxl_t g_buf_data[FIXTURE_H][FIXTURE_W];
 
 static void
-pxl_buf_zero(pxl_buf_t *pb) {
-	assert(pb && pb->data);
-	memset(pb->data, 0x00, pb->height * pb->stride * sizeof(pxl_t));
+setup_fixture(void) {
+	g_pb.width = FIXTURE_W;
+	g_pb.height = FIXTURE_H;
+	g_pb.stride = FIXTURE_W;
+	g_pb.data = &g_buf_data[0][0];
+	pxl_canvas_init(&g_cnv, &g_pb);
+	memset(g_buf_data, 0x00, sizeof(g_buf_data));
+	pxl_writer_init(&g_w, &g_cnv, &g_test_font);
 }
 
+/* Helpers */
 static bool
-fixture_init(const st_ctx_t *ctx, fixture_t *f, int w, int h) {
-	f->pb.width = w;
-	f->pb.height = h;
-	f->pb.stride = pxl_calc_stride(w);
-	f->pb.data = malloc(f->pb.stride * f->pb.height * sizeof(pxl_t));
-
-	if (!st_check(ctx, f->pb.data != NULL, "malloc failed")) {
-		return false;
-	}
-
-	pxl_canvas_init(&f->cnv, &f->pb);
-	pxl_buf_zero(&f->pb);
-	pxl_text_ctx_init(&f->text_ctx, &f->cnv, &test_font);
-
-	return true;
-}
-
-static void
-fixture_deinit(fixture_t *f) {
-	free(f->pb.data);
-	f->pb.data = NULL;
-}
-
-/* Helpers ----------------------------------------------------------------- */
-
-static inline bool
-has_pixels_in_rect(const pxl_buf_t *pb, pxl_rect_t rect) {
+has_pixels_in_rect(pxl_rect_t rect) {
 	for (int y = rect.y; y < rect.y + rect.h; y++) {
 		for (int x = rect.x; x < rect.x + rect.w; x++) {
-			if (*pxl_buf_ptr(pb, x, y) != 0) return true;
+			if (g_buf_data[y][x] != 0) return true;
 		}
 	}
 	return false;
 }
 
-/* Test pxl_draw_rune ----------------------------------------------------------- */
-
-static void
-test_pxl_draw_rune_basic(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
-
-	int x = 5, y = 5;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_rune(&f.text_ctx, 'A');
-
-	/* Check pixels in expected bounds */
-	pxl_rect_t bounds = pxl_rune_bounds(&f.text_ctx, 'A');
-	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in 'A' bounds at (%d,%d)", x, y);
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_draw_rune_fallback(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
-
-	int x = 5, y = 5;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	/* Character 200 is out of range, should fallback to 'D' (68) */
-	pxl_draw_rune(&f.text_ctx, 200);
-
-	/* Check pixels in fallback bounds (D is at rune 68) */
-	pxl_rect_t bounds = pxl_rune_bounds(&f.text_ctx, 68);
-	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in fallback bounds at (%d,%d)", x, y);
-
-	fixture_deinit(&f);
-}
-
-static void
-test_pxl_draw_rune_no_fallback(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	/* Create a font with no fallback */
-	pxl_font_t font_no_fallback = test_font;
-	font_no_fallback.fallback_rune = 0;
-	pxl_text_ctx_init(&f.text_ctx, &f.cnv, &font_no_fallback);
-
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
-
-	int x_pos = 5, y_pos = 5;
-	pxl_text_set_cursor(&f.text_ctx, x_pos, y_pos);
-	/* Character 200 should be skipped */
-	pxl_draw_rune(&f.text_ctx, 200);
-
-	/* No pixels should be drawn */
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			ST_CHECK(*pxl_buf_ptr(&f.pb, x, y) == 0,
-			         "Pixel (%d,%d) modified by out-of-range rune with no fallback", x, y);
+static bool
+buf_is_empty(void) {
+	for (int y = 0; y < FIXTURE_H; y++) {
+		for (int x = 0; x < FIXTURE_W; x++) {
+			if (g_buf_data[y][x] != 0) return false;
 		}
 	}
+	return true;
+}
 
-	fixture_deinit(&f);
+/* Tests for pxl_utf8_decode */
+
+static void
+test_pxl_utf8_decode_ascii(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("A", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 'A');
 }
 
 static void
-test_pxl_draw_rune_with_scissor(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	/* Set a scissor that clips part of the character */
-	pxl_canvas_set_scissor(&f.cnv, 8, 5, 8, 8);
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
-
-	int x = 5, y = 5;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_rune(&f.text_ctx, 'A');
-
-	/* Check that pixels appear in scissor area */
-	ST_CHECK(has_pixels_in_rect(&f.pb, (pxl_rect_t){8, 5, 8, 8}),
-	         "No pixels drawn in scissor area");
-
-	fixture_deinit(&f);
+test_pxl_utf8_decode_2byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xC2\xA9", &codepoint);
+	ASSERT(len == 2);
+	ASSERT(codepoint == 0xA9);
 }
 
 static void
-test_pxl_draw_rune_with_offset(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_offset(&f.cnv, 5, 5);
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
-
-	int x = 0, y = 0;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_rune(&f.text_ctx, 'A');
-
-	/* Should appear at (5,5) due to offset */
-	pxl_rect_t bounds = pxl_rune_bounds(&f.text_ctx, 'A');
-	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "Offset not applied to draw_rune");
-
-	fixture_deinit(&f);
+test_pxl_utf8_decode_3byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xE2\x82\xAC", &codepoint);
+	ASSERT(len == 3);
+	ASSERT(codepoint == 0x20AC);
 }
 
-/* Test pxl_rune_bounds ------------------------------------------------------- */
+static void
+test_pxl_utf8_decode_4byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xF0\x9F\x98\x80", &codepoint);
+	ASSERT(len == 4);
+	ASSERT(codepoint == 0x1F600);
+}
+
+static void
+test_pxl_utf8_decode_invalid(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xFF", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == '?');
+}
+
+/* Tests for pxl_rune_bounds */
 
 static void
 test_pxl_rune_bounds_basic(void) {
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, 10, 10)) return;
-
-	pxl_rect_t bounds = pxl_rune_bounds(&f.text_ctx, 'A');
-	ST_CHECK(bounds.w > 0, "rune bounds width should be > 0, got %d", bounds.w);
-	ST_CHECK(bounds.h > 0, "rune bounds height should be > 0, got %d", bounds.h);
-
-	fixture_deinit(&f);
+	setup_fixture();
+	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h > 0);
 }
 
 static void
 test_pxl_rune_bounds_control_chars(void) {
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, 10, 10)) return;
+	setup_fixture();
+	pxl_rect_t bounds_nl = pxl_rune_bounds(&g_w, '\n');
+	ASSERT(bounds_nl.w == 0 && bounds_nl.h == 0);
 
-	/* Control characters should return zero bounds */
-	pxl_rect_t bounds_nl = pxl_rune_bounds(&f.text_ctx, '\n');
-	ST_CHECK(bounds_nl.w == 0 && bounds_nl.h == 0,
-	         "Newline bounds should be zero, got w=%d, h=%d", bounds_nl.w, bounds_nl.h);
+	pxl_rect_t bounds_tab = pxl_rune_bounds(&g_w, '\t');
+	ASSERT(bounds_tab.w == 0 && bounds_tab.h == 0);
 
-	pxl_rect_t bounds_tab = pxl_rune_bounds(&f.text_ctx, '\t');
-	ST_CHECK(bounds_tab.w == 0 && bounds_tab.h == 0,
-	         "Tab bounds should be zero, got w=%d, h=%d", bounds_tab.w, bounds_tab.h);
-
-	pxl_rect_t bounds_cr = pxl_rune_bounds(&f.text_ctx, '\r');
-	ST_CHECK(bounds_cr.w == 0 && bounds_cr.h == 0,
-	         "Carriage return bounds should be zero, got w=%d, h=%d", bounds_cr.w, bounds_cr.h);
-
-	fixture_deinit(&f);
+	pxl_rect_t bounds_cr = pxl_rune_bounds(&g_w, '\r');
+	ASSERT(bounds_cr.w == 0 && bounds_cr.h == 0);
 }
 
 static void
 test_pxl_rune_bounds_fallback(void) {
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, 10, 10)) return;
-
-	/* Out of range rune should use fallback bounds (D=68) */
-	pxl_rect_t bounds = pxl_rune_bounds(&f.text_ctx, 200);
-	pxl_rect_t fallback_bounds = pxl_rune_bounds(&f.text_ctx, 68);
-	ST_CHECK(bounds.w == fallback_bounds.w && bounds.h == fallback_bounds.h,
-	         "Fallback bounds mismatch: got w=%d,h=%d, expected w=%d,h=%d",
-	         bounds.w, bounds.h, fallback_bounds.w, fallback_bounds.h);
-
-	fixture_deinit(&f);
+	setup_fixture();
+	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 200);
+	pxl_rect_t fallback_bounds = pxl_rune_bounds(&g_w, 68);
+	ASSERT(bounds.w == fallback_bounds.w && bounds.h == fallback_bounds.h);
 }
 
 static void
 test_pxl_rune_bounds_no_fallback(void) {
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, 10, 10)) return;
-
-	/* Create a font with no fallback */
-	pxl_font_t font_no_fallback = test_font;
+	setup_fixture();
+	pxl_font_t font_no_fallback = g_test_font;
 	font_no_fallback.fallback_rune = 0;
-	f.text_ctx.font = &font_no_fallback;
 
-	/* Out of range rune with no fallback should return zero bounds */
-	pxl_rect_t bounds = pxl_rune_bounds(&f.text_ctx, 200);
-	ST_CHECK(bounds.w == 0 && bounds.h == 0,
-	         "Out-of-range rune with no fallback should have zero bounds, got w=%d, h=%d",
-	         bounds.w, bounds.h);
+	pxl_writer_t ctx;
+	pxl_writer_init(&ctx, &g_cnv, &font_no_fallback);
 
-	fixture_deinit(&f);
+	pxl_rect_t bounds = pxl_rune_bounds(&ctx, 200);
+	ASSERT(bounds.w == 0 && bounds.h == 0);
 }
 
-/* Test pxl_draw_text ------------------------------------------------------------ */
+/* Tests for pxl_draw_rune */
+
+static void
+test_pxl_draw_rune_basic(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_rune(&g_w, 'A');
+
+	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+static void
+test_pxl_draw_rune_fallback(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_rune(&g_w, 200);
+
+	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 68);
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+static void
+test_pxl_draw_rune_no_fallback(void) {
+	setup_fixture();
+	pxl_font_t font_no_fallback = g_test_font;
+	font_no_fallback.fallback_rune = 0;
+	pxl_writer_init(&g_w, &g_cnv, &font_no_fallback);
+
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_rune(&g_w, 200);
+
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_pxl_draw_rune_with_scissor(void) {
+	setup_fixture();
+	pxl_canvas_set_scissor(&g_cnv, 8, 5, 8, 8);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_rune(&g_w, 'A');
+
+	ASSERT(has_pixels_in_rect((pxl_rect_t){8, 5, 8, 8}));
+}
+
+static void
+test_pxl_draw_rune_with_offset(void) {
+	setup_fixture();
+	pxl_canvas_set_offset(&g_cnv, 5, 5);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 0, y = 0;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_rune(&g_w, 'A');
+
+	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
+	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+/* Tests for pxl_draw_text */
 
 static void
 test_pxl_draw_text_basic(void) {
-	int w = 40, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	const char *text = "ABC";
 	int x = 5, y = 5;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_text(&f.text_ctx, text);
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text(&g_w, text);
 
-	/* Check pixels in expected bounds */
-	pxl_rect_t bounds = pxl_text_bounds(&f.text_ctx, text);
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in 'ABC' bounds at (%d,%d)", x, y);
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
 static void
 test_pxl_draw_text_empty(void) {
-	int w = 20, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text(&g_w, "");
 
-	int x_pos = 5, y_pos = 5;
-	pxl_text_set_cursor(&f.text_ctx, x_pos, y_pos);
-	pxl_draw_text(&f.text_ctx, "");
-
-	/* No pixels should be modified */
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			ST_CHECK(*pxl_buf_ptr(&f.pb, x, y) == 0,
-			         "Pixel (%d,%d) modified by empty string", x, y);
-		}
-	}
-
-	fixture_deinit(&f);
+	ASSERT(buf_is_empty());
 }
 
 static void
 test_pxl_draw_text_with_newline(void) {
-	int w = 40, h = 30;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	const char *text = "A\nB";
 	int x = 5, y = 5;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_text(&f.text_ctx, text);
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text(&g_w, text);
 
-	/* Check pixels in expected bounds */
-	pxl_rect_t bounds = pxl_text_bounds(&f.text_ctx, text);
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in 'A\\nB' bounds at (%d,%d)", x, y);
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
 static void
 test_pxl_draw_text_with_tab(void) {
-	int w = 40, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	const char *text = "A\tB";
 	int x = 5, y = 5;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_text(&f.text_ctx, text);
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text(&g_w, text);
 
-	/* Check pixels in expected bounds */
-	pxl_rect_t bounds = pxl_text_bounds(&f.text_ctx, text);
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in 'A\\tB' bounds at (%d,%d)", x, y);
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
 
 static void
 test_pxl_draw_text_with_scissor(void) {
-	int w = 40, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_scissor(&f.cnv, 10, 5, 20, 10);
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
+	setup_fixture();
+	pxl_canvas_set_scissor(&g_cnv, 10, 5, 20, 10);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	const char *text = "Hello";
 	int x = 5, y = 5;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_text(&f.text_ctx, text);
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text(&g_w, text);
 
-	/* Check that pixels appear in scissor area (y=5 to y=15 covers glyph height) */
-	ST_CHECK(has_pixels_in_rect(&f.pb, (pxl_rect_t){10, 5, 20, 10}),
-	         "No pixels drawn in scissor area");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect((pxl_rect_t){10, 5, 20, 10}));
 }
 
 static void
 test_pxl_draw_text_with_offset(void) {
-	int w = 40, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
-
-	pxl_canvas_set_offset(&f.cnv, 5, 5);
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
+	setup_fixture();
+	pxl_canvas_set_offset(&g_cnv, 5, 5);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	const char *text = "PXL";
 	int x = 0, y = 0;
-	pxl_text_set_cursor(&f.text_ctx, x, y);
-	pxl_draw_text(&f.text_ctx, text);
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text(&g_w, text);
 
-	/* Should appear at (5,5) due to offset */
-	pxl_rect_t bounds = pxl_text_bounds(&f.text_ctx, text);
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "Offset not applied to draw_text");
-
-	fixture_deinit(&f);
+	ASSERT(has_pixels_in_rect(expected));
 }
-
-/* Test pxl_draw_text with proportional font ------------------------------------- */
 
 static void
 test_pxl_draw_text_proportional(void) {
-	int w = 40, h = 20;
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, w, h)) return;
+	setup_fixture();
 
-	/* Create a proportional test font with 3 chars: 'A' (65), 'B' (66), 'C' (67) */
 	static const uint8_t font_data[15] = {
-		/* 'A': 3x5 at row 0 */
-		0x07, /* 0b00000111 */
-		0x15, /* 0b00010101 */
-		0x15, /* 0b00010101 */
-		0x1F, /* 0b00011111 */
-		0x15, /* 0b00010101 */
-		/* 'B': 5x5 at row 5 */
-		0x1F, /* 0b00011111 */
-		0x15, /* 0b00010101 */
-		0x1F, /* 0b00011111 */
-		0x15, /* 0b00010101 */
-		0x1F, /* 0b00011111 */
-		/* 'C': 4x5 at row 10 */
-		0x0E, /* 0b00001110 */
-		0x11, /* 0b00010001 */
-		0x10, /* 0b00010000 */
-		0x10, /* 0b00010000 */
-		0x0E  /* 0b00001110 */
+		0x07, 0x15, 0x15, 0x1F, 0x15,
+		0x1F, 0x15, 0x1F, 0x15, 0x1F,
+		0x0E, 0x11, 0x10, 0x10, 0x0E
 	};
 
 	const pxl_bitmask_t bitmask = {
@@ -468,7 +363,6 @@ test_pxl_draw_text_proportional(void) {
 		.stride = 1
 	};
 
-	/* Per-glyph metrics */
 	static const uint8_t widths[3] = {3, 5, 4};
 	static const uint8_t advances[3] = {4, 6, 5};
 	static const int8_t offsets_x[3] = {0, 0, 0};
@@ -476,8 +370,8 @@ test_pxl_draw_text_proportional(void) {
 
 	pxl_font_t prop_font = {
 		.bitmask = bitmask,
-		.rune_start = 65, /* 'A' */
-		.rune_end = 67,   /* 'C' */
+		.rune_start = 65,
+		.rune_end = 67,
 		.fallback_rune = 0,
 		.tracking = 0,
 		.leading = 6,
@@ -488,84 +382,133 @@ test_pxl_draw_text_proportional(void) {
 		.glyph_offsets_y = offsets_y
 	};
 
-	pxl_text_ctx_t prop_ctx;
-	pxl_text_ctx_init(&prop_ctx, &f.cnv, &prop_font);
+	pxl_writer_t prop_ctx;
+	pxl_writer_init(&prop_ctx, &g_cnv, &prop_font);
 
-	pxl_canvas_set_color(&f.cnv, COLOR_WHITE);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	const char *text = "ABC";
-	int x_pos = 5, y_pos = 5;
-	pxl_text_set_cursor(&prop_ctx, x_pos, y_pos);
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&prop_ctx, x, y);
 	pxl_draw_text(&prop_ctx, text);
 
-	/* Check pixels in expected bounds */
 	pxl_rect_t bounds = pxl_text_bounds(&prop_ctx, text);
-	pxl_rect_t expected = {x_pos, y_pos, bounds.w, bounds.h};
-	ST_CHECK(has_pixels_in_rect(&f.pb, expected),
-	         "No pixels drawn in proportional 'ABC' bounds at (%d,%d)", x_pos, y_pos);
-
-	fixture_deinit(&f);
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
 }
 
-/* Test pxl_text_bounds ---------------------------------------------------------- */
+/* Tests for pxl_text_bounds */
 
 static void
 test_pxl_text_bounds_basic(void) {
-	fixture_t f;
-	if (!fixture_init(&ST_HERE, &f, 10, 10)) return;
-
-	/* Test simple text */
-	pxl_rect_t bounds = pxl_text_bounds(&f.text_ctx, "Hello");
-	ST_CHECK(bounds.w > 0, "text bounds width should be > 0, got %d", bounds.w);
-	ST_CHECK(bounds.h > 0, "text bounds height should be > 0, got %d", bounds.h);
-
-	/* Test with newline */
-	bounds = pxl_text_bounds(&f.text_ctx, "Hello\nWorld");
-	ST_CHECK(bounds.h == f.text_ctx.font->leading * 2,
-	         "text with newline should have height = 2 * leading, got %d, expected %d",
-	         bounds.h, f.text_ctx.font->leading * 2);
-
-	/* Test empty string */
-	bounds = pxl_text_bounds(&f.text_ctx, "");
-	ST_CHECK(bounds.w == 0, "empty text should have width 0, got %d", bounds.w);
-	ST_CHECK(bounds.h == 0, "empty text should have height 0, got %d", bounds.h);
-
-	/* Test with tab */
-	bounds = pxl_text_bounds(&f.text_ctx, "A\tB");
-	ST_CHECK(bounds.w > 0, "text with tab should have width > 0, got %d", bounds.w);
-
-	fixture_deinit(&f);
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "Hello");
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h > 0);
 }
 
-/* Main ----------------------------------------------------------------- */
+static void
+test_pxl_text_bounds_empty(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "");
+	ASSERT(bounds.w == 0);
+	ASSERT(bounds.h == 0);
+}
+
+static void
+test_pxl_text_bounds_height(void) {
+	setup_fixture();
+	const int gh = g_w.font->glyph_height;
+	const int ld = g_w.font->leading;
+
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A");
+	ASSERT(bounds.h == gh);
+
+	bounds = pxl_text_bounds(&g_w, "");
+	ASSERT(bounds.h == 0);
+
+	bounds = pxl_text_bounds(&g_w, "\n");
+	ASSERT(bounds.h == ld);
+
+	bounds = pxl_text_bounds(&g_w, "A\n");
+	ASSERT(bounds.h == gh + ld);
+
+	bounds = pxl_text_bounds(&g_w, "A\nB");
+	ASSERT(bounds.h == 2 * gh + ld);
+
+	bounds = pxl_text_bounds(&g_w, "A\nB\nC");
+	ASSERT(bounds.h == 3 * gh + 2 * ld);
+}
+
+static void
+test_pxl_text_bounds_with_tab(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\tB");
+	ASSERT(bounds.w > 0);
+}
+
+static void
+test_pxl_text_bounds_zero_tracking(void) {
+	setup_fixture();
+	pxl_font_t font_zero_tracking = g_test_font;
+	font_zero_tracking.tracking = 0;
+	pxl_writer_init(&g_w, &g_cnv, &font_zero_tracking);
+
+	pxl_rect_t bounds_abc = pxl_text_bounds(&g_w, "ABC");
+	pxl_rect_t bounds_a = pxl_text_bounds(&g_w, "A");
+
+	ASSERT(bounds_abc.w > bounds_a.w);
+	ASSERT(bounds_abc.w < bounds_a.w * 5);
+}
+
+static void
+test_pxl_text_bounds_zero_leading(void) {
+	setup_fixture();
+	pxl_font_t font_zero_leading = g_test_font;
+	font_zero_leading.leading = 0;
+	pxl_writer_init(&g_w, &g_cnv, &font_zero_leading);
+
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\nB");
+	const int gh = g_w.font->glyph_height;
+
+	ASSERT(bounds.h == 2 * gh);
+}
+
+/* Main */
 
 int
-main(int argc, char *argv[]) {
-	ST_GETOPTS(argc, argv);
-	return ST_RUN(
-		/* Rune bounds tests */
-		ST_T(test_pxl_rune_bounds_basic),
-		ST_T(test_pxl_rune_bounds_control_chars),
-		ST_T(test_pxl_rune_bounds_fallback),
-		ST_T(test_pxl_rune_bounds_no_fallback),
+main(void) {
+	test_pxl_utf8_decode_ascii();
+	test_pxl_utf8_decode_2byte();
+	test_pxl_utf8_decode_3byte();
+	test_pxl_utf8_decode_4byte();
+	test_pxl_utf8_decode_invalid();
 
-		/* Character tests */
-		ST_T(test_pxl_draw_rune_basic),
-		ST_T(test_pxl_draw_rune_fallback),
-		ST_T(test_pxl_draw_rune_no_fallback),
-		ST_T(test_pxl_draw_rune_with_scissor),
-		ST_T(test_pxl_draw_rune_with_offset),
+	test_pxl_rune_bounds_basic();
+	test_pxl_rune_bounds_control_chars();
+	test_pxl_rune_bounds_fallback();
+	test_pxl_rune_bounds_no_fallback();
 
-		/* String tests */
-		ST_T(test_pxl_draw_text_basic),
-		ST_T(test_pxl_draw_text_empty),
-		ST_T(test_pxl_draw_text_with_newline),
-		ST_T(test_pxl_draw_text_with_tab),
-		ST_T(test_pxl_draw_text_with_scissor),
-		ST_T(test_pxl_draw_text_with_offset),
-		ST_T(test_pxl_draw_text_proportional),
+	test_pxl_draw_rune_basic();
+	test_pxl_draw_rune_fallback();
+	test_pxl_draw_rune_no_fallback();
+	test_pxl_draw_rune_with_scissor();
+	test_pxl_draw_rune_with_offset();
 
-		/* Bounds tests */
-		ST_T(test_pxl_text_bounds_basic)
-	);
+	test_pxl_draw_text_basic();
+	test_pxl_draw_text_empty();
+	test_pxl_draw_text_with_newline();
+	test_pxl_draw_text_with_tab();
+	test_pxl_draw_text_with_scissor();
+	test_pxl_draw_text_with_offset();
+	test_pxl_draw_text_proportional();
+
+	test_pxl_text_bounds_basic();
+	test_pxl_text_bounds_empty();
+	test_pxl_text_bounds_height();
+	test_pxl_text_bounds_with_tab();
+	test_pxl_text_bounds_zero_tracking();
+	test_pxl_text_bounds_zero_leading();
+
+	return 0;
 }
