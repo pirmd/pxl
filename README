@@ -6,6 +6,8 @@ Minimal 2D graphics library in C99.
 Features:
   - 2D primitives: line, rect, circle, triangle (outline + filled)
   - Canvas with scissor clipping, translation offset, color, clear, blit
+  - Test outputting using either built-in 8x8 ascii font or monospace or
+    proportional bitmask font
   - Backends: SDL2, X11
   - Keyboard/mouse input
 
@@ -16,14 +18,12 @@ Build:
   make demo     # demos
   make clean    # cleaning
 
-  Backend selection via BACKEND=sdl or BACKEND=x11 (default)
-  Changing Backends requires manual make clean.
-  Test and demo will work only if main lib use the same BACKEND. Use make clean as needed.
+  Configuration posible using config.mk.
+  'Release mode' (remove "asserts") via PXL_BUILD_MODE=release.
+  Backend selection via PXL_BACKEND=sdl or PXL_BACKEND=x11 (default).
 
-Testing:
-  Unit tests use minimal test.h header with ASSERT() macro.
-  Run all tests: make test
-  Run specific test: ./test/test_<name>
+  Main configuration is defined in Makefile.inc. Override in config.mk or via
+  environment variables.
 
 Quick start:
     pxl_backend_init("Title", 800, 600, false);
@@ -56,16 +56,10 @@ Demos:
 Architecture:
   Core:
     err.h          - Error codes
-    color.h        - ARGB8888 color creation and component extraction
-    geom.h         - Geometry primitives (rect, span, point) and clipping
     buf.h          - uint32_t pixel buffer with stride alignment
-    bitmask.h      - 1-bit per pixel mask for stencil/clip operations (LSB is bit 0)
-    canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
-    draw.h/c       - Basic 2D primitives (line, rect, span, blit, mask)
-    ascii.h/c      - ASCII text rendering with built-in font (char, string, bounds)
-    draw_extra.h/c - Advanced 2D primitives (circle, triangle)
-    text.h/text.c  - Text rendering with mono or proportional font
-    tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
+    input.h        - Input state handling (keyboard, mouse, window events)
+    backend.h      - Backend interface. All backends use ARGB8888 pixel format
+                     (A:24-31, R:16-23, G:8-15, B:0-7).
 
   Backend:
     input.h       - Input state handling (keyboard, mouse, window events)
@@ -74,8 +68,25 @@ Architecture:
     backend_sdl.c - SDL2 backend (do not activate VSYNC)
     backend_x11.c - X11 backend
 
-  Loop:
-    stepper.h     - Time-stepped physics loop helper (fixed timestep, interpolation)
+  Gfx:
+    bitmask.h      - 1-bit per pixel mask for stencil/clip operations
+    canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
+    geom.h         - Geometry primitives (rect, span, point) and clipping
+    draw.h/c       - Basic 2D primitives (line, rect, span, blit, LSB bitmask)
+    draw_ascii.h/c - ASCII text rendering with built-in 8x8 font (char, string, bounds)
+    draw_extra.h/c - Advanced 2D primitives (circle, triangle)
+    color.h        - ARGB8888 color creation and component extraction
+
+  Framework:
+    stepper.h      - Time-stepped physics loop helper (fixed timestep, interpolation)
+    text.h/text.c  - Text rendering with mono or proportional LSB bitmask font
+    tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
+
+  Note: pxl.h includes all public headers above. Users may include individual headers if preferred.
+
+Testing:
+  Framework: test.h (minimalist assert-based testing)
+  Run tests: make test or sh test.sh to go through all available backends.
 
 License:
   MIT. See LICENSE.
