@@ -70,6 +70,16 @@ pxl_backend_get_time(void);
 void
 pxl_backend_poll_events(pxl_input_t *in);
 
+/* Wait for events - blocks until at least one event is available, then updates input state.
+ *
+ * Similar to SDL_WaitEvent or glfwWaitEvents.
+ * Use this for passive applications (viewers, editors) to minimize CPU usage.
+ *
+ * The pxl_input_t struct passed as argument MUST be zero-initialized before first use.
+ */
+void
+pxl_backend_wait_events(pxl_input_t *in);
+
 /* Text input: get typed text as UTF-8 string.
  *
  * This function retrieves raw UTF-8 text from keyboard input events,

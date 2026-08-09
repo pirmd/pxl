@@ -270,69 +270,85 @@ sdl_button_to_pxl_input_code(const Uint8 button) {
     }
 }
 
+/* Process a single SDL event and update input state */
+static void
+process_sdl_event(SDL_Event *event, pxl_input_t *in) {
+    switch (event->type) {
+        case SDL_QUIT:
+			pxl_input_press(in, PXL_WM_QUIT);
+            break;
+
+        case SDL_KEYDOWN:
+            if (!event->key.repeat) {
+				pxl_input_press(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
+            }
+            break;
+
+        case SDL_KEYUP:
+			pxl_input_release(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
+            break;
+
+        case SDL_MOUSEBUTTONDOWN:
+			pxl_input_press(in, sdl_button_to_pxl_input_code(event->button.button));
+            break;
+
+        case SDL_MOUSEBUTTONUP:
+			pxl_input_release(in, sdl_button_to_pxl_input_code(event->button.button));
+            break;
+
+        case SDL_MOUSEMOTION:
+            in->mouse_x = event->motion.x;
+            in->mouse_y = event->motion.y;
+            break;
+
+        case SDL_MOUSEWHEEL:
+            in->mouse_wheel_x += event->wheel.x;
+            in->mouse_wheel_y += event->wheel.y;
+            break;
+
+        case SDL_WINDOWEVENT:
+            if (event->window.event == SDL_WINDOWEVENT_ENTER) {
+                pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
+            } else if (event->window.event == SDL_WINDOWEVENT_LEAVE) {
+                pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
+            } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                pxl_input_release(in, PXL_WM_FOCUS_LOST);
+            } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                pxl_input_press(in, PXL_WM_FOCUS_LOST);
+            }
+            break;
+
+        case SDL_TEXTINPUT:
+            /* FIFO: Append UTF-8 text to internal buffer (no null-termination) */
+            {
+                int len = strlen(event->text.text);
+                if (g_sdl.text_buffer_len + len > (int)sizeof(g_sdl.text_buffer)) {
+                    int excess = (g_sdl.text_buffer_len + len) - (int)sizeof(g_sdl.text_buffer);
+                    memmove(g_sdl.text_buffer, g_sdl.text_buffer + excess, g_sdl.text_buffer_len - excess);
+                    g_sdl.text_buffer_len -= excess;
+                }
+                memcpy(g_sdl.text_buffer + g_sdl.text_buffer_len, event->text.text, len);
+                g_sdl.text_buffer_len += len;
+            }
+            break;
+    }
+}
+
 void
 pxl_backend_poll_events(pxl_input_t *in) {
     SDL_Event event;
-
     while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-            case SDL_QUIT:
-				pxl_input_press(in, PXL_WM_QUIT);
-                break;
+        process_sdl_event(&event, in);
+    }
+}
 
-            case SDL_KEYDOWN:
-                if (!event.key.repeat) {
-					pxl_input_press(in, sdl_keysym_to_pxl_input_code(event.key.keysym.sym));
-                }
-                break;
-
-            case SDL_KEYUP:
-				pxl_input_release(in, sdl_keysym_to_pxl_input_code(event.key.keysym.sym));
-                break;
-
-            case SDL_MOUSEBUTTONDOWN:
-				pxl_input_press(in, sdl_button_to_pxl_input_code(event.button.button));
-                break;
-
-            case SDL_MOUSEBUTTONUP:
-				pxl_input_release(in, sdl_button_to_pxl_input_code(event.button.button));
-                break;
-
-            case SDL_MOUSEMOTION:
-                in->mouse_x = event.motion.x;
-                in->mouse_y = event.motion.y;
-                break;
-
-            case SDL_MOUSEWHEEL:
-                in->mouse_wheel_x += event.wheel.x;
-                in->mouse_wheel_y += event.wheel.y;
-                break;
-
-            case SDL_WINDOWEVENT:
-                if (event.window.event == SDL_WINDOWEVENT_ENTER) {
-                    pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
-                } else if (event.window.event == SDL_WINDOWEVENT_LEAVE) {
-                    pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
-                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                    pxl_input_release(in, PXL_WM_FOCUS_LOST);
-                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                    pxl_input_press(in, PXL_WM_FOCUS_LOST);
-                }
-                break;
-
-            case SDL_TEXTINPUT:
-                /* FIFO: Append UTF-8 text to internal buffer (no null-termination) */
-                { 
-                    int len = strlen(event.text.text);
-                    if (g_sdl.text_buffer_len + len > (int)sizeof(g_sdl.text_buffer)) {
-                        int excess = (g_sdl.text_buffer_len + len) - (int)sizeof(g_sdl.text_buffer);
-                        memmove(g_sdl.text_buffer, g_sdl.text_buffer + excess, g_sdl.text_buffer_len - excess);
-                        g_sdl.text_buffer_len -= excess;
-                    }
-                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_len, event.text.text, len);
-                    g_sdl.text_buffer_len += len;
-                }
-                break;
+void
+pxl_backend_wait_events(pxl_input_t *in) {
+    SDL_Event event;
+    if (SDL_WaitEvent(&event)) {
+        process_sdl_event(&event, in);
+        while (SDL_PollEvent(&event)) {
+            process_sdl_event(&event, in);
         }
     }
 }

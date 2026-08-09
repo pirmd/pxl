@@ -483,6 +483,20 @@ pxl_backend_poll_events(pxl_input_t *in) {
     }
 }
 
+void
+pxl_backend_wait_events(pxl_input_t *in) {
+    XEvent event;
+    XNextEvent(g_x11.display, &event); /* Block until first event */
+    if (!XFilterEvent(&event, None)) {
+        process_x11_event(&event, in);
+    }
+    while (XPending(g_x11.display)) {
+        XNextEvent(g_x11.display, &event);
+        if (XFilterEvent(&event, None)) continue;
+        process_x11_event(&event, in);
+    }
+}
+
 int
 pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     assert(out_text);
