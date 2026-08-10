@@ -499,17 +499,31 @@ test_pxl_text_bounds_height(void) {
 	bounds = pxl_text_bounds(&g_w, "");
 	ASSERT(bounds.h == 0);
 
+	/* \n creates 2 lines: first line (empty), second line (empty) */
 	bounds = pxl_text_bounds(&g_w, "\n");
-	ASSERT(bounds.h == ld);
+	ASSERT(bounds.h == 2 * gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\n");
-	ASSERT(bounds.h == gh + ld);
+	ASSERT(bounds.h == 2 * gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\nB");
 	ASSERT(bounds.h == 2 * gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\nB\nC");
 	ASSERT(bounds.h == 3 * gh + 2 * ld);
+
+	/* Empty lines: consecutive newlines create visual empty lines */
+	bounds = pxl_text_bounds(&g_w, "\n\n");
+	ASSERT(bounds.h == 3 * gh + 2 * ld);
+
+	bounds = pxl_text_bounds(&g_w, "A\n\nB");
+	ASSERT(bounds.h == 3 * gh + 2 * ld);
+
+	bounds = pxl_text_bounds(&g_w, "A\n\n");
+	ASSERT(bounds.h == 3 * gh + 2 * ld);
+
+	bounds = pxl_text_bounds(&g_w, "\nA");
+	ASSERT(bounds.h == 2 * gh + ld);
 }
 
 static void

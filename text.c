@@ -168,7 +168,6 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 	pxl_rect_t b = {0};
 	int width = 0;
 	int newline_count = 0;
-	int line_count = 0;  /* Number of lines with content */
 
 	uint32_t codepoint;
 	while (*txt) {
@@ -178,7 +177,6 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 		switch (rune) {
 			case '\n':
 				if (width > b.w) b.w = width;
-				if (width > 0) line_count++;  /* Line had content */
 				width = 0;
 				newline_count++;
 				continue;
@@ -206,13 +204,13 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 	}
 
 	if (width > b.w) b.w = width;
-	if (width > 0) line_count++;  /* Last line (without \n) has content */
 
-	/* Total height = (lines with content) * glyph_height + (newlines) * leading
-	 * Each line with content contributes glyph_height.
-	 * Each newline contributes leading (space between lines).
+	/* Calculate height: each \n creates a new line.
+	 * Total lines = newline_count + 1 (if any content/newlines exist).
+	 * Each line contributes glyph_height, each \n contributes leading.
 	 */
-	b.h = line_count * glyph_height + newline_count * leading;
+	int total_lines = (newline_count == 0 && width == 0) ? 0 : newline_count + 1;
+	b.h = total_lines * glyph_height + newline_count * leading;
 
 	return b;
 }
