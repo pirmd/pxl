@@ -132,11 +132,83 @@ test_pxl_utf8_decode_4byte(void) {
 }
 
 static void
-test_pxl_utf8_decode_invalid(void) {
+test_pxl_utf8_decode_invalid_byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xFF", &codepoint);
 	ASSERT(len == 1);
-	ASSERT(codepoint == '?');
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_continuation_as_first(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\x80", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_incomplete_2byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xC0", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_incomplete_3byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xE2\x82", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_incomplete_4byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xF0\x9F\x98", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_invalid_continuation_byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xC0\x22", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_overlong_2byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xC0\x80", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_overlong_3byte(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xE0\x80\x81", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_surrogate(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xED\xA0\x80", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
+}
+
+static void
+test_pxl_utf8_decode_above_10ffff(void) {
+	uint32_t codepoint;
+	int len = pxl_utf8_decode("\xF4\x90\x80\x80", &codepoint);
+	ASSERT(len == 1);
+	ASSERT(codepoint == 0xFFFD);
 }
 
 /* Tests for pxl_rune_bounds */
@@ -482,7 +554,16 @@ main(void) {
 	test_pxl_utf8_decode_2byte();
 	test_pxl_utf8_decode_3byte();
 	test_pxl_utf8_decode_4byte();
-	test_pxl_utf8_decode_invalid();
+	test_pxl_utf8_decode_invalid_byte();
+	test_pxl_utf8_decode_continuation_as_first();
+	test_pxl_utf8_decode_incomplete_2byte();
+	test_pxl_utf8_decode_incomplete_3byte();
+	test_pxl_utf8_decode_incomplete_4byte();
+	test_pxl_utf8_decode_invalid_continuation_byte();
+	test_pxl_utf8_decode_overlong_2byte();
+	test_pxl_utf8_decode_overlong_3byte();
+	test_pxl_utf8_decode_surrogate();
+	test_pxl_utf8_decode_above_10ffff();
 
 	test_pxl_rune_bounds_basic();
 	test_pxl_rune_bounds_control_chars();

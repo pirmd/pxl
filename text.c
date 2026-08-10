@@ -38,37 +38,52 @@ pxl_font_glyph_metrics(const pxl_font_t *font, int idx,
 }
 
 /* UTF-8 decoder: returns bytes consumed (1-4), outputs Unicode codepoint.
- * On invalid sequences, returns 1 and outputs fallback '?'.
+ * On invalid sequences, returns 1 and outputs U+FFFD (REPLACEMENT CHARACTER).
+ * Validates: continuation bytes, overlong sequences, surrogates, and codepoint range.
  */
 int
 pxl_utf8_decode(const char *text, uint32_t *out_codepoint) {
 	assert(text && out_codepoint);
-	unsigned char c = (unsigned char)text[0];
+
+	unsigned char c0 = (unsigned char)text[0];
+	uint32_t cp;
+	int len;
 
 	/* ASCII (1 byte) */
-	if (c < 0x80) {
-		*out_codepoint = c;
+	if (c0 < 0x80) {
+		*out_codepoint = c0;
 		return 1;
 	}
-	/* 2-byte sequence */
-	if ((c & 0xE0) == 0xC0) {
-		*out_codepoint = ((c & 0x1F) << 6) | (text[1] & 0x3F);
-		return 2;
-	}
-	/* 3-byte sequence */
-	if ((c & 0xF0) == 0xE0) {
-		*out_codepoint = ((c & 0x0F) << 12) | ((text[1] & 0x3F) << 6) | (text[2] & 0x3F);
-		return 3;
-	}
-	/* 4-byte sequence */
-	if ((c & 0xF8) == 0xF0) {
-		*out_codepoint = ((c & 0x07) << 18) | ((text[1] & 0x3F) << 12) |
-		                 ((text[2] & 0x3F) << 6) | (text[3] & 0x3F);
-		return 4;
+
+	/* Continuation byte as first byte -> invalid */
+	if ((c0 & 0xC0) == 0x80)
+		goto invalid;
+
+	/* Determine sequence length and extract leading bits */
+	if (c0 < 0xE0) { len = 2; cp = c0 & 0x1F; }
+	else if (c0 < 0xF0) { len = 3; cp = c0 & 0x0F; }
+	else if (c0 < 0xF8) { len = 4; cp = c0 & 0x07; }
+	else goto invalid;
+
+	/* Validate continuation bytes and decode */
+	for (int i = 1; i < len; i++) {
+		unsigned char c = (unsigned char)text[i];
+		if (c == '\0' || (c & 0xC0) != 0x80)
+			goto invalid;
+		cp = (cp << 6) | (c & 0x3F);
 	}
 
-	/* Invalid or desynced character */
-	*out_codepoint = '?';
+	/* Validate codepoint ranges */
+	if ((len == 2 && cp < 0x80) ||
+	    (len == 3 && (cp < 0x800 || (cp >= 0xD800 && cp <= 0xDFFF))) ||
+	    (len == 4 && (cp < 0x10000 || cp > 0x10FFFF)))
+		goto invalid;
+
+	*out_codepoint = cp;
+	return len;
+
+invalid:
+	*out_codepoint = 0xFFFD;
 	return 1;
 }
 
