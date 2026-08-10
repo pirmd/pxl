@@ -10,22 +10,26 @@
 #define H 600
 #define FPS 60.0f
 
-#define BG_COLOR     0xFFFAFAFA  /* Off-white / light gray background */
-#define TEXT_COLOR   0xFF000000  /* Black text for better contrast */
-#define CURSOR_COLOR 0xFFFFFF00
+#define BG_COLOR     0xFF121212  /* Dark background */
+#define PAPER_COLOR  0xFFFFFFFF  /* White paper     */
+#define TEXT_COLOR   0xFF000000  /* Black           */
+#define CURSOR_COLOR 0xFF000000  /* Black cursor    */
 
-#define MAX_TEXT_LEN 1024 /* maximum text buffer size */
+#define PAPER_W  W / 100 * 80
+#define PAPER_H  H / 100 * 80
 
-/* Typewriter settings */
-#define PAGE_WIDTH_CHARS 80
+#define MARGIN_X (W - PAPER_W) / 2
+#define MARGIN_Y (H - PAPER_H) / 2
 
-#define MARGIN_X 40
-#define MARGIN_Y 40
-#define PAGE_MARGIN_LEFT  (MARGIN_X)
-#define PAGE_MARGIN_RIGHT (W - MARGIN_X)
-#define LINE_SPACING 2
+#define CHAR_W   8
+#define CHAR_H   8
+#define TRACKING 1
+#define LEADING  2
 
-#define CHAR_APPPEAR_DELAY 0.05     /* Delay between character appearances (seconds) */
+#define PAGE_W   PAPER_W / (CHAR_W + TRACKING) 
+#define PAGE_H   PAPER_H / (CHAR_H + LEADING)
+
+#define PRINT_DURATION  0.5   /* Duration of printing in s */
 
 /* Typewriter 8x8 monochrome bitmap font based on IBM VGA fonts */
 static char font_typewriter_data[128][8] = {
@@ -169,37 +173,124 @@ static pxl_font_t pxl_font_typewriter = {
         .rune_start = 0,
         .rune_end   = 127,
         .fallback_rune = '?',
-        .tracking = 1,
-        .leading = 8 + LINE_SPACING,
-        .glyph_height = 8,
-        .glyph_widths = NULL,
-        .glyph_advances = NULL,
-        .glyph_offsets_x = NULL,
-        .glyph_offsets_y = NULL,
+        .tracking      = TRACKING,
+        .leading       = CHAR_W + LEADING,
+        .glyph_height  = CHAR_H,
 };
-
-typedef enum keyboard_layout_e {
-    KEYBOARD_QWERTY,
-    KEYBOARD_AZERTY
-} keyboard_layout_t;
 
 /*
  *  Typewriter state
  */
-typedef struct typewriter_s {
-    uint32_t buffer[MAX_TEXT_LEN];
-    double char_appear_time[MAX_TEXT_LEN];
-    int length;
-    int cursor_pos;
-    int scroll_line;
-    bool cursor_visible;
-    double cursor_timer;
+typedef struct {
+    uint32_t   paper[PAGE_H][PAGE_W];
 
-    int margin_left;
-    int margin_right;
-    int char_width;
-    bool needs_carriage_return;
+    int carriage_i, carriage_j;
+
+	double   printing_dt;
+	uint32_t is_printing;
+	double   is_printing_acc;
 } typewriter_t;
+
+static void
+init_typewriter(typewriter_t *tw) {
+	memset(tw->paper, 0, sizeof(tw->paper));
+
+    tw->carriage_i = 0;
+	tw->carriage_j = 0;
+
+	tw->printing_dt = PRINT_DURATION;
+	tw->is_printing = 0;
+	tw->is_printing_acc = 0;
+}
+
+static void
+carriage_return(typewriter_t *tw) {
+	tw->carriage_i  = 0;
+	if (tw->carriage_j < PAGE_H - 1) tw->carriage_j++;
+
+}
+
+static void
+carriage_left(typewriter_t *tw) {
+	if (tw->carriage_i > 0) tw->carriage_i--;
+}
+
+static void
+carriage_right(typewriter_t *tw) {
+	if (tw->carriage_i < PAGE_W - 1) tw->carriage_i++;
+}
+
+static void
+carriage_up(typewriter_t *tw) {
+	if (tw->carriage_j > 0) tw->carriage_j--;
+}
+
+static void
+carriage_down(typewriter_t *tw) {
+	if (tw->carriage_j < PAGE_H - 1) tw->carriage_j++;
+}
+
+static void
+press_rune(typewriter_t *tw, uint32_t c) {
+	if (tw->is_printing == c) return;
+
+	tw->is_printing     = c;
+	tw->is_printing_acc = 0;
+}
+
+static void
+update_typewriter(typewriter_t *tw, float dt) {
+	if (tw->is_printing > 0) {
+		tw->is_printing_acc += dt;
+		if (tw->is_printing_acc > tw->printing_dt) {
+			tw->paper[tw->carriage_j][tw->carriage_i] = tw->is_printing;
+			carriage_right(tw);
+
+			tw->is_printing     = 0;
+			tw->is_printing_acc = 0;
+		}
+	}
+}
+
+static void
+render_typewriter(pxl_canvas_t *cnv, typewriter_t *tw) {
+    pxl_canvas_set_color(cnv, BG_COLOR);
+    pxl_canvas_clear(cnv);
+
+	pxl_canvas_set_offset(cnv, MARGIN_X, MARGIN_Y);
+	pxl_canvas_set_scissor(cnv, MARGIN_X, MARGIN_Y, PAPER_W, PAPER_H);
+
+    /* Draw paper sheet */
+    pxl_canvas_set_color(cnv, PAPER_COLOR);
+    pxl_canvas_clear(cnv);
+
+
+    pxl_writer_t w;
+    pxl_writer_init(&w, cnv, &pxl_font_typewriter);
+	pxl_writer_set_cursor(&w, 0, 0);
+	pxl_canvas_set_color(cnv, TEXT_COLOR);
+
+	for (int j = 0; j < PAGE_H; ++j) {
+		for (int i = 0; i < PAGE_W; ++i) {
+			pxl_draw_rune(&w, tw->paper[j][i]);
+		}
+		pxl_draw_rune(&w, '\n');
+	}
+
+	int cursor_x = tw->carriage_i * (CHAR_W + TRACKING);
+	int cursor_y = tw->carriage_j * (CHAR_H + LEADING);
+	pxl_canvas_set_color(cnv, CURSOR_COLOR);
+	
+	if (tw->is_printing > 0) {
+		pxl_fill_rect(cnv, cursor_x, cursor_y, 8, 8);
+
+		pxl_writer_set_cursor(&w, cursor_x, cursor_y);
+		pxl_canvas_set_color(cnv, PAPER_COLOR);
+		pxl_draw_rune(&w, tw->is_printing);
+	} else {
+		pxl_draw_rect(cnv, cursor_x, cursor_y, 8, 8);
+	}
+}
 
 
 /*
@@ -209,9 +300,11 @@ struct app_s {
     pxl_input_t in_prev;
     pxl_input_t in_curr;
 
+    pxl_time_stepper_t stepper;
     typewriter_t tw;
-    keyboard_layout_t layout;
-} app;
+} app = {
+    .stepper = { .dt = 1.0f / FPS }
+};
 
 static inline bool
 is_pressed(pxl_input_code_t code) {
@@ -223,187 +316,60 @@ was_pressed(pxl_input_code_t code) {
     return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
 }
 
-static void
-init_typewriter(void) {
-    memset(&app.tw, 0, sizeof(app.tw));
-    app.tw.length = 0;
-    app.tw.cursor_pos = 0;
-    app.tw.scroll_line = 0;
-    app.tw.cursor_visible = true;
-    app.tw.cursor_timer = 0.0;
-
-    app.tw.margin_left = PAGE_MARGIN_LEFT;
-    app.tw.margin_right = PAGE_MARGIN_RIGHT;
-    app.tw.char_width = 8;
-    app.tw.needs_carriage_return = false;
-}
+/*
+ *  Keyboard handling
+ */
 
 static void
-draw_text_with_cursor(pxl_canvas_t *cnv, double now) {
-    pxl_writer_t w;
-    pxl_writer_init(&w, cnv, &pxl_font_typewriter);
-
-    int visible_lines = (H - MARGIN_Y * 2) / pxl_font_typewriter.leading;
-    int char_h = pxl_font_typewriter.glyph_height;
-
-    int line_count = 0;
-    int line_char_start = 0;
-    int cursor_line = 0;
-    int cursor_x = app.tw.margin_left;
-    bool cursor_on_visible_line = false;
-
-    for (int i = 0; i < app.tw.cursor_pos && i < app.tw.length; i++) {
-        if (app.tw.buffer[i] == '\n') {
-            cursor_line++;
-        }
+handle_input(void) {
+    /* Handle special keys for cursor movement */
+    if (was_pressed(PXL_KEYB_LEFT)) {
+		carriage_left(&app.tw);
     }
 
-    for (int i = 0; i <= app.tw.length; i++) {
-        if (app.tw.needs_carriage_return && line_count == cursor_line) {
-            pxl_writer_set_cursor(&w, app.tw.margin_left, w.y);
-            app.tw.needs_carriage_return = false;
-        }
+    if (was_pressed(PXL_KEYB_RIGHT)) {
+		carriage_right(&app.tw);
+    }
 
-        if (app.tw.buffer[i] == '\n' || app.tw.buffer[i] == '\0') {
-            int line_end = (app.tw.buffer[i] == '\n') ? i : app.tw.length;
+    if (was_pressed(PXL_KEYB_UP)) {
+		carriage_up(&app.tw);
+    }
 
-            if (line_count >= app.tw.scroll_line && line_count < app.tw.scroll_line + visible_lines) {
-                int y_pos = MARGIN_Y + (line_count - app.tw.scroll_line) * pxl_font_typewriter.leading;
-                pxl_writer_set_cursor(&w, app.tw.margin_left, y_pos);
+    if (was_pressed(PXL_KEYB_DOWN)) {
+		carriage_down(&app.tw);
+    }
 
-                for (int j = line_char_start; j < line_end; j++) {
-                    if (now >= app.tw.char_appear_time[j]) {
-                        if (line_count == cursor_line && j == app.tw.cursor_pos) {
-                            cursor_x = w.x;
-                            cursor_on_visible_line = true;
-                        }
+    if (was_pressed(PXL_KEYB_HOME) || was_pressed(PXL_KEYB_ENTER)) {
+		carriage_return(&app.tw);
+    }
 
-                        pxl_canvas_set_color(cnv, TEXT_COLOR);
-                        pxl_draw_rune(&w, app.tw.buffer[j]);
-                    }
+    /* Process typed text from backend (UTF-8) */
+    char utf8_buf[32];
+    int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
+    if (len > 0) {
+        const char *ptr = utf8_buf;
+        const char *end = utf8_buf + len;
+        
+        while (ptr < end) {
+            uint32_t rune;
+            int consumed = pxl_utf8_decode(ptr, &rune);
+            if (consumed > 0) {
+                /* Filter out control characters (handled by special keys) */
+                if (rune >= 32 && rune != 127) {
+                    press_rune(&app.tw, rune);
                 }
-
-                if (line_count == cursor_line && app.tw.cursor_pos == line_end) {
-                    cursor_x = w.x;
-                    cursor_on_visible_line = true;
-                }
+                ptr += consumed;
+            } else {
+                /* Invalid UTF-8, skip this byte */
+                ptr++;
             }
-
-            line_count++;
-            line_char_start = i + 1;
         }
     }
-
-    if (app.tw.cursor_visible && cursor_on_visible_line) {
-        int visible_line = cursor_line - app.tw.scroll_line;
-        int cursor_y = MARGIN_Y + visible_line * pxl_font_typewriter.leading;
-
-        pxl_canvas_set_color(cnv, CURSOR_COLOR);
-        pxl_fill_rect(cnv, cursor_x, cursor_y, 2, char_h);
-    }
 }
 
-static void
-render_typewriter(pxl_canvas_t *cnv, double now) {
-    pxl_canvas_set_color(cnv, BG_COLOR);
-    pxl_canvas_clear(cnv);
-
-    draw_text_with_cursor(cnv, now);
-}
-
-static void
-delete_char(void) {
-    if (app.tw.cursor_pos > 0 && app.tw.length > 0) {
-        memmove(&app.tw.buffer[app.tw.cursor_pos - 1],
-                &app.tw.buffer[app.tw.cursor_pos],
-                (app.tw.length - app.tw.cursor_pos) * sizeof(uint32_t));
-        memmove(&app.tw.char_appear_time[app.tw.cursor_pos - 1],
-                &app.tw.char_appear_time[app.tw.cursor_pos],
-                (app.tw.length - app.tw.cursor_pos) * sizeof(double));
-        app.tw.length--;
-        app.tw.cursor_pos--;
-        app.tw.buffer[app.tw.length] = 0;
-        app.tw.char_appear_time[app.tw.length] = 0;
-    }
-}
-
-static void
-carriage_return(void) {
-    int line_start = app.tw.cursor_pos;
-    while (line_start > 0 && app.tw.buffer[line_start - 1] != '\n') {
-        line_start--;
-    }
-    app.tw.cursor_pos = line_start;
-    app.tw.needs_carriage_return = true;
-}
-
-static void
-move_cursor_left(void) {
-    if (app.tw.cursor_pos > 0) {
-        app.tw.cursor_pos--;
-    }
-}
-
-static void
-move_cursor_right(void) {
-    if (app.tw.cursor_pos < app.tw.length) {
-        app.tw.cursor_pos++;
-    }
-}
-
-static void
-insert_char(int c, double now) {
-    if (app.tw.length >= MAX_TEXT_LEN - 1) {
-        return;
-    }
-
-    int chars_from_start = 0;
-    int line_start_pos = app.tw.cursor_pos;
-    while (line_start_pos > 0 && app.tw.buffer[line_start_pos - 1] != '\n') {
-        line_start_pos--;
-        chars_from_start++;
-    }
-
-    if (chars_from_start + 1 > PAGE_WIDTH_CHARS) {
-        if (app.tw.length >= MAX_TEXT_LEN - 1) {
-            return;
-        }
-
-        if (app.tw.cursor_pos < app.tw.length) {
-            memmove(&app.tw.buffer[app.tw.cursor_pos + 1],
-                    &app.tw.buffer[app.tw.cursor_pos],
-                    (app.tw.length - app.tw.cursor_pos) * sizeof(uint32_t));
-            memmove(&app.tw.char_appear_time[app.tw.cursor_pos + 1],
-                    &app.tw.char_appear_time[app.tw.cursor_pos],
-                    (app.tw.length - app.tw.cursor_pos) * sizeof(double));
-        }
-
-        app.tw.buffer[app.tw.cursor_pos] = '\n';
-        app.tw.char_appear_time[app.tw.cursor_pos] = now;
-        app.tw.length++;
-        app.tw.cursor_pos++;
-        app.tw.buffer[app.tw.length] = 0;
-        app.tw.char_appear_time[app.tw.length] = 0;
-
-        chars_from_start = 0;
-    }
-
-    if (app.tw.cursor_pos < app.tw.length) {
-        memmove(&app.tw.buffer[app.tw.cursor_pos + 1],
-                &app.tw.buffer[app.tw.cursor_pos],
-                (app.tw.length - app.tw.cursor_pos) * sizeof(uint32_t));
-        memmove(&app.tw.char_appear_time[app.tw.cursor_pos + 1],
-                &app.tw.char_appear_time[app.tw.cursor_pos],
-                (app.tw.length - app.tw.cursor_pos) * sizeof(double));
-    }
-
-    app.tw.buffer[app.tw.cursor_pos] = (uint32_t)c;
-    app.tw.char_appear_time[app.tw.cursor_pos] = now + (app.tw.length * CHAR_APPPEAR_DELAY);
-    app.tw.length++;
-    app.tw.cursor_pos++;
-    app.tw.buffer[app.tw.length] = 0;
-    app.tw.char_appear_time[app.tw.length] = 0;
-}
+/*
+ * FPS
+ */
 
 static void
 log_fps(double now) {
@@ -417,238 +383,10 @@ log_fps(double now) {
     n++;
     if (now - t0 >= 1.0) {
         int current_fps = (int)((float)n / (float)(now - t0));
-        printf("FPS: %d | Text length: %d characters\r", current_fps, app.tw.length);
+        printf("FPS: %d\r", current_fps);
         fflush(stdout);
         n = 0;
         t0 = now;
-    }
-}
-
-
-/*
- *  Keyboard handling
- */
-
-static void
-handle_input_common(void) {
-    if (was_pressed(PXL_KEYB_BACKSPACE)) {
-        delete_char();
-    }
-
-    if (was_pressed(PXL_KEYB_DELETE)) {
-        if (app.tw.cursor_pos < app.tw.length) {
-            memmove(&app.tw.buffer[app.tw.cursor_pos],
-                    &app.tw.buffer[app.tw.cursor_pos + 0],
-                    app.tw.length - app.tw.cursor_pos);
-            app.tw.length--;
-            app.tw.buffer[app.tw.length] = '\0';
-        }
-    }
-
-    if (was_pressed(PXL_KEYB_LEFT)) {
-        move_cursor_left();
-    }
-
-    if (was_pressed(PXL_KEYB_RIGHT)) {
-        move_cursor_right();
-    }
-
-    if (was_pressed(PXL_KEYB_HOME)) {
-        app.tw.cursor_pos = -1;
-    }
-
-    if (was_pressed(PXL_KEYB_END)) {
-        app.tw.cursor_pos = app.tw.length;
-    }
-}
-
-static void
-handle_input_qwerty(double now) {
-    handle_input_common();
-
-    if (was_pressed(PXL_KEYB_SPACE))        { insert_char(' ', now); }
-    if (was_pressed(PXL_KEYB_APOSTROPHE))   { insert_char('\'', now); }
-    if (was_pressed(PXL_KEYB_COMMA))        { insert_char(',', now); }
-    if (was_pressed(PXL_KEYB_MINUS))        { insert_char('-', now); }
-    if (was_pressed(PXL_KEYB_PERIOD))       { insert_char('.', now); }
-    if (was_pressed(PXL_KEYB_SLASH))        { insert_char('/', now); }
-    if (was_pressed(PXL_KEYB_SEMICOLON))    { insert_char(';', now); }
-    if (was_pressed(PXL_KEYB_EQUAL))         { insert_char('=', now); }
-    if (was_pressed(PXL_KEYB_LEFT_BRACKET)) { insert_char('[', now); }
-    if (was_pressed(PXL_KEYB_BACKSLASH))    { insert_char('\\', now); }
-    if (was_pressed(PXL_KEYB_RIGHT_BRACKET)){ insert_char(']', now); }
-    if (was_pressed(PXL_KEYB_GRAVE_ACCENT)) { insert_char('`', now); }
-
-    if (was_pressed(PXL_KEYB_0)) { insert_char('0', now); }
-    if (was_pressed(PXL_KEYB_1)) { insert_char('1', now); }
-    if (was_pressed(PXL_KEYB_2)) { insert_char('2', now); }
-    if (was_pressed(PXL_KEYB_3)) { insert_char('3', now); }
-    if (was_pressed(PXL_KEYB_4)) { insert_char('4', now); }
-    if (was_pressed(PXL_KEYB_5)) { insert_char('5', now); }
-    if (was_pressed(PXL_KEYB_6)) { insert_char('6', now); }
-    if (was_pressed(PXL_KEYB_7)) { insert_char('7', now); }
-    if (was_pressed(PXL_KEYB_8)) { insert_char('8', now); }
-    if (was_pressed(PXL_KEYB_9)) { insert_char('9', now); }
-
-    bool shift_pressed = is_pressed(PXL_KEYB_LSHIFT) || is_pressed(PXL_KEYB_RSHIFT);
-    if (was_pressed(PXL_KEYB_A)) { insert_char(shift_pressed ? 'A' : 'a', now); }
-    if (was_pressed(PXL_KEYB_B)) { insert_char(shift_pressed ? 'B' : 'b', now); }
-    if (was_pressed(PXL_KEYB_C)) { insert_char(shift_pressed ? 'C' : 'c', now); }
-    if (was_pressed(PXL_KEYB_D)) { insert_char(shift_pressed ? 'D' : 'd', now); }
-    if (was_pressed(PXL_KEYB_E)) { insert_char(shift_pressed ? 'E' : 'e', now); }
-    if (was_pressed(PXL_KEYB_F)) { insert_char(shift_pressed ? 'F' : 'f', now); }
-    if (was_pressed(PXL_KEYB_G)) { insert_char(shift_pressed ? 'G' : 'g', now); }
-    if (was_pressed(PXL_KEYB_H)) { insert_char(shift_pressed ? 'H' : 'h', now); }
-    if (was_pressed(PXL_KEYB_I)) { insert_char(shift_pressed ? 'I' : 'i', now); }
-    if (was_pressed(PXL_KEYB_J)) { insert_char(shift_pressed ? 'J' : 'j', now); }
-    if (was_pressed(PXL_KEYB_K)) { insert_char(shift_pressed ? 'K' : 'k', now); }
-    if (was_pressed(PXL_KEYB_L)) { insert_char(shift_pressed ? 'L' : 'l', now); }
-    if (was_pressed(PXL_KEYB_M)) { insert_char(shift_pressed ? 'M' : 'm', now); }
-    if (was_pressed(PXL_KEYB_N)) { insert_char(shift_pressed ? 'N' : 'n', now); }
-    if (was_pressed(PXL_KEYB_O)) { insert_char(shift_pressed ? 'O' : 'o', now); }
-    if (was_pressed(PXL_KEYB_P)) { insert_char(shift_pressed ? 'P' : 'p', now); }
-    if (was_pressed(PXL_KEYB_Q)) { insert_char(shift_pressed ? 'Q' : 'q', now); }
-    if (was_pressed(PXL_KEYB_R)) { insert_char(shift_pressed ? 'R' : 'r', now); }
-    if (was_pressed(PXL_KEYB_S)) { insert_char(shift_pressed ? 'S' : 's', now); }
-    if (was_pressed(PXL_KEYB_T)) { insert_char(shift_pressed ? 'T' : 't', now); }
-    if (was_pressed(PXL_KEYB_U)) { insert_char(shift_pressed ? 'U' : 'u', now); }
-    if (was_pressed(PXL_KEYB_V)) { insert_char(shift_pressed ? 'V' : 'v', now); }
-    if (was_pressed(PXL_KEYB_W)) { insert_char(shift_pressed ? 'W' : 'w', now); }
-    if (was_pressed(PXL_KEYB_X)) { insert_char(shift_pressed ? 'X' : 'x', now); }
-    if (was_pressed(PXL_KEYB_Y)) { insert_char(shift_pressed ? 'Y' : 'y', now); }
-    if (was_pressed(PXL_KEYB_Z)) { insert_char(shift_pressed ? 'Z' : 'z', now); }
-
-    if (was_pressed(PXL_KEYB_ENTER)) {
-        insert_char('\n', now);
-    }
-
-    if (was_pressed(PXL_KEYB_R)) {
-        carriage_return();
-    }
-}
-
-static void
-handle_input_azerty(double now) {
-    handle_input_common();
-
-    bool shift_pressed = is_pressed(PXL_KEYB_LSHIFT) || is_pressed(PXL_KEYB_RSHIFT);
-    bool altgr_pressed = is_pressed(PXL_KEYB_RALT);
-
-    if (was_pressed(PXL_KEYB_ENTER)) {
-        insert_char('\n', now);
-        return;
-    }
-
-    if (was_pressed(PXL_KEYB_R)) {
-        carriage_return();
-        return;
-    }
-
-    if (altgr_pressed) {
-        if (was_pressed(PXL_KEYB_E))     { insert_char(0x20AB, now); }
-        if (was_pressed(PXL_KEYB_7))     { insert_char('[', now); }
-        if (was_pressed(PXL_KEYB_MINUS)) { insert_char(']', now); }
-        return;
-    }
-
-    if (shift_pressed) {
-        if (was_pressed(PXL_KEYB_2))        { insert_char(0x00C9, now); }
-        if (was_pressed(PXL_KEYB_7))        { insert_char(0x00C8, now); }
-        if (was_pressed(PXL_KEYB_9))        { insert_char(0x00C7, now); }
-        if (was_pressed(PXL_KEYB_0))        { insert_char(0x00C0, now); }
-        if (was_pressed(PXL_KEYB_EQUAL))    { insert_char(0x00D8, now); }
-        if (was_pressed(PXL_KEYB_3))        { insert_char('#', now); }
-        if (was_pressed(PXL_KEYB_4))        { insert_char('{', now); }
-        if (was_pressed(PXL_KEYB_5))        { insert_char('[', now); }
-        if (was_pressed(PXL_KEYB_6))        { insert_char('|', now); }
-        if (was_pressed(PXL_KEYB_8))        { insert_char('\\', now); }
-        if (was_pressed(PXL_KEYB_APOSTROPHE)) { insert_char('~', now); }
-        if (was_pressed(PXL_KEYB_EQUAL))    { insert_char('+', now); }
-    } else {
-        if (was_pressed(PXL_KEYB_2))        { insert_char(0x00E9, now); }
-        if (was_pressed(PXL_KEYB_7))        { insert_char(0x00E8, now); }
-        if (was_pressed(PXL_KEYB_9))        { insert_char(0x00E7, now); }
-        if (was_pressed(PXL_KEYB_0))        { insert_char(0x00E0, now); }
-        if (was_pressed(PXL_KEYB_EQUAL))    { insert_char(0x00F8, now); }
-        if (was_pressed(PXL_KEYB_SPACE))       { insert_char(' ', now); }
-        if (was_pressed(PXL_KEYB_APOSTROPHE))  { insert_char(0x00B1, now); }
-        if (was_pressed(PXL_KEYB_3))         { insert_char('"', now); }
-        if (was_pressed(PXL_KEYB_4))         { insert_char('\'', now); }
-        if (was_pressed(PXL_KEYB_5))         { insert_char('(', now); }
-        if (was_pressed(PXL_KEYB_6))         { insert_char('-', now); }
-        if (was_pressed(PXL_KEYB_8))         { insert_char('_', now); }
-        if (was_pressed(PXL_KEYB_BACKSLASH)) { insert_char(0x00AF, now); }
-    }
-
-    if (shift_pressed) {
-        if (was_pressed(PXL_KEYB_Q)) { insert_char('A', now); }
-        if (was_pressed(PXL_KEYB_A)) { insert_char('Q', now); }
-        if (was_pressed(PXL_KEYB_W)) { insert_char('Z', now); }
-        if (was_pressed(PXL_KEYB_Z)) { insert_char('W', now); }
-        if (was_pressed(PXL_KEYB_B)) { insert_char('B', now); }
-        if (was_pressed(PXL_KEYB_C)) { insert_char('C', now); }
-        if (was_pressed(PXL_KEYB_D)) { insert_char('D', now); }
-        if (was_pressed(PXL_KEYB_E)) { insert_char('E', now); }
-        if (was_pressed(PXL_KEYB_F)) { insert_char('F', now); }
-        if (was_pressed(PXL_KEYB_G)) { insert_char('G', now); }
-        if (was_pressed(PXL_KEYB_H)) { insert_char('H', now); }
-        if (was_pressed(PXL_KEYB_I)) { insert_char('I', now); }
-        if (was_pressed(PXL_KEYB_J)) { insert_char('J', now); }
-        if (was_pressed(PXL_KEYB_K)) { insert_char('K', now); }
-        if (was_pressed(PXL_KEYB_L)) { insert_char('L', now); }
-        if (was_pressed(PXL_KEYB_COMMA)) { insert_char('M', now); }
-        if (was_pressed(PXL_KEYB_N)) { insert_char('N', now); }
-        if (was_pressed(PXL_KEYB_O)) { insert_char('O', now); }
-        if (was_pressed(PXL_KEYB_P)) { insert_char('P', now); }
-        if (was_pressed(PXL_KEYB_R)) { insert_char('R', now); }
-        if (was_pressed(PXL_KEYB_S)) { insert_char('S', now); }
-        if (was_pressed(PXL_KEYB_T)) { insert_char('T', now); }
-        if (was_pressed(PXL_KEYB_U)) { insert_char('U', now); }
-        if (was_pressed(PXL_KEYB_V)) { insert_char('V', now); }
-        if (was_pressed(PXL_KEYB_X)) { insert_char('X', now); }
-        if (was_pressed(PXL_KEYB_Y)) { insert_char('Y', now); }
-    } else {
-        if (was_pressed(PXL_KEYB_Q)) { insert_char('a', now); }
-        if (was_pressed(PXL_KEYB_A)) { insert_char('q', now); }
-        if (was_pressed(PXL_KEYB_W)) { insert_char('z', now); }
-        if (was_pressed(PXL_KEYB_Z)) { insert_char('w', now); }
-        if (was_pressed(PXL_KEYB_B)) { insert_char('b', now); }
-        if (was_pressed(PXL_KEYB_C)) { insert_char('c', now); }
-        if (was_pressed(PXL_KEYB_D)) { insert_char('d', now); }
-        if (was_pressed(PXL_KEYB_E)) { insert_char('e', now); }
-        if (was_pressed(PXL_KEYB_F)) { insert_char('f', now); }
-        if (was_pressed(PXL_KEYB_G)) { insert_char('g', now); }
-        if (was_pressed(PXL_KEYB_H)) { insert_char('h', now); }
-        if (was_pressed(PXL_KEYB_I)) { insert_char('i', now); }
-        if (was_pressed(PXL_KEYB_J)) { insert_char('j', now); }
-        if (was_pressed(PXL_KEYB_K)) { insert_char('k', now); }
-        if (was_pressed(PXL_KEYB_L)) { insert_char('l', now); }
-        if (was_pressed(PXL_KEYB_COMMA)) { insert_char('m', now); }
-        if (was_pressed(PXL_KEYB_N)) { insert_char('n', now); }
-        if (was_pressed(PXL_KEYB_O)) { insert_char('o', now); }
-        if (was_pressed(PXL_KEYB_P)) { insert_char('p', now); }
-        if (was_pressed(PXL_KEYB_R)) { insert_char('r', now); }
-        if (was_pressed(PXL_KEYB_S)) { insert_char('s', now); }
-        if (was_pressed(PXL_KEYB_T)) { insert_char('t', now); }
-        if (was_pressed(PXL_KEYB_U)) { insert_char('u', now); }
-        if (was_pressed(PXL_KEYB_V)) { insert_char('v', now); }
-        if (was_pressed(PXL_KEYB_X)) { insert_char('x', now); }
-        if (was_pressed(PXL_KEYB_Y)) { insert_char('y', now); }
-        if (was_pressed(PXL_KEYB_SEMICOLON)) { insert_char(';', now); }
-        if (was_pressed(PXL_KEYB_SLASH)) { insert_char('/', now); }
-        if (was_pressed(PXL_KEYB_PERIOD)) { insert_char('.', now); }
-        if (was_pressed(PXL_KEYB_LEFT_BRACKET)) { insert_char('^', now); }
-        if (was_pressed(PXL_KEYB_RIGHT_BRACKET)) { insert_char('$', now); }
-        if (was_pressed(PXL_KEYB_GRAVE_ACCENT)) { insert_char('`', now); }
-    }
-}
-
-static void
-handle_input(double now) {
-    if (app.layout == KEYBOARD_AZERTY) {
-        handle_input_azerty(now);
-    } else {
-        handle_input_qwerty(now);
     }
 }
 
@@ -661,37 +399,40 @@ main(void) {
     if (pxl_backend_init("PXL Typewriter", W, H, 0) != PXL_SUCCESS)
         return 1;
 
-    printf("Typewriter demo. Type text, use arrows to navigate, Backspace/Delete to edit.\n");
-    printf("F1=toggle AZERTY/QWERTY, R=carriage return, ESC=quit\n");
+    printf("Typewriter demo. Type text, use arrows to navigate.\n");
+    printf("R=carriage return, Arrows=move cursor, ESC=quit\n");
 
-    init_typewriter();
-    app.layout = KEYBOARD_QWERTY;
+    init_typewriter(&app.tw);
+
+    app.stepper.dt = 1.0f / FPS;
+    pxl_stepper_init(&app.stepper, pxl_backend_get_time());
 
     while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
         app.in_prev = app.in_curr;
         pxl_backend_poll_events(&app.in_curr);
 
-        if (was_pressed(PXL_KEYB_F1)) {
-            app.layout = (app.layout == KEYBOARD_QWERTY) ? KEYBOARD_AZERTY : KEYBOARD_QWERTY;
-            printf("Keyboard layout: %s\n", app.layout == KEYBOARD_AZERTY ? "AZERTY" : "QWERTY");
-        }
+		handle_input();
 
-        double now = pxl_backend_get_time();
-		handle_input(now);
+        pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
+
+		while (pxl_stepper_advance(&app.stepper)) {
+			update_typewriter(&app.tw, (float)app.stepper.dt);
+		}
 
         pxl_buf_t pb;
         if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
             pxl_canvas_t cnv;
             pxl_canvas_init(&cnv, &pb);
 
-            render_typewriter(&cnv, now);
+            render_typewriter(&cnv, &app.tw);
 
-			log_fps(now);
+			log_fps(pxl_backend_get_time());
             pxl_backend_end_frame();
         }
     }
 
-    printf("Text length: %d characters\n", app.tw.length);
+	printf("\n");
+
     pxl_backend_deinit();
     return 0;
 }

@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <locale.h>
 
 #include "backend.h"
 #include "input.h"
@@ -29,6 +30,15 @@ static struct {
     XImage         *img;
     int             width, height;
     Atom            wm_delete;
+    /* Input method / input context: required for Xutf8LookupString to
+     * produce correct UTF-8 text (dead keys, compose sequences, non-Latin1
+     * layouts). Without this, XLookupString would only yield raw Latin-1
+     * bytes for accented characters, which is NOT valid UTF-8. */
+    XIM             xim;
+    XIC             xic;
+    /* Text input buffer for typed characters (UTF-8) */
+    char            text_buffer[128];
+    int             text_buffer_len;
 } g_x11;
 
 static bool
@@ -62,10 +72,14 @@ pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     pxl_backend_deinit();
 
-    /* Validate parameters */
     if (!title || w <= 0 || h <= 0) {
         return PXL_E_INVALID_PARAM;
     }
+
+    /* Required for Xutf8LookupString to produce correct UTF-8 output and
+     * for XIM to negotiate a proper input method with the OS/desktop. */
+    setlocale(LC_CTYPE, "");
+    XSetLocaleModifiers("");
 
     g_x11.display = XOpenDisplay(NULL);
     if (!g_x11.display) return PXL_E_BACKEND_INIT;
@@ -105,12 +119,21 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
         ExposureMask | KeyPressMask | KeyReleaseMask |
         ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
         StructureNotifyMask | EnterWindowMask | LeaveWindowMask | FocusChangeMask);
-
 	
 	XkbSetDetectableAutoRepeat(g_x11.display, True, NULL);
 
     g_x11.wm_delete = XInternAtom(g_x11.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(g_x11.display, g_x11.window, &g_x11.wm_delete, 1);
+
+    g_x11.xim = XOpenIM(g_x11.display, NULL, NULL, NULL);
+    if (!g_x11.xim) goto fail;
+
+    g_x11.xic = XCreateIC(g_x11.xim,
+        XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
+        XNClientWindow, g_x11.window,
+        XNFocusWindow, g_x11.window,
+        NULL);
+    if (!g_x11.xic) goto fail;
 
     /* Map window temporarily for XShmAttach to work */
     XMapWindow(g_x11.display, g_x11.window);
@@ -199,10 +222,21 @@ pxl_backend_deinit(void) {
         g_x11.gc = 0;
     }
 
+    if (g_x11.xic) {
+        XDestroyIC(g_x11.xic);
+        g_x11.xic = NULL;
+    }
+    if (g_x11.xim) {
+        XCloseIM(g_x11.xim);
+        g_x11.xim = NULL;
+    }
+
     if (g_x11.window) {
         XDestroyWindow(g_x11.display, g_x11.window);
         g_x11.window = 0;
     }
+
+    g_x11.text_buffer_len = 0;
 
     XCloseDisplay(g_x11.display);
     g_x11.display = NULL;
@@ -352,71 +386,123 @@ x11_button_to_pxl_input_code(const unsigned int button) {
     }
 }
 
+/* Process a single X11 event and update input state */
+static void
+process_x11_event(XEvent *event, pxl_input_t *in) {
+    switch (event->type) {
+        case ClientMessage:
+            if ((Atom)event->xclient.data.l[0] == g_x11.wm_delete) {
+                pxl_input_press(in, PXL_WM_QUIT);
+            }
+            break;
+
+        case KeyPress: {
+            /* Get the physical key code */
+            pxl_input_press(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
+
+            /* Get the actual character from the OS keyboard layout / IME using
+             * Xutf8LookupString. */
+            char buf[32];
+            KeySym keysym_return;
+            Status status;
+            int len = Xutf8LookupString(g_x11.xic, &event->xkey, buf, sizeof(buf) - 1,
+                                         &keysym_return, &status);
+            if (len > 0 && (status == XLookupChars || status == XLookupBoth)) {
+                /* FIFO: if buffer is full, shift left to make room for new characters */
+                if (g_x11.text_buffer_len + len > (int)sizeof(g_x11.text_buffer)) {
+                    int excess = (g_x11.text_buffer_len + len) - (int)sizeof(g_x11.text_buffer);
+                    memmove(g_x11.text_buffer, g_x11.text_buffer + excess, g_x11.text_buffer_len - excess);
+                    g_x11.text_buffer_len -= excess;
+                }
+                memcpy(g_x11.text_buffer + g_x11.text_buffer_len, buf, len);
+                g_x11.text_buffer_len += len;
+            }
+            break;
+        }
+
+        case KeyRelease:
+            pxl_input_release(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
+            break;
+
+        case ButtonPress: {
+            pxl_input_code_t b = x11_button_to_pxl_input_code(event->xbutton.button);
+            if (b != PXL_IN_UNKNOWN) {
+				pxl_input_press(in, b);
+            } else if (event->xbutton.button == 4) {
+                in->mouse_wheel_y += 1;
+            } else if (event->xbutton.button == 5) {
+                in->mouse_wheel_y -= 1;
+            } else if (event->xbutton.button == 6) {
+                in->mouse_wheel_x -= 1;
+            } else if (event->xbutton.button == 7) {
+                in->mouse_wheel_x += 1;
+            }
+            break;
+        }
+
+        case ButtonRelease:
+			pxl_input_release(in, x11_button_to_pxl_input_code(event->xbutton.button));
+            break;
+
+        case MotionNotify:
+            in->mouse_x = event->xmotion.x;
+            in->mouse_y = event->xmotion.y;
+            break;
+
+        case EnterNotify:
+            pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
+            in->mouse_x = event->xcrossing.x;
+            in->mouse_y = event->xcrossing.y;
+            break;
+
+        case LeaveNotify:
+            pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
+            break;
+
+        case FocusIn:
+            pxl_input_release(in, PXL_WM_FOCUS_LOST);
+            if (g_x11.xic) XSetICFocus(g_x11.xic);
+            break;
+
+        case FocusOut:
+            pxl_input_press(in, PXL_WM_FOCUS_LOST);
+            if (g_x11.xic) XUnsetICFocus(g_x11.xic);
+            break;
+    }
+}
+
 void
 pxl_backend_poll_events(pxl_input_t *in) {
     XEvent event;
-
     while (XPending(g_x11.display)) {
         XNextEvent(g_x11.display, &event);
-
-        switch (event.type) {
-            case ClientMessage:
-                if ((Atom)event.xclient.data.l[0] == g_x11.wm_delete) {
-                    pxl_input_press(in, PXL_WM_QUIT);
-                }
-                break;
-
-            case KeyPress:
-                pxl_input_press(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event.xkey, 0)));
-                break;
-
-            case KeyRelease:
-                pxl_input_release(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event.xkey, 0)));
-                break;
-
-            case ButtonPress: {
-                pxl_input_code_t b = x11_button_to_pxl_input_code(event.xbutton.button);
-                if (b != PXL_IN_UNKNOWN) {
-					pxl_input_press(in, b);
-                } else if (event.xbutton.button == 4) {
-                    in->mouse_wheel_y += 1;
-                } else if (event.xbutton.button == 5) {
-                    in->mouse_wheel_y -= 1;
-                } else if (event.xbutton.button == 6) {
-                    in->mouse_wheel_x -= 1;
-                } else if (event.xbutton.button == 7) {
-                    in->mouse_wheel_x += 1;
-                }
-                break;
-            }
-
-            case ButtonRelease: {
-				pxl_input_release(in, x11_button_to_pxl_input_code(event.xbutton.button));
-                break;
-            }
-
-            case MotionNotify:
-                in->mouse_x = event.xmotion.x;
-                in->mouse_y = event.xmotion.y;
-                break;
-
-            case EnterNotify:
-                pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
-                in->mouse_x = event.xcrossing.x;
-                in->mouse_y = event.xcrossing.y;
-                break;
-
-            case LeaveNotify:
-                pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
-                break;
-
-            case FocusIn:
-                pxl_input_release(in, PXL_WM_FOCUS_LOST);
-                break;
-
-            case FocusOut:
-                pxl_input_press(in, PXL_WM_FOCUS_LOST);
-                break;
-        }
+        /* Events consumed by the input method (e.g. mid-compose dead-key
+         * sequences) must not be processed as normal key events. */
+        if (XFilterEvent(&event, None)) continue;
+        process_x11_event(&event, in);
     }
+}
+
+int
+pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
+    assert(out_text);
+    assert(out_text_max_len > 0);
+
+    if (g_x11.text_buffer_len == 0) return 0;
+
+    int copy_len = (g_x11.text_buffer_len < out_text_max_len)
+        ? g_x11.text_buffer_len
+        : out_text_max_len - 1;
+
+    /* Early return if nothing to copy (kept for clarity and to avoid useless operations) */
+    if (copy_len <= 0) return 0;
+
+    memcpy(out_text, g_x11.text_buffer, copy_len);
+    out_text[copy_len] = '\0';
+
+    /* Consume copied bytes (no null-termination in internal buffer) */
+    g_x11.text_buffer_len -= copy_len;
+    memmove(g_x11.text_buffer, g_x11.text_buffer + copy_len, g_x11.text_buffer_len);
+
+    return copy_len;
 }

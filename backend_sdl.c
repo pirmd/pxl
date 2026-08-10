@@ -5,6 +5,7 @@
 #include <SDL.h>
 #include <assert.h>
 #include <stdint.h>
+#include <string.h>
 
 static struct {
     SDL_Window   *window;
@@ -12,6 +13,9 @@ static struct {
     SDL_Texture  *texture;
     int width;
     int height;
+    /* Text input buffer for typed characters (UTF-8) */
+    char text_buffer[128];
+    int text_buffer_len;
 } g_sdl;
 
 pxl_err_t
@@ -73,6 +77,10 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 
 	g_sdl.width = w;
 	g_sdl.height = h;
+
+	/* Enable text input for character retrieval */
+	SDL_StartTextInput();
+
 	return PXL_SUCCESS;
 
 fail:
@@ -82,6 +90,8 @@ fail:
 
 void
 pxl_backend_deinit(void) {
+    SDL_StopTextInput();
+    g_sdl.text_buffer_len = 0;  /* No null-termination needed */
     if (g_sdl.texture)  { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
     if (g_sdl.renderer) { SDL_DestroyRenderer(g_sdl.renderer); g_sdl.renderer = NULL; }
     if (g_sdl.window)   { SDL_DestroyWindow(g_sdl.window); g_sdl.window = NULL; }
@@ -309,6 +319,44 @@ pxl_backend_poll_events(pxl_input_t *in) {
                     pxl_input_press(in, PXL_WM_FOCUS_LOST);
                 }
                 break;
+
+            case SDL_TEXTINPUT:
+                /* FIFO: Append UTF-8 text to internal buffer (no null-termination) */
+                { 
+                    int len = strlen(event.text.text);
+                    if (g_sdl.text_buffer_len + len > (int)sizeof(g_sdl.text_buffer)) {
+                        int excess = (g_sdl.text_buffer_len + len) - (int)sizeof(g_sdl.text_buffer);
+                        memmove(g_sdl.text_buffer, g_sdl.text_buffer + excess, g_sdl.text_buffer_len - excess);
+                        g_sdl.text_buffer_len -= excess;
+                    }
+                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_len, event.text.text, len);
+                    g_sdl.text_buffer_len += len;
+                }
+                break;
         }
     }
+}
+
+int
+pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
+    assert(out_text);
+    assert(out_text_max_len > 0);
+
+    if (g_sdl.text_buffer_len == 0) return 0;
+
+    int copy_len = (g_sdl.text_buffer_len < out_text_max_len)
+        ? g_sdl.text_buffer_len
+        : out_text_max_len - 1;
+
+    /* Early return if nothing to copy (kept for clarity and to avoid useless operations) */
+    if (copy_len <= 0) return 0;
+
+    memcpy(out_text, g_sdl.text_buffer, copy_len);
+    out_text[copy_len] = '\0';
+
+    /* Consume copied bytes (no null-termination in internal buffer) */
+    g_sdl.text_buffer_len -= copy_len;
+    memmove(g_sdl.text_buffer, g_sdl.text_buffer + copy_len, g_sdl.text_buffer_len);
+
+    return copy_len;
 }

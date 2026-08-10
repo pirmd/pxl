@@ -2,6 +2,7 @@
 #define PXL_BACKEND_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "err.h"
 #include "buf.h"
 #include "input.h"
@@ -68,5 +69,46 @@ pxl_backend_get_time(void);
  */
 void
 pxl_backend_poll_events(pxl_input_t *in);
+
+/* Text input: get typed text as UTF-8 string.
+ *
+ * This function retrieves raw UTF-8 text from keyboard input events,
+ * converted according to the OS keyboard layout (e.g., AZERTY, QWERTY).
+ * The returned string is guaranteed to be valid UTF-8.
+ *
+ * The function uses an internal fixed-size buffer with FIFO behavior:
+ * if the buffer is full, oldest characters are discarded to make room for new ones.
+ *
+ * Note: Text input must be enabled for this to work. It is automatically
+ *       enabled when the backend window has focus.
+ *
+ * Note: Special keys (ENTER, TAB, BACKSPACE, arrows, etc.) do NOT generate text input.
+ *       Use pxl_input_state() with PXL_KEYB_* codes to detect these keys.
+ * For UTF-8 to Unicode codepoint conversion, use pxl_utf8_decode() from text.h
+ * or your own decoder.
+ *
+ * Example usage:
+ *   char utf8_buf[32];
+ *   if (pxl_backend_has_typed_text()) {
+ *       int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
+ *       if (len > 0) {
+ *           uint32_t rune;
+ *           int consumed = pxl_utf8_decode(utf8_buf, &rune);
+ *           if (consumed > 0) {
+ *               // Process Unicode codepoint 'rune'
+ *           }
+ *       }
+ *   }
+ *   // Check for special keys separately:
+ *   if (pxl_input_state(&input, PXL_KEYB_ENTER)) {
+ *       // Handle Enter key
+ *   }
+ *
+ * Returns:
+ *   Number of bytes written (excluding null terminator), or 0 if no text available.
+ *   The output buffer is always null-terminated if out_text_max_len > 0.
+ */
+int
+pxl_backend_get_typed_text(char *out_text, int out_text_max_len);
 
 #endif /* PXL_BACKEND_H */
