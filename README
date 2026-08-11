@@ -48,6 +48,7 @@ Demos:
   - demo_typewriter.c - Text typing animation
   - demo_fountain.c   - Particle fountain with tileset/sprite
 
+
 Architecture:
   Core:
     err.h          - Error codes
@@ -80,6 +81,10 @@ Architecture:
     tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
 
   Note: pxl.h includes all public headers above. Users may include individual headers if preferred.
+
+Tools:
+  - bdf2pxl - Convert BDF font files to pxl_font_t C header
+    Example: bdf2pxl -n my_font -r U+0020-U+007F DejaVuSans.bdf > my_font.h
 
 Testing:
   Framework: test.h (minimalist assert-based testing)

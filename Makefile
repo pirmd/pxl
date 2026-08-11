@@ -42,6 +42,7 @@ lint:
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(SRC) $(HDR)
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) test/*.c test/*.h
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) demo/*.c
+	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) tool/*.c
 
 test: $(LIB)
 	$(MAKE) -C test test
@@ -50,9 +51,13 @@ test: $(LIB)
 demo: $(LIB)
 	$(MAKE) -C demo
 
+tool:
+	$(MAKE) -C tool
+
 clean:
 	rm -f *.o $(LIB)
 	$(MAKE) -C test clean
 	$(MAKE) -C demo clean
+	$(MAKE) -C tool clean
 
-.PHONY: all lint test clean demo
+.PHONY: all lint test demo tool clean
