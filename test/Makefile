@@ -32,6 +32,7 @@ $(t): $(t).c test.h $(PXL_DIR)/libpxl.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
 .endfor
 
+
 clean:
 	@rm -f $(TST)
 

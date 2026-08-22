@@ -12,51 +12,51 @@
  * Per-glyph arrays: glyph_widths and glyph_advances use uint8_t, limiting values to 255px.
  * Spacing: tracking is extra horizontal space added after each glyph (advance + tracking),
  *          leading is vertical space between baselines (excludes glyph_height).
+ * A font covers a single contiguous rune range [rune_start, rune_end].
  */
 typedef struct {
 	pxl_bitmask_t  bitmask;         /* Bitmask data (LSB=leftmost) */
 
-	uint32_t       rune_start;      /* First rune in the font                 */
-	uint32_t       rune_end;        /* Last rune in the font                  */
-	uint32_t       fallback_rune;   /* Fallback character (0 = skip)         */
+	uint32_t       rune_start;      /* First rune in the font */
+	uint32_t       rune_end;        /* Last rune in the font (inclusive) */
+	uint32_t       fallback_rune;   /* Fallback character (0 = skip) */
 	int            tracking;        /* Extra horizontal space (pixels, added to glyph advance) */
 	int            leading;         /* Vertical line spacing (pixels, baseline to baseline, excludes glyph_height) */
 
-	int            glyph_height;    /* Glyph height (pixels)                */
+	int            glyph_height;    /* Glyph height (pixels) */
 	const uint8_t *glyph_widths;    /* Per-glyph widths (NULL = use bitmask.width) */
 	const uint8_t *glyph_advances;  /* Per-glyph advances (NULL = use glyph_widths or bitmask.width) */
-	const int8_t  *glyph_offsets_x; /* Per-glyph X offsets (NULL = 0)       */
-	const int8_t  *glyph_offsets_y; /* Per-glyph Y offsets (NULL = 0)       */
+	const int8_t  *glyph_offsets_x; /* Per-glyph X offsets (NULL = 0) */
+	const int8_t  *glyph_offsets_y; /* Per-glyph Y offsets (NULL = 0) */
 } pxl_font_t;
 
-/* Writer: writing state with cursor, font, and writing specific spacing.
+/* Writer: writing state with cursor, fonts, and writing specific spacing.
+ * Uses a list of fonts: tries each in order until a glyph is found.
  * Control characters:
  *   \n: newline (x=line_start_x, y += leading)
  *   \r: carriage return (x=line_start_x)
  *   \t: tab (x += tracking * tab_width)
  * After each glyph: x += glyph_advance + tracking
+ * Note: User must ensure cursor (x,y) is within canvas bounds; draw functions will
+ *       respect canvas scissor but do not validate cursor position.
  */
 typedef struct {
-	pxl_canvas_t     *cnv;          /* Target canvas (public: access offset/scissor/color) */
-	const pxl_font_t *font;         /* Active font */
-	int               tracking;     /* 0 = use font->tracking */
-	int               leading;      /* 0 = use font->leading */
-	int               tab_width;    /* Tab width in character spaces (default=4, set by pxl_writer_init) */
-	int               x, y;         /* Cursor position (before canvas offset) */
-	int               line_start_x; /* (private) X position at start of current line (for \n, \r) */
+	const pxl_font_t **fonts;      /* Array of fonts to try in order */
+	size_t           font_count;    /* Number of fonts in array */
+	int              tracking;     /* 0 = use first font's tracking */
+	int              leading;      /* 0 = use first font's leading */
+	int              tab_width;    /* Tab width in character spaces (default=4) */
+	int              x, y;         /* Cursor position (before canvas offset) */
+	int              line_start_x; /* (private) X position at start of current line (for \n, \r) */
 } pxl_writer_t;
 
 /* Initialization */
 void
-pxl_writer_init(pxl_writer_t *w, pxl_canvas_t *cnv, const pxl_font_t *font);
+pxl_writer_init(pxl_writer_t *w, const pxl_font_t **fonts, size_t font_count);
 
 static inline void
 pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
 	assert(w);
-	assert(w->cnv && w->cnv->pb);
-	assert(x >= 0 && x < w->cnv->pb->width);
-	assert(y >= 0 && y < w->cnv->pb->height);
-
 	w->x = x;
 	w->y = y;
 	w->line_start_x = x;
@@ -64,10 +64,10 @@ pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
 
 /* Writing */
 void
-pxl_draw_rune(pxl_writer_t *w, uint32_t rune);
+pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune);
 
 void
-pxl_draw_text(pxl_writer_t *w, const char *txt);
+pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
 
 /* UTF-8 utilities */
 int

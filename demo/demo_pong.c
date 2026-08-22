@@ -264,10 +264,6 @@ const pxl_font_t pxl_font_pong = {
 	.glyph_offsets_y = NULL,
 };
 
-/*
- * Model
- */
-
 typedef struct {
     struct {
         float x, y;
@@ -418,23 +414,24 @@ interpolate_pong(pong_t *out, const pong_t *prev, const pong_t *cur, float alpha
 static void
 draw_score(pxl_canvas_t *cnv, const pong_t *p) {
     pxl_writer_t w;
-    pxl_writer_init(&w, cnv, &pxl_font_pong);
+    const pxl_font_t *fonts[] = {&pxl_font_pong};
+    pxl_writer_init(&w, fonts, 1);
 
 	/* Use text_bounds to calculate width for a typical score (e.g., "999") */
 	pxl_rect_t max_score_bounds = pxl_text_bounds(&w, "999");
 	const int score_half_width = max_score_bounds.w / 2;
     const int score_y     = 30;
 
-    pxl_canvas_set_color(w.cnv, WHITE);
+    pxl_canvas_set_color(cnv, WHITE);
     
     char score_str[8];
     snprintf(score_str, sizeof(score_str), "%d", p->score_left);
     pxl_writer_set_cursor(&w, W/4 - score_half_width, score_y);
-    pxl_draw_text(&w, score_str);
+    pxl_draw_text(cnv, &w, score_str);
 
     snprintf(score_str, sizeof(score_str), "%d", p->score_right);
     pxl_writer_set_cursor(&w, 3 * W / 4 - score_half_width, score_y);
-    pxl_draw_text(&w, score_str);
+    pxl_draw_text(cnv, &w, score_str);
 }
 
 static void

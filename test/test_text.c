@@ -59,6 +59,55 @@ static const pxl_font_t g_test_font = {
 	.glyph_offsets_y = NULL
 };
 
+/* Test fonts for cascade: each covers a single rune */
+static const uint8_t g_font_a_data[5] = {0x07, 0x15, 0x15, 0x1F, 0x15};  /* 'A' */
+static const pxl_bitmask_t g_font_a_bitmask = {.data = g_font_a_data, .width = 5, .height = 5, .stride = 1};
+static const pxl_font_t g_font_a = {
+	.bitmask = g_font_a_bitmask,
+	.rune_start = 65,
+	.rune_end = 65,
+	.fallback_rune = 0,
+	.tracking = 1,
+	.leading = 6,
+	.glyph_height = 5,
+	.glyph_widths = NULL,
+	.glyph_advances = NULL,
+	.glyph_offsets_x = NULL,
+	.glyph_offsets_y = NULL
+};
+
+static const uint8_t g_font_c_data[5] = {0x0E, 0x11, 0x10, 0x10, 0x0E};  /* 'C' */
+static const pxl_bitmask_t g_font_c_bitmask = {.data = g_font_c_data, .width = 5, .height = 5, .stride = 1};
+static const pxl_font_t g_font_c = {
+	.bitmask = g_font_c_bitmask,
+	.rune_start = 67,
+	.rune_end = 67,
+	.fallback_rune = 0,
+	.tracking = 1,
+	.leading = 6,
+	.glyph_height = 5,
+	.glyph_widths = NULL,
+	.glyph_advances = NULL,
+	.glyph_offsets_x = NULL,
+	.glyph_offsets_y = NULL
+};
+
+static const uint8_t g_font_lowercase_a_data[5] = {0x10, 0x28, 0x10, 0x2A, 0x1C};  /* 'a' */
+static const pxl_bitmask_t g_font_lowercase_a_bitmask = {.data = g_font_lowercase_a_data, .width = 5, .height = 5, .stride = 1};
+static const pxl_font_t g_font_lowercase_a = {
+	.bitmask = g_font_lowercase_a_bitmask,
+	.rune_start = 97,
+	.rune_end = 97,
+	.fallback_rune = 0,
+	.tracking = 1,
+	.leading = 6,
+	.glyph_height = 5,
+	.glyph_widths = NULL,
+	.glyph_advances = NULL,
+	.glyph_offsets_x = NULL,
+	.glyph_offsets_y = NULL
+};
+
 /* Fixture */
 static pxl_buf_t g_pb;
 static pxl_canvas_t g_cnv;
@@ -73,7 +122,8 @@ setup_fixture(void) {
 	g_pb.data = &g_buf_data[0][0];
 	pxl_canvas_init(&g_cnv, &g_pb);
 	memset(g_buf_data, 0x00, sizeof(g_buf_data));
-	pxl_writer_init(&g_w, &g_cnv, &g_test_font);
+	const pxl_font_t *fonts[] = {&g_test_font};
+	pxl_writer_init(&g_w, fonts, 1);
 }
 
 /* Helpers */
@@ -249,10 +299,12 @@ test_pxl_rune_bounds_no_fallback(void) {
 	font_no_fallback.fallback_rune = 0;
 
 	pxl_writer_t ctx;
-	pxl_writer_init(&ctx, &g_cnv, &font_no_fallback);
+	const pxl_font_t *fonts[] = {&font_no_fallback};
+	pxl_writer_init(&ctx, fonts, 1);
 
 	pxl_rect_t bounds = pxl_rune_bounds(&ctx, 200);
-	ASSERT(bounds.w == 0 && bounds.h == 0);
+	ASSERT(bounds.w == font_no_fallback.bitmask.width &&
+	       bounds.h == font_no_fallback.glyph_height);
 }
 
 /* Tests for pxl_draw_rune */
@@ -264,7 +316,7 @@ test_pxl_draw_rune_basic(void) {
 
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_rune(&g_w, 'A');
+	pxl_draw_rune(&g_cnv, &g_w, 'A');
 
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
@@ -278,7 +330,7 @@ test_pxl_draw_rune_fallback(void) {
 
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_rune(&g_w, 200);
+	pxl_draw_rune(&g_cnv, &g_w, 200);
 
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 68);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
@@ -290,15 +342,18 @@ test_pxl_draw_rune_no_fallback(void) {
 	setup_fixture();
 	pxl_font_t font_no_fallback = g_test_font;
 	font_no_fallback.fallback_rune = 0;
-	pxl_writer_init(&g_w, &g_cnv, &font_no_fallback);
+	const pxl_font_t *fonts[] = {&font_no_fallback};
+	pxl_writer_init(&g_w, fonts, 1);
 
 	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_rune(&g_w, 200);
+	int x_before = g_w.x;
+	pxl_draw_rune(&g_cnv, &g_w, 200);
 
 	ASSERT(buf_is_empty());
+	ASSERT(g_w.x > x_before); /* Cursor must advance even for missing rune */
 }
 
 static void
@@ -309,7 +364,7 @@ test_pxl_draw_rune_with_scissor(void) {
 
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_rune(&g_w, 'A');
+	pxl_draw_rune(&g_cnv, &g_w, 'A');
 
 	ASSERT(has_pixels_in_rect((pxl_rect_t){8, 5, 8, 8}));
 }
@@ -322,7 +377,7 @@ test_pxl_draw_rune_with_offset(void) {
 
 	int x = 0, y = 0;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_rune(&g_w, 'A');
+	pxl_draw_rune(&g_cnv, &g_w, 'A');
 
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
 	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
@@ -339,7 +394,7 @@ test_pxl_draw_text_basic(void) {
 	const char *text = "ABC";
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_text(&g_w, text);
+	pxl_draw_text(&g_cnv, &g_w, text);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
@@ -353,7 +408,7 @@ test_pxl_draw_text_empty(void) {
 
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_text(&g_w, "");
+	pxl_draw_text(&g_cnv, &g_w, "");
 
 	ASSERT(buf_is_empty());
 }
@@ -366,7 +421,7 @@ test_pxl_draw_text_with_newline(void) {
 	const char *text = "A\nB";
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_text(&g_w, text);
+	pxl_draw_text(&g_cnv, &g_w, text);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
@@ -381,7 +436,7 @@ test_pxl_draw_text_with_tab(void) {
 	const char *text = "A\tB";
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_text(&g_w, text);
+	pxl_draw_text(&g_cnv, &g_w, text);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
@@ -397,7 +452,7 @@ test_pxl_draw_text_with_scissor(void) {
 	const char *text = "Hello";
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_text(&g_w, text);
+	pxl_draw_text(&g_cnv, &g_w, text);
 
 	ASSERT(has_pixels_in_rect((pxl_rect_t){10, 5, 20, 10}));
 }
@@ -411,7 +466,7 @@ test_pxl_draw_text_with_offset(void) {
 	const char *text = "PXL";
 	int x = 0, y = 0;
 	pxl_writer_set_cursor(&g_w, x, y);
-	pxl_draw_text(&g_w, text);
+	pxl_draw_text(&g_cnv, &g_w, text);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
@@ -455,14 +510,15 @@ test_pxl_draw_text_proportional(void) {
 	};
 
 	pxl_writer_t prop_ctx;
-	pxl_writer_init(&prop_ctx, &g_cnv, &prop_font);
+	const pxl_font_t *fonts[] = {&prop_font};
+	pxl_writer_init(&prop_ctx, fonts, 1);
 
 	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
 	const char *text = "ABC";
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&prop_ctx, x, y);
-	pxl_draw_text(&prop_ctx, text);
+	pxl_draw_text(&g_cnv, &prop_ctx, text);
 
 	pxl_rect_t bounds = pxl_text_bounds(&prop_ctx, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
@@ -490,8 +546,8 @@ test_pxl_text_bounds_empty(void) {
 static void
 test_pxl_text_bounds_height(void) {
 	setup_fixture();
-	const int gh = g_w.font->glyph_height;
-	const int ld = g_w.font->leading;
+	const int gh = g_w.fonts[0]->glyph_height;
+	const int ld = g_w.fonts[0]->leading;
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A");
 	ASSERT(bounds.h == gh);
@@ -538,7 +594,8 @@ test_pxl_text_bounds_zero_tracking(void) {
 	setup_fixture();
 	pxl_font_t font_zero_tracking = g_test_font;
 	font_zero_tracking.tracking = 0;
-	pxl_writer_init(&g_w, &g_cnv, &font_zero_tracking);
+	const pxl_font_t *fonts[] = {&font_zero_tracking};
+	pxl_writer_init(&g_w, fonts, 1);
 
 	pxl_rect_t bounds_abc = pxl_text_bounds(&g_w, "ABC");
 	pxl_rect_t bounds_a = pxl_text_bounds(&g_w, "A");
@@ -552,12 +609,76 @@ test_pxl_text_bounds_zero_leading(void) {
 	setup_fixture();
 	pxl_font_t font_zero_leading = g_test_font;
 	font_zero_leading.leading = 0;
-	pxl_writer_init(&g_w, &g_cnv, &font_zero_leading);
+	const pxl_font_t *fonts[] = {&font_zero_leading};
+	pxl_writer_init(&g_w, fonts, 1);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\nB");
-	const int gh = g_w.font->glyph_height;
+	const int gh = g_w.fonts[0]->glyph_height;
 
 	ASSERT(bounds.h == 2 * gh);
+}
+
+/* Tests for font cascade */
+
+static void
+test_pxl_draw_rune_cascade_basic(void) {
+	setup_fixture();
+	pxl_writer_t cascade_w;
+	const pxl_font_t *fonts[] = {&g_font_a, &g_font_c, &g_font_lowercase_a};
+	pxl_writer_init(&cascade_w, fonts, 3);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	pxl_writer_set_cursor(&cascade_w, 5, 5);
+	pxl_draw_rune(&g_cnv, &cascade_w, 'A');
+
+	pxl_rect_t bounds = pxl_rune_bounds(&cascade_w, 'A');
+	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+static void
+test_pxl_draw_rune_cascade_missing_rune(void) {
+	setup_fixture();
+	pxl_writer_t cascade_w;
+	const pxl_font_t *fonts[] = {&g_font_a, &g_font_c, &g_font_lowercase_a};
+	pxl_writer_init(&cascade_w, fonts, 3);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	pxl_writer_set_cursor(&cascade_w, 5, 5);
+	pxl_draw_rune(&g_cnv, &cascade_w, 'B');  /* Not in any font, no fallback */
+
+	/* Should not draw anything but cursor should advance */
+	int x_before = 5;
+	ASSERT(cascade_w.x > x_before);
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_pxl_draw_rune_cascade_lowercase(void) {
+	setup_fixture();
+	pxl_writer_t cascade_w;
+	const pxl_font_t *fonts[] = {&g_font_a, &g_font_c, &g_font_lowercase_a};
+	pxl_writer_init(&cascade_w, fonts, 3);
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	pxl_writer_set_cursor(&cascade_w, 5, 5);
+	pxl_draw_rune(&g_cnv, &cascade_w, 'a');  /* In third font */
+
+	pxl_rect_t bounds = pxl_rune_bounds(&cascade_w, 'a');
+	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+static void
+test_pxl_text_bounds_cascade(void) {
+	setup_fixture();
+	pxl_writer_t cascade_w;
+	const pxl_font_t *fonts[] = {&g_font_a, &g_font_c, &g_font_lowercase_a};
+	pxl_writer_init(&cascade_w, fonts, 3);
+
+	pxl_rect_t bounds = pxl_text_bounds(&cascade_w, "AaC");
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == g_font_a.glyph_height);
 }
 
 /* Main */
@@ -604,6 +725,12 @@ main(void) {
 	test_pxl_text_bounds_with_tab();
 	test_pxl_text_bounds_zero_tracking();
 	test_pxl_text_bounds_zero_leading();
+
+	/* Tests for font cascade */
+	test_pxl_draw_rune_cascade_basic();
+	test_pxl_draw_rune_cascade_missing_rune();
+	test_pxl_draw_rune_cascade_lowercase();
+	test_pxl_text_bounds_cascade();
 
 	return 0;
 }

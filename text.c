@@ -4,22 +4,42 @@
 #include "geom.h"
 #include "text.h"
 
-/* Font helper: resolve rune to actual rune and index, handling fallback.
- * Returns false if rune is out of range and no fallback is available.
+/* Writer helper: find a rune in the writer's font list.
+ * Tries each font in order. If found, returns the font, actual rune (after fallback), and glyph index.
+ * If not found even with fallback, returns false.
  */
 static bool
-pxl_font_resolve_rune(const pxl_font_t *font, uint32_t rune, uint32_t *out_rune, int *out_idx) {
-	if (rune < font->rune_start || rune > font->rune_end) {
-		if (font->fallback_rune == 0) {
-			return false;
+pxl_writer_find_glyph(const pxl_writer_t *w, uint32_t rune,
+                      const pxl_font_t **out_font, int *out_idx)
+{
+	assert(w && w->font_count > 0);
+
+	/* First, try to find the rune in any font */
+	for (size_t i = 0; i < w->font_count; i++) {
+		const pxl_font_t *font = w->fonts[i];
+		
+		if (rune >= font->rune_start && rune <= font->rune_end) {
+			*out_font = font;
+			*out_idx = (int)(rune - font->rune_start);
+			assert(*out_idx >= 0 && *out_idx <= (int)(font->rune_end - font->rune_start));
+			return true;
 		}
-		assert(font->fallback_rune >= font->rune_start && font->fallback_rune <= font->rune_end);
-		rune = font->fallback_rune;
 	}
-	*out_rune = rune;
-	*out_idx = (int)(rune - font->rune_start);
-	assert(*out_idx >= 0 && *out_idx <= (int)(font->rune_end - font->rune_start));
-	return true;
+
+	/* If not found, try fallbacks in order */
+	for (size_t i = 0; i < w->font_count; i++) {
+		const pxl_font_t *font = w->fonts[i];
+		
+		if (font->fallback_rune != 0 && 
+		    font->fallback_rune >= font->rune_start && 
+		    font->fallback_rune <= font->rune_end) {
+			*out_font = font;
+			*out_idx = (int)(font->fallback_rune - font->rune_start);
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /* Font helper: get glyph metrics for a given index.
@@ -88,26 +108,28 @@ invalid:
 }
 
 void
-pxl_writer_init(pxl_writer_t *w, pxl_canvas_t *cnv, const pxl_font_t *font) {
-	assert(w && cnv);
-	assert(font && font->bitmask.data && font->bitmask.width > 0 &&
-	       font->rune_start <= font->rune_end && font->glyph_height > 0);
+pxl_writer_init(pxl_writer_t *w, const pxl_font_t **fonts, size_t font_count) {
+	assert(w);
+	assert(fonts && font_count > 0);
+	for (size_t i = 0; i < font_count; i++) {
+		assert(fonts[i] && fonts[i]->bitmask.data && fonts[i]->bitmask.width > 0 &&
+		       fonts[i]->rune_start <= fonts[i]->rune_end && fonts[i]->glyph_height > 0);
+	}
 
-	w->cnv       = cnv;
-	w->font      = font;
-	w->tracking  = font->tracking;
-	w->leading   = font->leading;
+	w->fonts     = fonts;
+	w->font_count = font_count;
+	w->tracking  = fonts[0]->tracking;
+	w->leading   = fonts[0]->leading;
 	w->tab_width = 4;
 
 	pxl_writer_set_cursor(w, 0, 0);
 }
 
 void
-pxl_draw_rune(pxl_writer_t *w, uint32_t rune) {
-	assert(w && w->cnv && w->font);
+pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune) {
+	assert(cnv && w && w->font_count > 0);
 
-	const pxl_font_t *font = w->font;
-	const int tracking = w->tracking ? w->tracking : font->tracking;
+	const int tracking = w->tracking;
 
 	switch (rune) {
 	case '\n':
@@ -124,9 +146,11 @@ pxl_draw_rune(pxl_writer_t *w, uint32_t rune) {
 		return;
 	}
 
-	uint32_t actual_rune;
+	const pxl_font_t *font;
 	int idx;
-	if (!pxl_font_resolve_rune(font, rune, &actual_rune, &idx)) {
+	if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+		/* Rune not found and no fallback available: advance cursor with default metrics */
+		w->x += w->fonts[0]->bitmask.width + tracking;
 		return;
 	}
 
@@ -136,7 +160,7 @@ pxl_draw_rune(pxl_writer_t *w, uint32_t rune) {
 	assert((idx + 1) * glyph_h <= font->bitmask.height);
 	assert(glyph_w <= font->bitmask.width);
 
-	pxl_draw_bitmask(w->cnv, &font->bitmask,
+	pxl_draw_bitmask(cnv, &font->bitmask,
 		(pxl_rect_t){.y = idx * font->glyph_height, .w = glyph_w, .h = glyph_h},
 		w->x + offset_x, w->y + offset_y);
 
@@ -144,26 +168,25 @@ pxl_draw_rune(pxl_writer_t *w, uint32_t rune) {
 }
 
 void
-pxl_draw_text(pxl_writer_t *w, const char *txt) {
-	assert(w && w->cnv && w->font);
+pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt) {
+	assert(cnv && w && w->font_count > 0);
 	assert(txt);
 
 	uint32_t codepoint;
 	while (*txt) {
 		txt += pxl_utf8_decode(txt, &codepoint);
-		pxl_draw_rune(w, codepoint);
+		pxl_draw_rune(cnv, w, codepoint);
 	}
 }
 
 pxl_rect_t
 pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
-	assert(w && w->font);
+	assert(w && w->font_count > 0);
 	assert(txt);
 
-	const pxl_font_t *font = w->font;
-	const int tracking = w->tracking ? w->tracking : font->tracking;
-	const int leading = w->leading ? w->leading : font->leading;
-	const int glyph_height = font->glyph_height;
+	const int tracking = w->tracking;
+	const int leading = w->leading ? w->leading : w->fonts[0]->leading;
+	const int glyph_height = w->fonts[0]->glyph_height;
 
 	pxl_rect_t b = {0};
 	int width = 0;
@@ -191,9 +214,11 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 				continue;
 		}
 
-		uint32_t actual_rune;
+		const pxl_font_t *font;
 		int idx;
-		if (!pxl_font_resolve_rune(font, rune, &actual_rune, &idx)) {
+		if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+			/* Rune not found: add default advance to width */
+			width += w->fonts[0]->bitmask.width + tracking;
 			continue;
 		}
 
@@ -217,9 +242,7 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 
 pxl_rect_t
 pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune) {
-	assert(w && w->font);
-
-	const pxl_font_t *font = w->font;
+	assert(w && w->font_count > 0);
 
 	/* Control characters return zero bounds */
 	switch (rune) {
@@ -229,10 +252,11 @@ pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune) {
 			return (pxl_rect_t){0};
 	}
 
-	uint32_t actual_rune;
+	const pxl_font_t *font;
 	int idx;
-	if (!pxl_font_resolve_rune(font, rune, &actual_rune, &idx)) {
-		return (pxl_rect_t){0};
+	if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+		/* Rune not found: return default bounds from first font */
+		return (pxl_rect_t){0, 0, w->fonts[0]->bitmask.width, w->fonts[0]->glyph_height};
 	}
 
 	int glyph_w, glyph_h;

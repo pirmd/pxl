@@ -266,15 +266,16 @@ render_typewriter(pxl_canvas_t *cnv, typewriter_t *tw) {
 
 
     pxl_writer_t w;
-    pxl_writer_init(&w, cnv, &pxl_font_typewriter);
+    const pxl_font_t *fonts[] = { &pxl_font_typewriter };
+    pxl_writer_init(&w, fonts, 1);
 	pxl_writer_set_cursor(&w, 0, 0);
 	pxl_canvas_set_color(cnv, TEXT_COLOR);
 
 	for (int j = 0; j < PAGE_H; ++j) {
 		for (int i = 0; i < PAGE_W; ++i) {
-			pxl_draw_rune(&w, tw->paper[j][i]);
+			pxl_draw_rune(cnv, &w, tw->paper[j][i]);
 		}
-		pxl_draw_rune(&w, '\n');
+		pxl_draw_rune(cnv, &w, '\n');
 	}
 
 	int cursor_x = tw->carriage_i * (CHAR_W + TRACKING);
@@ -286,7 +287,7 @@ render_typewriter(pxl_canvas_t *cnv, typewriter_t *tw) {
 
 		pxl_writer_set_cursor(&w, cursor_x, cursor_y);
 		pxl_canvas_set_color(cnv, PAPER_COLOR);
-		pxl_draw_rune(&w, tw->is_printing);
+		pxl_draw_rune(cnv, &w, tw->is_printing);
 	} else {
 		pxl_draw_rect(cnv, cursor_x, cursor_y, 8, 8);
 	}
