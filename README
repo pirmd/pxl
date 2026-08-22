@@ -51,10 +51,7 @@ Quick start:
     pxl_backend_deinit();
 
 Examples:
-  - demo_sketch.c - Etch-a-Sketch
   - demo_pong.c   - Pong game
-  - demo_loops.c  - Game loop comparison: 3 squares on same line showing
-                    Variable vs Fixed Accum vs Fixed Lerp timesteps
   - demo_gas.c    - Boltzmann gas simulation
 
 Architecture:
