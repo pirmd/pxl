@@ -1,6 +1,6 @@
 # pxl - Examples
 
-DEMO = demo_pong demo_gas demo_typewriter demo_fountain
+DEMO = demo_pong demo_gas demo_typewriter demo_fountain demo_fontview
 
 PXL_DIR=..
 
