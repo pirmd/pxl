@@ -2,6 +2,7 @@
 #define PXL_CANVAS_H
 
 #include <assert.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <string.h>
 

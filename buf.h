@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 typedef uint32_t pxl_t;  /* 32-bit ARGB pixel */
 
