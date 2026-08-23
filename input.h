@@ -2,12 +2,15 @@
 #define PXL_INPUT_H
 
 #include <assert.h>
-#include <stdbool.h>
 #include <stdint.h>
 
-#define PXL_IN_BITSET_MAX 128
-#define PXL_IN_BITSET_WORDS (PXL_IN_BITSET_MAX / 64)
-
+/*
+ * Gather input state: physical keys, mouse button or windows-related events
+ *
+ * Physical key codes represent physical keys and not characters: names
+ * correspond to QWERTY keyboard layout positions.
+ *
+ */
 typedef enum {
     PXL_IN_UNKNOWN = 0,
 
@@ -81,107 +84,49 @@ typedef enum {
     PXL_MOUSE_MIDDLE,
 
 	/* WM events */
+	PXL_WM_FOCUS_LOST,
+	PXL_WM_MOUSE_FOCUS_LOST,
 	PXL_WM_QUIT,
 
     PXL_IN_COUNT
 } pxl_input_code_t;
 
-typedef char static_assert_input_count_fits_into_bitset[PXL_IN_COUNT <= PXL_IN_BITSET_MAX ? 1 : -1];
-
-
-/* Input state ------------------------------------------------------------- */
-
+/*
+ * pxl_input_t: Gathers current input state (keyboard, mouse, WM events).
+ * MUST be zero-initialized before first use (e.g., pxl_input_t in = {0};).
+ * Backends only UPDATE its fields via pxl_backend_poll_events().
+ */
 typedef struct {
-	uint64_t pressed[PXL_IN_BITSET_WORDS];
-
-    int mouse_x, mouse_y;
-    int mouse_wheel_x, mouse_wheel_y;
-} pxl_input_state_t;
-
-static inline void
-pxl_input_init_state(pxl_input_state_t *state) {
-    assert(state);
-    *state = (pxl_input_state_t){0};
-}
-
-static inline void
-pxl_input_reinit_state(pxl_input_state_t *in) {
-    in->mouse_wheel_x = 0;
-    in->mouse_wheel_y = 0;
-}
-
-static inline void
-pxl_input_press(pxl_input_state_t *in, pxl_input_code_t c) {
-	assert(in);
-	assert(c >= PXL_IN_UNKNOWN && c < PXL_IN_COUNT);
-	in->pressed[c / 64] |= (1ULL << (c % 64));
-}
-
-static inline void
-pxl_input_release(pxl_input_state_t *in, pxl_input_code_t c) {
-	assert(in);
-	assert(c >= PXL_IN_UNKNOWN && c < PXL_IN_COUNT);
-	in->pressed[c / 64] &= ~(1ULL << (c % 64));
-}
-
-static inline bool
-pxl_input_pressed(const pxl_input_state_t *in, pxl_input_code_t c) {
-	assert(in);
-	assert(c >= PXL_IN_UNKNOWN && c < PXL_IN_COUNT);
-	return (in->pressed[c / 64] & (1ULL << (c % 64))) != 0;
-}
-
-static inline void
-pxl_input_set_mouse_pos(pxl_input_state_t *in, int x, int y) {
-    assert(in);
-	in->mouse_x = x;
-    in->mouse_y = y;
-}
-
-static inline void
-pxl_input_inc_mouse_wheel(pxl_input_state_t *in, int dx, int dy) {
-    assert(in);
-	in->mouse_wheel_x += dx;
-    in->mouse_wheel_y += dy;
-}
-
-/* Input ------------------------------------------------------------------- */
-
-typedef struct {
-	pxl_input_state_t cur, prev;
+	uint64_t state[(PXL_IN_COUNT + 63) / 64];    /* Current key/mouse button state */
+	int mouse_x, mouse_y;                        /* Current mouse position         */
+	int mouse_wheel_x, mouse_wheel_y;            /* Wheel delta since last reset   */
 } pxl_input_t;
 
+/* Check key/mouse button state. Returns 1 if pressed/down, 0 if released/up. */
+static inline int
+pxl_input_state(const pxl_input_t *in, pxl_input_code_t c) {
+	assert(in);
+	assert(c >= 0 && c < PXL_IN_COUNT);
+	return (in->state[c / 64] & (1ULL << (c % 64))) != 0;
+}
+
+
+/*
+ *  Mostly for backends internal use
+ */
+
+/* Set key/mouse button as pressed in input state bitset */
 static inline void
-pxl_input_init(pxl_input_t *in) {
-    assert(in);
-    pxl_input_init_state(&in->cur);
-    pxl_input_init_state(&in->prev);
+pxl_input_press(pxl_input_t *in, pxl_input_code_t code) {
+	assert(in && code >= 0 && code < PXL_IN_COUNT);
+	in->state[code / 64] |= (1ULL << (code % 64));
 }
 
+/* Set key/mouse button as released in input state bitset */
 static inline void
-pxl_input_next_state(pxl_input_t *in) {
-	assert(in);
-	in->prev = in->cur;
-	pxl_input_reinit_state(&in->cur);
+pxl_input_release(pxl_input_t *in, pxl_input_code_t code) {
+	assert(in && code >= 0 && code < PXL_IN_COUNT);
+	in->state[code / 64] &= ~(1ULL << (code % 64));
 }
-
-static inline bool
-pxl_input_is_pressed(const pxl_input_t *in, pxl_input_code_t c) {
-	assert(in);
-	return pxl_input_pressed(&in->cur, c);
-}
-
-static inline bool
-pxl_input_was_pressed(const pxl_input_t *in, pxl_input_code_t c) {
-	assert(in);
-	return pxl_input_pressed(&in->cur, c) && !pxl_input_pressed(&in->prev, c);
-}
-
-static inline bool
-pxl_input_was_released(const pxl_input_t *in, pxl_input_code_t c) {
-	assert(in);
-	return !pxl_input_pressed(&in->cur, c) && pxl_input_pressed(&in->prev, c);
-}
-
 
 #endif /* PXL_INPUT_H */

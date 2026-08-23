@@ -241,7 +241,7 @@ sdl_button_to_pxl_input_code(const Uint8 button) {
 }
 
 void
-pxl_backend_poll_events(pxl_input_state_t *in) {
+pxl_backend_poll_events(pxl_input_t *in) {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
@@ -261,19 +261,33 @@ pxl_backend_poll_events(pxl_input_state_t *in) {
                 break;
 
             case SDL_MOUSEBUTTONDOWN:
-				pxl_input_press(in, sdl_button_to_pxl_input_code(event.key.keysym.sym));
+				pxl_input_press(in, sdl_button_to_pxl_input_code(event.button.button));
                 break;
 
             case SDL_MOUSEBUTTONUP:
-				pxl_input_release(in, sdl_button_to_pxl_input_code(event.key.keysym.sym));
+				pxl_input_release(in, sdl_button_to_pxl_input_code(event.button.button));
                 break;
 
             case SDL_MOUSEMOTION:
-                pxl_input_set_mouse_pos(in, event.motion.x, event.motion.y);
+                in->mouse_x = event.motion.x;
+                in->mouse_y = event.motion.y;
                 break;
 
             case SDL_MOUSEWHEEL:
-                pxl_input_inc_mouse_wheel(in, event.wheel.x, event.wheel.y);
+                in->mouse_wheel_x += event.wheel.x;
+                in->mouse_wheel_y += event.wheel.y;
+                break;
+
+            case SDL_WINDOWEVENT:
+                if (event.window.event == SDL_WINDOWEVENT_ENTER) {
+                    pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
+                } else if (event.window.event == SDL_WINDOWEVENT_LEAVE) {
+                    pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
+                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    pxl_input_release(in, PXL_WM_FOCUS_LOST);
+                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                    pxl_input_press(in, PXL_WM_FOCUS_LOST);
+                }
                 break;
         }
     }

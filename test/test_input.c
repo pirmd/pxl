@@ -1,57 +1,45 @@
 #include "input.h"
-#include "stest/stest.h"
-
-/* State tests --------------------------------------------------------------- */
+#include "test.h"
 
 static void
-test_input_init(void) {
-	pxl_input_t input;
-	pxl_input_init(&input);
+test_pxl_input_state(void) {
+	pxl_input_t in = {0};
 
-	ST_CHECK(input.cur.mouse_x == 0, "mouse.x not initialized to 0");
-	ST_CHECK(input.cur.mouse_y == 0, "mouse.y not initialized to 0");
-	ST_CHECK(input.cur.mouse_wheel_x == 0, "mouse_wheel_x not initialized to 0");
-	ST_CHECK(input.cur.mouse_wheel_y == 0, "mouse_wheel_y not initialized to 0");
+	/* Set a key as down (code 42) */
+	in.state[42 / 64] = 1ULL << (42 % 64);
+	ASSERT(pxl_input_state(&in, 42) == 1);
+	ASSERT(pxl_input_state(&in, 41) == 0);
+	ASSERT(pxl_input_state(&in, 43) == 0);
 
-	/* Verify all pressed bits are initialized to 0 */
-	for (int i = 0; i < PXL_IN_BITSET_WORDS; i++) {
-		ST_CHECK(input.cur.pressed[i] == 0, "pressed[%d] not initialized to 0", i);
-	}
+	/* Set a key in the second word (code 63, last code) */
+	in.state[63 / 64] = 1ULL << (63 % 64);
+	ASSERT(pxl_input_state(&in, 63) == 1);
+	ASSERT(pxl_input_state(&in, 62) == 0);
 }
 
 static void
-test_input_press_release(void) {
-	pxl_input_t input;
-	pxl_input_init(&input);
+test_pxl_input_press_release(void) {
+	pxl_input_t in = {0};
 
-	pxl_input_press(&input.cur, PXL_KEYB_A);
-	ST_CHECK(pxl_input_pressed(&input.cur, PXL_KEYB_A), "PXL_KEYB_A should be pressed");
-	ST_CHECK(!pxl_input_pressed(&input.cur, PXL_KEYB_B), "PXL_KEYB_B should not be pressed");
+	pxl_input_press(&in, PXL_KEYB_A);
+	ASSERT(pxl_input_state(&in, PXL_KEYB_A) == 1);
+	ASSERT(pxl_input_state(&in, PXL_KEYB_B) == 0);
 
-	pxl_input_release(&input.cur, PXL_KEYB_A);
-	ST_CHECK(!pxl_input_pressed(&input.cur, PXL_KEYB_A), "PXL_KEYB_A should be released");
+	pxl_input_release(&in, PXL_KEYB_A);
+	ASSERT(pxl_input_state(&in, PXL_KEYB_A) == 0);
+
+	pxl_input_press(&in, PXL_IN_COUNT - 1);
+	ASSERT(pxl_input_state(&in, PXL_IN_COUNT - 1) == 1);
+
+	pxl_input_release(&in, PXL_IN_COUNT - 1);
+	ASSERT(pxl_input_state(&in, PXL_IN_COUNT - 1) == 0);
 }
 
-/* State transition tests -------------------------------------------------- */
-
-static void
-test_input_next_state(void) {
-	pxl_input_t input;
-	pxl_input_init(&input);
-
-	pxl_input_press(&input.cur, PXL_KEYB_A);
-	pxl_input_next_state(&input);
-
-	ST_CHECK(pxl_input_pressed(&input.prev, PXL_KEYB_A), "PXL_KEYB_A should be in prev state");
-}
-
-/* Main ----------------------------------------------------------------------- */
+/* Main */
 int
-main(int argc, char *argv[]) {
-	ST_GETOPTS(argc, argv);
-	return ST_RUN(
-		ST_T(test_input_init),
-		ST_T(test_input_press_release),
-		ST_T(test_input_next_state)
-	);
+main(void) {
+	test_pxl_input_state();
+	test_pxl_input_press_release();
+
+	return 0;
 }

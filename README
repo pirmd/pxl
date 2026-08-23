@@ -13,32 +13,29 @@ Build:
   make          # lib
   make lint     # run lint
   make test     # run tests
-  make examples # demos
+  make demo     # demos
   make clean    # cleaning
 
   Backend selection via BACKEND=sdl or BACKEND=x11 (default)
   Changing Backends requires manual make clean.
   Test and demo will work only if main lib use the same BACKEND. Use make clean as needed.
 
-  Simple test.sh scripts that run test with the different available backends.
-
 Testing:
-  Unit tests use stest framework (test/stest/).
+  Unit tests use minimal test.h header with ASSERT() macro.
   Run all tests: make test
-  Run specific test: ./test/test_<name> [filter]
-  Test conventions: use ST_CHECK() for assertions, fixture pattern for setup/teardown,
-  verify rectangular regions with has_pixels_in_rect() rather than individual pixels.
+  Run specific test: ./test/test_<name>
 
 Quick start:
     pxl_backend_init("Title", 800, 600, false);
 
-    pxl_input_t input;
-    pxl_input_init(&input);
+    struct {
+        pxl_input_t in_prev, in_curr;
+    } app = {0};
 
-    while (!pxl_input_is_pressed(&input, PXL_KEYB_ESCAPE) &&
-           !pxl_input_is_pressed(&input, PXL_WM_QUIT)) {
-        pxl_input_next_state(&input);
-        pxl_backend_poll_events(&input.cur);
+    while (!pxl_input_state(&app.in_curr, PXL_KEYB_ESCAPE) &&
+           !pxl_input_state(&app.in_curr, PXL_WM_QUIT)) {
+        app.in_prev = app.in_curr;
+        pxl_backend_poll_events(&app.in_curr);
 
         pxl_buf_t pb;
         if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
@@ -50,13 +47,16 @@ Quick start:
     }
     pxl_backend_deinit();
 
-Examples:
-  - demo_pong.c   - Pong game
-  - demo_gas.c    - Boltzmann gas simulation
+Demos:
+  - demo_pong.c       - Pong game
+  - demo_gas.c        - Boltzmann gas simulation
+  - demo_typewriter.c - Text typing animation
+  - demo_fountain.c   - Particle fountain with tileset/sprite
 
 Architecture:
   Core:
     err.h          - Error codes
+    color.h        - ARGB8888 color creation and component extraction
     geom.h         - Geometry primitives (rect, span, point) and clipping
     buf.h          - uint32_t pixel buffer with stride alignment
     bitmask.h      - 1-bit per pixel mask for stencil/clip operations (LSB is bit 0)
@@ -64,7 +64,7 @@ Architecture:
     draw.h/c       - Basic 2D primitives (line, rect, span, blit, mask)
     ascii.h/c      - ASCII text rendering with built-in font (char, string, bounds)
     draw_extra.h/c - Advanced 2D primitives (circle, triangle)
-    text.h/text.c  - Basic text displaying helpers with mono or proportional font
+    text.h/text.c  - Text rendering with mono or proportional font
     tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
 
   Backend:

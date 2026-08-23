@@ -7,6 +7,7 @@
 
 #define W 800
 #define H 600
+#define FPS 60.0f
 
 /* Colors */
 #define BLACK       0xFF000000
@@ -174,36 +175,70 @@ init_sprites(fountain_t *fountain) {
     }
 }
 
+/*
+ * Application
+ */
+
+struct {
+	pxl_input_t in_prev;
+	pxl_input_t in_curr;
+
+	pxl_time_stepper_t stepper;
+	bool paused;
+
+	fountain_t fountain;
+	fountain_t fountain_prev;
+	int current_fps;
+} app;
+
+static inline bool
+is_pressed(pxl_input_code_t code) {
+	return pxl_input_state(&app.in_curr, code) == 1;
+}
+
+static inline bool
+was_pressed(pxl_input_code_t code) {
+	return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
+}
+
+static inline bool
+is_paused(void) {
+	bool auto_paused = pxl_input_state(&app.in_curr, PXL_WM_FOCUS_LOST) || pxl_input_state(&app.in_curr, PXL_WM_MOUSE_FOCUS_LOST);
+	app.stepper.paused = app.paused || auto_paused;
+	return app.paused || auto_paused;
+}
+
+
 static void
-handle_input(fountain_t *fountain, pxl_input_t *in) {
-    if (pxl_input_was_pressed(in, PXL_KEYB_1)) {
+handle_input(fountain_t *fountain) {
+    if (was_pressed(PXL_KEYB_1)) {
         fountain->emit_type = PARTICLE_FIRE;
     }
-    if (pxl_input_was_pressed(in, PXL_KEYB_2)) {
+    if (was_pressed(PXL_KEYB_2)) {
         fountain->emit_type = PARTICLE_SMOKE;
     }
-    if (pxl_input_was_pressed(in, PXL_KEYB_3)) {
+    if (was_pressed(PXL_KEYB_3)) {
         fountain->emit_type = PARTICLE_SPARK;
     }
-    if (pxl_input_was_pressed(in, PXL_KEYB_UP) || pxl_input_was_pressed(in, PXL_KEYB_K)) {
+    if (was_pressed(PXL_KEYB_UP) || was_pressed(PXL_KEYB_K)) {
         fountain->emit_rate += 5;
     }
-    if (pxl_input_was_pressed(in, PXL_KEYB_DOWN) || pxl_input_was_pressed(in, PXL_KEYB_J)) {
+    if (was_pressed(PXL_KEYB_DOWN) || was_pressed(PXL_KEYB_J)) {
         fountain->emit_rate = (fountain->emit_rate > 5) ? fountain->emit_rate - 5 : 5;
     }
     
     /* Change particle type with mouse buttons */
-    if (pxl_input_was_pressed(in, PXL_MOUSE_LEFT)) {
+    if (was_pressed(PXL_MOUSE_LEFT)) {
         fountain->emit_type = (fountain->emit_type + 1) % PARTICLE_COUNT;
     }
-    if (pxl_input_was_pressed(in, PXL_MOUSE_RIGHT)) {
+    if (was_pressed(PXL_MOUSE_RIGHT)) {
         fountain->emit_type = (fountain->emit_type - 1 + PARTICLE_COUNT) % PARTICLE_COUNT;
     }
     
     /* Update source position to follow mouse cursor */
-    if (in->cur.mouse_x >= 0 && in->cur.mouse_y >= 0) {
-        fountain->source_x = (float)in->cur.mouse_x;
-        fountain->source_y = (float)in->cur.mouse_y;
+    if (app.in_curr.mouse_x >= 0 && app.in_curr.mouse_y >= 0) {
+        fountain->source_x = (float)app.in_curr.mouse_x;
+        fountain->source_y = (float)app.in_curr.mouse_y;
     }
 }
 
@@ -251,6 +286,43 @@ spawn_particles(fountain_t *fountain, float x, float y, particle_type_t type, in
         if (p) {
             init_particle(p, x, y, type);
         }
+    }
+}
+
+static void
+interpolate_fountain(fountain_t *out, const fountain_t *prev, const fountain_t *cur, float alpha) {
+    out->tileset = cur->tileset;
+    out->atlas = cur->atlas;
+    for (int i = 0; i < PARTICLE_COUNT; i++) {
+        out->sprites[i] = cur->sprites[i];
+    }
+    out->emit_rate = cur->emit_rate;
+    out->emit_accumulator = cur->emit_accumulator;
+    out->emit_type = cur->emit_type;
+    out->source_x = cur->source_x;
+    out->source_y = cur->source_y;
+
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        const particle_t *p_prev = &prev->particles[i];
+        const particle_t *p_cur = &cur->particles[i];
+        particle_t *p_out = &out->particles[i];
+
+        if (!p_cur->active) {
+            p_out->active = false;
+            continue;
+        }
+
+        p_out->active = true;
+        p_out->x = p_prev->x + (p_cur->x - p_prev->x) * alpha;
+        p_out->y = p_prev->y + (p_cur->y - p_prev->y) * alpha;
+        p_out->vx = p_cur->vx;
+        p_out->vy = p_cur->vy;
+        p_out->life = p_cur->life;
+        p_out->max_life = p_cur->max_life;
+        p_out->type = p_cur->type;
+        p_out->current_frame = p_cur->current_frame;
+        p_out->frame_timer = p_cur->frame_timer;
+        p_out->scale = p_cur->scale;
     }
 }
 
@@ -309,16 +381,18 @@ render_particle(pxl_canvas_t *cnv, fountain_t *fountain, const particle_t *p) {
                    p->current_frame, screen_x, screen_y);
 }
 
-
 static void
-render_hud(pxl_canvas_t *cnv, fountain_t *fountain, int current_fps, pxl_input_state_t *in) {
+render_hud(pxl_canvas_t *cnv, fountain_t *fountain, int current_fps, bool paused, pxl_input_t *in) {
     pxl_buf_t *pb = cnv->pb;
     int m_x = in->mouse_x, m_y = in->mouse_y;
     int active_particles = count_active_particles(fountain);
 
     char hud_str[64];
 
-    if (m_x >= 0 && m_x < pb->width && m_y >= 0 && m_y < pb->height) {
+    if (paused) {
+        snprintf(hud_str, sizeof(hud_str), "PAUSED | Particles: %d/%d",
+                 active_particles, MAX_PARTICLES);
+    } else if (m_x >= 0 && m_x < pb->width && m_y >= 0 && m_y < pb->height) {
         pxl_t color = *pxl_buf_ptr(pb, m_x, m_y);
         snprintf(hud_str, sizeof(hud_str), "FPS: %d | Particles: %d/%d | Mouse: %d,%d | Pixel: #%06X",
                  current_fps, active_particles, MAX_PARTICLES,
@@ -342,6 +416,7 @@ render(pxl_canvas_t *cnv, fountain_t *fountain) {
     }
 }
 
+
 static void
 update_fps(double now, int *current_fps) {
     static double t0 = 0;
@@ -361,53 +436,59 @@ update_fps(double now, int *current_fps) {
 int
 main(void) {
     printf("Fountain Demo\n");
-    printf("Controls: 1/2/3=type, Left/Right click=cycle type, Up/Down=rate, CTRL=show HUD, ESC=quit\n");
+    printf("Controls: 1/2/3=type, Left/Right click=cycle type, Up/Down=rate, P=pause, CTRL=show HUD, ESC=quit\n");
     printf("Particle fountain follows mouse cursor\n\n");
 
     if (pxl_backend_init("PXL Fountain", W, H, false) != PXL_SUCCESS)
         return 1;
 
-    fountain_t fountain;
-    init_fountain(&fountain);
+    init_fountain(&app.fountain);
+    app.fountain_prev = app.fountain;
 
-    pxl_input_t in;
-    pxl_input_init(&in);
+    app.stepper.dt = 1.0f / FPS;
+    pxl_stepper_init(&app.stepper, pxl_backend_get_time());
 
-    int current_fps = 0;
-    double prev_time = pxl_backend_get_time();
+    while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
+        app.in_prev = app.in_curr;
+        pxl_backend_poll_events(&app.in_curr);
 
-    while (!pxl_input_is_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_is_pressed(&in, PXL_WM_QUIT)) {
-        pxl_input_next_state(&in);
-        pxl_backend_poll_events(&in.cur);
+        if (was_pressed(PXL_KEYB_P)) {
+            app.paused = !app.paused;
+        }
 
-        handle_input(&fountain, &in);
+        handle_input(&app.fountain);
 
-        double now = pxl_backend_get_time();
-        float dt = (float)(now - prev_time);
-        prev_time = now;
+        pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
 
-        update_fountain(&fountain, dt);
+        if (!is_paused()) {
+            while (pxl_stepper_advance(&app.stepper)) {
+                app.fountain_prev = app.fountain;
+                update_fountain(&app.fountain, (float)app.stepper.dt);
+            }
+        }
 
         pxl_buf_t pb;
         if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
             pxl_canvas_t cnv;
             pxl_canvas_init(&cnv, &pb);
 
-            render(&cnv, &fountain);
+            fountain_t fountain_interpolated;
+            interpolate_fountain(&fountain_interpolated, &app.fountain_prev, &app.fountain, app.stepper.lerp_factor);
+            render(&cnv, &fountain_interpolated);
 
 			/* Show HUD when CTRL is pressed */
-			if (pxl_input_is_pressed(&in, PXL_KEYB_LCTRL) || pxl_input_is_pressed(&in, PXL_KEYB_RCTRL)) {
-				render_hud(&cnv, &fountain, current_fps, &in.cur);
+			if (is_pressed(PXL_KEYB_LCTRL) || is_pressed(PXL_KEYB_RCTRL)) {
+				render_hud(&cnv, &fountain_interpolated, app.current_fps, is_paused(), &app.in_curr);
 			}
 
             pxl_backend_end_frame();
         }
         
-        update_fps(now, &current_fps);
+        update_fps(pxl_backend_get_time(), &app.current_fps);
     }
 
-    free(fountain.atlas.data);
-    fountain.atlas.data = NULL;
+    free(app.fountain.atlas.data);
+    app.fountain.atlas.data = NULL;
     pxl_backend_deinit();
     return 0;
 }

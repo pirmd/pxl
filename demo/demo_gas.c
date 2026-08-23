@@ -16,18 +16,21 @@
 #define PARTICLE_RADIUS 4
 #define CELL_SIZE (2 * PARTICLE_RADIUS + 1)
 
-/* Particle definition */
+/*
+ * Model
+ */
+
 typedef struct {
     float x, y;
     float vx, vy;
     uint32_t color;
 } particle_t;
 
-/* Gas simulation state */
 typedef struct {
     particle_t particles[MAX_PARTICLES];
     size_t count;
     float width, height;
+
     /* Spatial grid for optimized collision detection */
     int grid_width, grid_height;
     int *cell_head;
@@ -93,9 +96,8 @@ gas_init(gas_t *gas, size_t initial_count) {
     gas_build_grid(gas);
 }
 
-/* Free gas simulation */
 static void
-gas_free(gas_t *gas) {
+gas_deinit(gas_t *gas) {
     free(gas->cell_head);
     free(gas->cell_next);
     gas->cell_head = NULL;
@@ -103,7 +105,6 @@ gas_free(gas_t *gas) {
     gas->count = 0;
 }
 
-/* Add particles to the simulation */
 static void
 gas_add_particles(gas_t *gas, size_t n) {
     size_t new_count = gas->count + n;
@@ -115,7 +116,6 @@ gas_add_particles(gas_t *gas, size_t n) {
     gas->count = new_count;
 }
 
-/* Remove particles from the simulation */
 static void
 gas_remove_particles(gas_t *gas, size_t n) {
     if (gas->count <= n) {
@@ -125,7 +125,6 @@ gas_remove_particles(gas_t *gas, size_t n) {
     }
 }
 
-/* Handle collision between two particles */
 static void
 gas_handle_collision(particle_t *p1, particle_t *p2) {
     float dx = p2->x - p1->x;
@@ -164,9 +163,8 @@ gas_handle_collision(particle_t *p1, particle_t *p2) {
     p2->y += overlap * ny;
 }
 
-/* Update particle positions with boundary and particle collisions */
 static void
-gas_update(gas_t *gas, float dt) {
+update_gas(gas_t *gas, float dt) {
     /* Move all particles */
     for (size_t i = 0; i < gas->count; i++) {
         particle_t *p = &gas->particles[i];
@@ -226,9 +224,8 @@ gas_update(gas_t *gas, float dt) {
     }
 }
 
-/* Interpolate between previous and current gas state */
 static void
-gas_interpolate(gas_t *out, const gas_t *prev, const gas_t *cur, float alpha) {
+interpolate_gas(gas_t *out, const gas_t *prev, const gas_t *cur, float alpha) {
     out->count = cur->count;
     out->width = cur->width;
     out->height = cur->height;
@@ -242,9 +239,8 @@ gas_interpolate(gas_t *out, const gas_t *prev, const gas_t *cur, float alpha) {
     }
 }
 
-/* Render gas simulation */
 static void
-gas_render(pxl_canvas_t *cnv, const gas_t *gas) {
+render_gas(pxl_canvas_t *cnv, const gas_t *gas) {
     pxl_canvas_set_color(cnv, BLACK);
     pxl_canvas_clear(cnv);
     
@@ -264,9 +260,44 @@ gas_render(pxl_canvas_t *cnv, const gas_t *gas) {
     }
 }
 
-/* Log FPS to stdout */
+/*
+ * Application state
+ */
+
+struct {
+	pxl_input_t in_prev;
+	pxl_input_t in_curr;
+
+	pxl_time_stepper_t stepper;
+	bool paused;
+
+	gas_t gas;
+	gas_t gas_prev;
+
+	float speed_factor;  /* 1.0 = normal, 2.0 = 2x, 4.0 = 4x, 0.5 = 0.5x */
+} app;
+
+static inline bool
+is_pressed(pxl_input_code_t code) {
+	return pxl_input_state(&app.in_curr, code) == 1;
+}
+
+static inline bool
+was_pressed(pxl_input_code_t code) {
+	return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
+}
+
+static inline bool
+is_paused(void) {
+	bool auto_paused = pxl_input_state(&app.in_curr, PXL_WM_FOCUS_LOST) || pxl_input_state(&app.in_curr, PXL_WM_MOUSE_FOCUS_LOST);
+	app.stepper.paused = app.paused || auto_paused;
+	return app.paused || auto_paused;
+}
+
+
+
 static void
-log_fps(double now, size_t particle_count) {
+log_fps(double now, size_t particle_count, float speed_factor) {
     static double t0 = 0;
     static int n = 0;
     
@@ -277,7 +308,7 @@ log_fps(double now, size_t particle_count) {
     n++;
     if (now - t0 >= 1.0) {
         int current_fps = (int)((float)n / (float)(now - t0));
-        printf("FPS: %d | Particles: %zu\r", current_fps, particle_count);
+        printf("FPS: %d | Particles: %zu | Speed: x%.1f\r", current_fps, particle_count, speed_factor);
         fflush(stdout);
         n = 0;
         t0 = now;
@@ -289,34 +320,43 @@ main(void) {
     if (pxl_backend_init("PXL Gas Demo (Spatial Grid)", W, H, false) != PXL_SUCCESS)
         return 1;
 
-    printf("Gas simulation with spatial grid. Up/Down arrow: add/remove 10 particles, ESC to quit\n");
+    printf("Gas simulation. Up/Down: add/remove particles, 1-4: speed, P=pause, ESC=quit\n");
 
-    gas_t gas, gas_prev;
-    gas_init(&gas, 200);
-    gas_prev = gas;
+    gas_init(&app.gas, 200);
+    app.gas_prev = app.gas;
 
-    pxl_time_stepper_t ts;
-    ts.dt = 1.0f / FPS;
-    pxl_stepper_init(&ts, pxl_backend_get_time());
+    app.stepper.dt = 1.0f / FPS;
+    pxl_stepper_init(&app.stepper, pxl_backend_get_time());
+    app.speed_factor = 1.0f;
 
-    pxl_input_t in;
-    pxl_input_init(&in);
+    while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
+        app.in_prev = app.in_curr;
+        pxl_backend_poll_events(&app.in_curr);
 
-    while (!pxl_input_is_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_is_pressed(&in, PXL_WM_QUIT)) {
-        pxl_stepper_sync_time(&ts, pxl_backend_get_time());
-        pxl_input_next_state(&in);
-        pxl_backend_poll_events(&in.cur);
-
-        if (pxl_input_was_pressed(&in, PXL_KEYB_K) || pxl_input_was_pressed(&in, PXL_KEYB_UP)) {
-            gas_add_particles(&gas, 10);
-        }
-        if (pxl_input_was_pressed(&in, PXL_KEYB_J) || pxl_input_was_pressed(&in, PXL_KEYB_DOWN)) {
-            gas_remove_particles(&gas, 10);
+        if (was_pressed(PXL_KEYB_P)) {
+            app.paused = !app.paused;
         }
 
-        while (pxl_stepper_advance(&ts)) {
-            gas_prev = gas;
-            gas_update(&gas, (float)ts.dt);
+        /* Speed controls */
+        if (was_pressed(PXL_KEYB_1)) app.speed_factor = 1.0f;
+        if (was_pressed(PXL_KEYB_2)) app.speed_factor = 2.0f;
+        if (was_pressed(PXL_KEYB_3)) app.speed_factor = 4.0f;
+        if (was_pressed(PXL_KEYB_4)) app.speed_factor = 0.5f;
+
+        pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
+
+        if (was_pressed(PXL_KEYB_K) || was_pressed(PXL_KEYB_UP)) {
+            gas_add_particles(&app.gas, 10);
+        }
+        if (was_pressed(PXL_KEYB_J) || was_pressed(PXL_KEYB_DOWN)) {
+            gas_remove_particles(&app.gas, 10);
+        }
+
+        if (!is_paused()) {
+            while (pxl_stepper_advance(&app.stepper)) {
+                app.gas_prev = app.gas;
+                update_gas(&app.gas, (float)app.stepper.dt * app.speed_factor);
+            }
         }
 
         pxl_buf_t pb;
@@ -325,16 +365,22 @@ main(void) {
             pxl_canvas_init(&cnv, &pb);
             
             gas_t interpolated;
-            gas_interpolate(&interpolated, &gas_prev, &gas, ts.lerp_factor);
-            gas_render(&cnv, &interpolated);
+            interpolate_gas(&interpolated, &app.gas_prev, &app.gas, app.stepper.lerp_factor);
+            render_gas(&cnv, &interpolated);
             
-            log_fps(pxl_backend_get_time(), gas.count);
+            if (is_paused()) {
+                printf("PAUSED | Press P to resume\r");
+                fflush(stdout);
+            } else {
+                log_fps(pxl_backend_get_time(), app.gas.count, app.speed_factor);
+            }
+            
             pxl_backend_end_frame();
         }
     }
 
     printf("\n");
-    gas_free(&gas);
+    gas_deinit(&app.gas);
     pxl_backend_deinit();
     return 0;
 }

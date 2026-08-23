@@ -264,8 +264,11 @@ const pxl_font_t pxl_font_pong = {
 	.glyph_offsets_y = NULL,
 };
 
+/*
+ * Model
+ */
+
 typedef struct {
-    /* Paddles */
     struct {
         float x, y;
         int w, h;
@@ -273,7 +276,6 @@ typedef struct {
         float vy;
     } paddle_left, paddle_right;
 
-    /* Ball */
     struct {
         float x, y;
         int radius;
@@ -281,24 +283,9 @@ typedef struct {
         float speed;
     } ball;
 
-    /* Scores */
     int score_left;
     int score_right;
 } pong_t;
-
-static void
-handle_input(pong_t *p, pxl_input_t *in) {
-    p->paddle_left.vy = 0;
-    p->paddle_right.vy = 0;  /* Will be set by AI */
-
-    /* Left paddle: vim keys (k=up, j=down) or arrows (up/down) */
-    if (pxl_input_is_pressed(in, PXL_KEYB_K) || pxl_input_is_pressed(in, PXL_KEYB_UP)) {
-        p->paddle_left.vy = -p->paddle_left.speed;
-    }
-    if (pxl_input_is_pressed(in, PXL_KEYB_J) || pxl_input_is_pressed(in, PXL_KEYB_DOWN)) {
-        p->paddle_left.vy = p->paddle_left.speed;
-    }
-}
 
 static void
 reset_ball(pong_t *p) {
@@ -309,62 +296,34 @@ reset_ball(pong_t *p) {
 }
 
 static void
-pong_interpolate(pong_t *out, const pong_t *prev, const pong_t *cur, float alpha) {
-    out->paddle_left.x = cur->paddle_left.x;
-    out->paddle_left.y = prev->paddle_left.y + (cur->paddle_left.y - prev->paddle_left.y) * alpha;
-    out->paddle_left.w = cur->paddle_left.w;
-    out->paddle_left.h = cur->paddle_left.h;
+init_pong(pong_t *p) {
+    /* Paddles */
+    p->paddle_left.x = 20;
+    p->paddle_left.y = H/2 - 50;
+    p->paddle_left.w = 15;
+    p->paddle_left.h = 100;
+    p->paddle_left.speed = 400.0f;
 
-    out->paddle_right.x = cur->paddle_right.x;
-    out->paddle_right.y = prev->paddle_right.y + (cur->paddle_right.y - prev->paddle_right.y) * alpha;
-    out->paddle_right.w = cur->paddle_right.w;
-    out->paddle_right.h = cur->paddle_right.h;
+    p->paddle_right.x = W - 20 - 15;
+    p->paddle_right.y = H/2 - 50;
+    p->paddle_right.w = 15;
+    p->paddle_right.h = 100;
+    p->paddle_right.speed = 400.0f;
 
-    out->ball.x = prev->ball.x + (cur->ball.x - prev->ball.x) * alpha;
-    out->ball.y = prev->ball.y + (cur->ball.y - prev->ball.y) * alpha;
-    out->ball.radius = cur->ball.radius;
-    out->ball.speed = cur->ball.speed;
+    /* Ball */
+    p->ball.radius = 8;
+    p->ball.speed = 300.0f;
+    reset_ball(p);
 
-    out->score_left = cur->score_left;
-    out->score_right = cur->score_right;
-}
-
-static void
-ai_decide(pong_t *p) {
-    /* Simple AI: predict ball position on right side */
-    float target_y;
-    
-    /* Ball going right: direct prediction */
-    if (p->ball.vx > 0) {
-        float time_to_right = (p->paddle_right.x - p->ball.x) / p->ball.vx;
-        target_y = p->ball.y + p->ball.vy * time_to_right;
-    }
-    /* Ball going left: move to center (simplest reliable strategy) */
-    else {
-        target_y = H / 2.0f;
-    }
-    
-    /* Clamp to playable area */
-    target_y = fmaxf(p->paddle_right.h / 2.0f, 
-                   fminf(H - p->paddle_right.h / 2.0f, target_y));
-    
-    /* Calculate required movement */
-    float error = target_y - (p->paddle_right.y + p->paddle_right.h / 2.0f);
-    
-    if (fabsf(error) > 2.0f) {
-        p->paddle_right.vy = (error < 0 ? -1.0f : 1.0f) * p->paddle_right.speed;
-    } else {
-        p->paddle_right.vy = 0;
-    }
+    /* Scores */
+    p->score_left = 0;
+    p->score_right = 0;
 }
 
 static void
 update_pong(pong_t *p, float dt) {
-    /* AI decision (separate from physics update) */
-    ai_decide(p);
-
     /* Update paddles */
-    p->paddle_left.y += p->paddle_left.vy * dt;
+    p->paddle_left.y  += p->paddle_left.vy * dt;
     p->paddle_right.y += p->paddle_right.vy * dt;
 
     /* Clamp paddles to screen */
@@ -422,6 +381,41 @@ update_pong(pong_t *p, float dt) {
 }
 
 static void
+handle_input(pong_t *p, pxl_input_t *in) {
+    p->paddle_left.vy = 0;
+    p->paddle_right.vy = 0;  /* Will be set by AI */
+
+    /* Left paddle: vim keys (k=up, j=down) or arrows (up/down) */
+    if (pxl_input_state(in, PXL_KEYB_K) == 1 || pxl_input_state(in, PXL_KEYB_UP) == 1) {
+        p->paddle_left.vy = -p->paddle_left.speed;
+    }
+    if (pxl_input_state(in, PXL_KEYB_J) == 1 || pxl_input_state(in, PXL_KEYB_DOWN) == 1) {
+        p->paddle_left.vy = p->paddle_left.speed;
+    }
+}
+
+static void
+interpolate_pong(pong_t *out, const pong_t *prev, const pong_t *cur, float alpha) {
+    out->paddle_left.x = cur->paddle_left.x;
+    out->paddle_left.y = prev->paddle_left.y + (cur->paddle_left.y - prev->paddle_left.y) * alpha;
+    out->paddle_left.w = cur->paddle_left.w;
+    out->paddle_left.h = cur->paddle_left.h;
+
+    out->paddle_right.x = cur->paddle_right.x;
+    out->paddle_right.y = prev->paddle_right.y + (cur->paddle_right.y - prev->paddle_right.y) * alpha;
+    out->paddle_right.w = cur->paddle_right.w;
+    out->paddle_right.h = cur->paddle_right.h;
+
+    out->ball.x = prev->ball.x + (cur->ball.x - prev->ball.x) * alpha;
+    out->ball.y = prev->ball.y + (cur->ball.y - prev->ball.y) * alpha;
+    out->ball.radius = cur->ball.radius;
+    out->ball.speed = cur->ball.speed;
+
+    out->score_left = cur->score_left;
+    out->score_right = cur->score_right;
+}
+
+static void
 draw_score(pxl_canvas_t *cnv, const pong_t *p) {
     pxl_text_ctx_t w;
     pxl_text_ctx_init(&w, cnv, &pxl_font_pong);
@@ -469,24 +463,73 @@ render_pong(pxl_canvas_t *cnv, const pong_t *p) {
     pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, p->ball.radius);
 }
 
+/*
+ * AI
+ */
+
 static void
-render_debug_hud(pxl_canvas_t *cnv, int fps, pxl_input_state_t *in) {
-	pxl_buf_t *pb = cnv->pb;
-	int m_x = in->mouse_x, m_y = in->mouse_y;
-
-    char hud_str[64];
-	
-	if (m_x >= 0 && m_x < pb->width && m_y >= 0 && m_y < pb->height) {
-		pxl_t color = *pxl_buf_ptr(pb, m_x, m_y);
-		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Mouse: %d,%d | Pixel: #%06X",
-				fps, m_x, m_y, color & 0x00FFFFFF);
-	} else {
-		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Mouse: n/a | Pixel: n/a", fps);
-	}
-
-    pxl_canvas_set_color(cnv, WHITE);
-    pxl_draw_str(cnv, 10, H - 15, hud_str);
+ai_decide(pong_t *p) {
+    /* Simple AI: predict ball position on right side */
+    float target_y;
+    
+    /* Ball going right: direct prediction */
+    if (p->ball.vx > 0) {
+        float time_to_right = (p->paddle_right.x - p->ball.x) / p->ball.vx;
+        target_y = p->ball.y + p->ball.vy * time_to_right;
+    }
+    /* Ball going left: move to center (simplest reliable strategy) */
+    else {
+        target_y = H / 2.0f;
+    }
+    
+    /* Clamp to playable area */
+    target_y = fmaxf(p->paddle_right.h / 2.0f, 
+                   fminf(H - p->paddle_right.h / 2.0f, target_y));
+    
+    /* Calculate required movement */
+    float error = target_y - (p->paddle_right.y + p->paddle_right.h / 2.0f);
+    
+    if (fabsf(error) > 2.0f) {
+        p->paddle_right.vy = (error < 0 ? -1.0f : 1.0f) * p->paddle_right.speed;
+    } else {
+        p->paddle_right.vy = 0;
+    }
 }
+
+
+/*
+ * Application
+ */
+
+struct {
+	pxl_input_t in_prev;
+	pxl_input_t in_curr;
+
+	pxl_time_stepper_t stepper;
+	bool paused;
+
+	pong_t pong;
+	pong_t pong_prev;
+	int current_fps;
+} app;
+
+static inline bool
+is_pressed(pxl_input_code_t code) {
+	return pxl_input_state(&app.in_curr, code) == 1;
+}
+
+static inline bool
+was_pressed(pxl_input_code_t code) {
+	return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
+}
+
+static inline bool
+is_paused(void) {
+	bool auto_paused = pxl_input_state(&app.in_curr, PXL_WM_FOCUS_LOST) || pxl_input_state(&app.in_curr, PXL_WM_MOUSE_FOCUS_LOST);
+	app.stepper.paused = app.paused || auto_paused;
+	return app.paused || auto_paused;
+}
+
 
 static void
 update_fps(double now, int *current_fps) {
@@ -505,28 +548,22 @@ update_fps(double now, int *current_fps) {
 }
 
 static void
-init_pong(pong_t *p) {
-    /* Paddles */
-    p->paddle_left.x = 20;
-    p->paddle_left.y = H/2 - 50;
-    p->paddle_left.w = 15;
-    p->paddle_left.h = 100;
-    p->paddle_left.speed = 400.0f;
+render_debug_hud(pxl_canvas_t *cnv, int fps, pxl_input_t *in) {
+	pxl_buf_t *pb = cnv->pb;
+	int m_x = in->mouse_x, m_y = in->mouse_y;
 
-    p->paddle_right.x = W - 20 - 15;
-    p->paddle_right.y = H/2 - 50;
-    p->paddle_right.w = 15;
-    p->paddle_right.h = 100;
-    p->paddle_right.speed = 400.0f;
+    char hud_str[64];
+	
+	if (m_x >= 0 && m_x < pb->width && m_y >= 0 && m_y < pb->height) {
+		pxl_t color = *pxl_buf_ptr(pb, m_x, m_y);
+		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Mouse: %d,%d | Pixel: #%06X",
+				fps, m_x, m_y, color & 0x00FFFFFF);
+	} else {
+		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Mouse: n/a | Pixel: n/a", fps);
+	}
 
-    /* Ball */
-    p->ball.radius = 8;
-    p->ball.speed = 300.0f;
-    reset_ball(p);
-
-    /* Scores */
-    p->score_left = 0;
-    p->score_right = 0;
+    pxl_canvas_set_color(cnv, WHITE);
+    pxl_draw_str(cnv, 10, H - 15, hud_str);
 }
 
 int
@@ -534,30 +571,33 @@ main(void) {
     if (pxl_backend_init("PXL Pong", W, H, false) != PXL_SUCCESS)
         return 1;
 
-    printf("Pong game. Vim keys: J=down, K=up. CTRL=show debug HUD, ESC=quit\n");
+    printf("Pong game. Vim keys: J=down, K=up. CTRL=HUD, P=pause, ESC=quit\n");
 
-    pong_t pong, pong_prev;
-    init_pong(&pong);
-    pong_prev = pong;
+    app.stepper.dt = 1.0f / FPS;
+    pxl_stepper_init(&app.stepper, pxl_backend_get_time());
 
-    pxl_time_stepper_t ts;
-    ts.dt = 1.0f / FPS;
-    pxl_stepper_init(&ts, pxl_backend_get_time());
+    init_pong(&app.pong);
+    app.pong_prev = app.pong;
+    app.current_fps = 0;
 
-    pxl_input_t in;
-    pxl_input_init(&in);
+    while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
+        app.in_prev = app.in_curr;
+        pxl_backend_poll_events(&app.in_curr);
 
-    int current_fps = 0;
+        if (was_pressed(PXL_KEYB_P)) {
+            app.paused = !app.paused;
+        }
 
-    while (!pxl_input_is_pressed(&in, PXL_KEYB_ESCAPE) && !pxl_input_is_pressed(&in, PXL_WM_QUIT)) {
-        pxl_stepper_sync_time(&ts, pxl_backend_get_time());
-        pxl_input_next_state(&in);
-        pxl_backend_poll_events(&in.cur);
-        handle_input(&pong, &in);
+        pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
+        handle_input(&app.pong, &app.in_curr);
 
-        while (pxl_stepper_advance(&ts)) {
-            pong_prev = pong;
-            update_pong(&pong, (float)ts.dt);
+        if (!is_paused()) {
+            while (pxl_stepper_advance(&app.stepper)) {
+				ai_decide(&app.pong);
+
+                app.pong_prev = app.pong;
+                update_pong(&app.pong, (float)app.stepper.dt);
+            }
         }
 
         pxl_buf_t pb;
@@ -566,21 +606,27 @@ main(void) {
             pxl_canvas_init(&cnv, &pb);
             
             pong_t pong_interpolated;
-            pong_interpolate(&pong_interpolated, &pong_prev, &pong, ts.lerp_factor);
+            interpolate_pong(&pong_interpolated, &app.pong_prev, &app.pong, app.stepper.lerp_factor);
             render_pong(&cnv, &pong_interpolated);
             
 			/* Show HUD when CTRL is pressed */
-			if (pxl_input_is_pressed(&in, PXL_KEYB_LCTRL) || pxl_input_is_pressed(&in, PXL_KEYB_RCTRL)) {
-				render_debug_hud(&cnv, current_fps, &in.cur);
+			if (is_pressed(PXL_KEYB_LCTRL) || is_pressed(PXL_KEYB_RCTRL)) {
+				render_debug_hud(&cnv, app.current_fps, &app.in_curr);
+			}
+
+			/* Pause indicator */
+			if (is_paused()) {
+				printf("PAUSED | Press P to resume\r");
+				fflush(stdout);
 			}
 
             pxl_backend_end_frame();
         }
 
-		update_fps(pxl_backend_get_time(), &current_fps);
+		update_fps(pxl_backend_get_time(), &app.current_fps);
     }
 
-    printf("Final Score: %d - %d\n", pong.score_left, pong.score_right);
+    printf("\nFinal Score: %d - %d\n", app.pong.score_left, app.pong.score_right);
     pxl_backend_deinit();
     return 0;
 }

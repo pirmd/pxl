@@ -76,8 +76,7 @@ test_pxl_backend_poll_events_null_input(void) {
 	ST_CHECK(pxl_backend_init("test", 100, 100, false) == PXL_SUCCESS, "init failed");
 
 	/* NULL input should not crash (implementation may choose to ignore or assert) */
-	pxl_input_state_t input_state;
-	pxl_input_init_state(&input_state);
+	pxl_input_t input_state = {0};
 	pxl_backend_poll_events(&input_state);
 	
 	/* Also test with NULL */
@@ -125,38 +124,6 @@ test_pxl_backend_multiple_frames(void) {
 	pxl_backend_deinit();
 }
 
-/* Integration ----------------------------------------------------------- */
-
-static void
-test_pxl_backend_quick_start_loop(void) {
-	/* Simulate the quick start loop from README (single iteration) */
-	pxl_err_t err = pxl_backend_init("Test", 800, 600, false);
-	ST_CHECK(err == PXL_SUCCESS, "backend_init failed: %d", err);
-
-	pxl_input_t input;
-	pxl_input_init(&input);
-
-	/* First iteration: normal flow */
-	pxl_input_next_state(&input);
-	pxl_backend_poll_events(&input.cur);
-
-	pxl_buf_t pb;
-	err = pxl_backend_begin_frame(&pb);
-	ST_CHECK(err == PXL_SUCCESS, "begin_frame failed: %d", err);
-
-	pxl_canvas_t cnv;
-	pxl_canvas_init(&cnv, &pb);
-	/* No actual drawing, just verify the flow works */
-	pxl_backend_end_frame();
-
-	/* Simulate ESC key press to exit loop condition */
-	pxl_input_press(&input.cur, PXL_KEYB_ESCAPE);
-	ST_CHECK(pxl_input_is_pressed(&input, PXL_KEYB_ESCAPE),
-	         "ESCAPE should be pressed");
-
-	pxl_backend_deinit();
-}
-
 /* Main --------------------------------------------------------------------- */
 
 int
@@ -176,9 +143,6 @@ main(int argc, char *argv[]) {
 		
 		/* Utilities */
 		ST_T(test_pxl_backend_get_time_basic),
-		ST_T(test_pxl_backend_poll_events_null_input),
-		
-		/* Integration */
-		ST_T(test_pxl_backend_quick_start_loop)
+		ST_T(test_pxl_backend_poll_events_null_input)
 	);
 }

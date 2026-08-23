@@ -102,7 +102,7 @@ pxl_backend_init(const char *title, int w, int h, bool fullscreen) {
     XSelectInput(g_x11.display, g_x11.window,
         ExposureMask | KeyPressMask | KeyReleaseMask |
         ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
-        StructureNotifyMask);
+        StructureNotifyMask | EnterWindowMask | LeaveWindowMask | FocusChangeMask);
 
 	
 	XkbSetDetectableAutoRepeat(g_x11.display, True, NULL);
@@ -343,7 +343,7 @@ x11_button_to_pxl_input_code(const unsigned int button) {
 }
 
 void
-pxl_backend_poll_events(pxl_input_state_t *in) {
+pxl_backend_poll_events(pxl_input_t *in) {
     XEvent event;
 
     while (XPending(g_x11.display)) {
@@ -369,13 +369,13 @@ pxl_backend_poll_events(pxl_input_state_t *in) {
                 if (b != PXL_IN_UNKNOWN) {
 					pxl_input_press(in, b);
                 } else if (event.xbutton.button == 4) {
-                    pxl_input_inc_mouse_wheel(in, 0, 1);
+                    in->mouse_wheel_y += 1;
                 } else if (event.xbutton.button == 5) {
-                    pxl_input_inc_mouse_wheel(in, 0, -1);
+                    in->mouse_wheel_y -= 1;
                 } else if (event.xbutton.button == 6) {
-                    pxl_input_inc_mouse_wheel(in, -1, 0);
+                    in->mouse_wheel_x -= 1;
                 } else if (event.xbutton.button == 7) {
-                    pxl_input_inc_mouse_wheel(in, 1, 0);
+                    in->mouse_wheel_x += 1;
                 }
                 break;
             }
@@ -386,7 +386,26 @@ pxl_backend_poll_events(pxl_input_state_t *in) {
             }
 
             case MotionNotify:
-                pxl_input_set_mouse_pos(in, event.xmotion.x, event.xmotion.y);
+                in->mouse_x = event.xmotion.x;
+                in->mouse_y = event.xmotion.y;
+                break;
+
+            case EnterNotify:
+                pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
+                in->mouse_x = event.xcrossing.x;
+                in->mouse_y = event.xcrossing.y;
+                break;
+
+            case LeaveNotify:
+                pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
+                break;
+
+            case FocusIn:
+                pxl_input_release(in, PXL_WM_FOCUS_LOST);
+                break;
+
+            case FocusOut:
+                pxl_input_press(in, PXL_WM_FOCUS_LOST);
                 break;
         }
     }
