@@ -10,10 +10,9 @@ PXL_SRC += ../stepper.h ../input.h ../backend.h
 
 CC     ?= cc
 CFLAGS ?= -O0 -g -std=c99 -Wall -Wextra
-CFLAGS += -I.. -I. -Istest
+CFLAGS += -I.. -I.
 
 LDFLAGS += -L.. -lpxl
-LDFLAGS += -Lstest -lstest
 
 X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
 SDL_LIBS   ?= -L/usr/local/lib -lSDL2
@@ -33,15 +32,11 @@ test: $(TESTS)
 		done
 
 .for t in $(TESTS)
-$(t): $(t).c ../libpxl.a stest/libstest.a
+$(t): $(t).c test.h ../libpxl.a 
 	@$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
 .endfor
 
-stest/libstest.a:
-	@$(MAKE) -C stest libstest.a
-
 clean:
 	@rm -f $(TESTS)
-	$(MAKE) -C stest clean
 
 .PHONY: all test clean
