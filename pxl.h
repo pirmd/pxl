@@ -1,6 +1,11 @@
 #ifndef PXL_H
 #define PXL_H
 
+/*
+ * PXL umbrella header - includes all public API headers.
+ * For finer granularity, include individual headers directly.
+ */
+
 /* Core types and error handling */
 #include "err.h"
 #include "geom.h"

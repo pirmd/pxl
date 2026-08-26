@@ -8,7 +8,7 @@ Features:
   - Canvas with scissor clipping, translation offset, color, clear, blit
   - Test outputting using either built-in 8x8 ascii font or monospace or
     proportional bitmask font
-  - Backends: SDL2, X11
+  - Backends: SDL2, X11 (uses SHM, XIM/XIC extensions for performance and UTF-8 input)
   - Keyboard/mouse input
 
 Build:
@@ -43,6 +43,7 @@ Quick start:
     pxl_backend_deinit();
 
 Demos:
+  - demo_hello_world.c - Minimal static example: colored rect + text
   - demo_pong.c       - Pong game
   - demo_gas.c        - Boltzmann gas simulation
   - demo_typewriter.c - Text typing animation
@@ -80,7 +81,7 @@ Architecture:
     text.h/text.c  - Text rendering with mono or proportional LSB bitmask font
     tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
 
-  Note: pxl.h includes all public headers above. Users may include individual headers if preferred.
+  Note: pxl.h is an umbrella header that includes all public headers. For finer granularity, users may include individual headers (e.g., "buf.h", "canvas.h") directly.
 
 Tools:
   - bdf2pxl - Convert BDF font files to pxl_font_t C header
