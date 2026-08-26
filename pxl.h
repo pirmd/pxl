@@ -13,7 +13,7 @@
 #include "draw_extra.h"
 
 /* Text */
-#include "ascii.h"
+#include "draw_ascii.h"
 #include "text.h"
 
 /* Tileset */
