@@ -1,6 +1,7 @@
 #include <assert.h>
 
-#include "draw.h"
+#include "blit.h"
+#include "shape.h"
 #include "geom.h"
 #include "text.h"
 

@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <limits.h>  /* for INT_MAX */
 
-#include "draw.h"
+#include "blit.h"
 #include "tileset.h"
 
 /* Draw a tile from a tileset to canvas at (x, y).

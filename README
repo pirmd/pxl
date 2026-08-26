@@ -70,9 +70,9 @@ Architecture:
     bitmask.h      - 1-bit per pixel mask for stencil/clip operations
     canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
     geom.h         - Geometry primitives (rect, span, point) and clipping
-    draw.h/c       - Basic 2D primitives (line, rect, span, blit, LSB bitmask)
-    draw_ascii.h/c - ASCII text rendering with built-in 8x8 font (char, string, bounds)
-    draw_extra.h/c - Advanced 2D primitives (circle, triangle)
+    shape.h/c      - 2D primitives (line, rect, circle, triangle, outline + filled)
+    blit.h/c       - Pixel operations (blit, bitmask drawing)
+    text_basic.h/c - ASCII text rendering with built-in 8x8 font (char, string, bounds)
     color.h        - ARGB8888 color creation and component extraction
 
   Framework:

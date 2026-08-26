@@ -1,7 +1,7 @@
 #include "test.h"
 #include "canvas.h"
 #include "buf.h"
-#include "draw_ascii.h"
+#include "text_basic.h"
 
 #define COLOR_WHITE 0xFFFFFFFFU
 #define FIXTURE_W 40

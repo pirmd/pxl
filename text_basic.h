@@ -1,5 +1,5 @@
-#ifndef PXL_ASCII_H
-#define PXL_ASCII_H
+#ifndef PXL_FONT_ASCII_H
+#define PXL_FONT_ASCII_H
 
 #include "canvas.h"
 
@@ -37,4 +37,4 @@ pxl_char_bounds(unsigned char c);
 pxl_rect_t
 pxl_str_bounds(const char *str);
 
-#endif /* PXL_ASCII_H */
+#endif /* PXL_FONT_ASCII_H */

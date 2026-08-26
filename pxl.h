@@ -9,11 +9,12 @@
 
 /* Drawing */
 #include "canvas.h"
-#include "draw.h"
-#include "draw_extra.h"
+#include "geom.h"
+#include "shape.h"
+#include "blit.h"
+#include "text_basic.h"
 
 /* Text */
-#include "draw_ascii.h"
 #include "text.h"
 
 /* Tileset */
