@@ -2,48 +2,32 @@
 
 LIB = libpxl.a
 
-SRC = draw.c draw_extra.c draw_ascii.c text.c tileset.c
-HDR = buf.h bitmask.h geom.h err.h canvas.h draw.h draw_extra.h draw_ascii.h stepper.h text.h tileset.h
+HDR = err.h buf.h input.h backend.h canvas.h bitmask.h geom.h draw.h draw_ascii.h draw_extra.h text.h tileset.h stepper.h
+SRC = draw.c draw_ascii.c draw_extra.c text.c tileset.c
 
--include "config.mk"
+-include config.mk
+CC         ?= cc
 
-CC     ?= cc
-CFLAGS  = -std=c99 -Wall -Wextra -I.
 
-.if defined(RELEASE)
-CFLAGS += -O2 -DNDEBUG
-.else
+include Makefile.inc
+
+SRC    += $(PXL_BACKEND_SRC)
+
+CFLAGS  ?= -std=c99 -Wall -Wextra
+CFLAGS  += $(PXL_CFLAGS)
+
+.if $(PXL_BUILD_MODE) == "debug"
 CFLAGS += -O0 -g
+.elif $(PXL_BUILD_MODE) == "release"
+CFLAGS += -DNDEBUG
 .endif
 
-X11_CFLAGS ?= -I/usr/X11R6/include
-X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
 
-SDL_CFLAGS ?= -I/usr/local/include/SDL2
-SDL_LIBS   ?= -L/usr/local/lib -lSDL2
-
-BACKEND ?= x11
-
-.if ${BACKEND} == "x11"
-SRC    += backend_x11.c
-CFLAGS += $(X11_CFLAGS)
-LIBS   += $(X11_LIBS)
-.elif ${BACKEND} == "sdl"
-SRC    += backend_sdl.c
-CFLAGS += $(SDL_CFLAGS)
-LIBS   += $(SDL_LIBS)
-.else
-invalid_backend:
-	@echo "Invalid BACKEND: ${BACKEND} - must be x11 or sdl"
-	@exit 1
-
-all: invalid_backend
-.endif
-
-CFLAGS_LINT  = -Wall -Wextra -Wpedantic -Werror -fsyntax-only
-CFLAGS_LINT += -Wshadow -Wvla
+CFLAGS_LINT  = -Wall -Wextra
+CFLAGS_LINT += -Wpedantic -Wshadow -Wvla
 CFLAGS_LINT += -Wwrite-strings -Wold-style-definition
 CFLAGS_LINT += -Wno-unused-function
+
 
 all: $(LIB)
 
@@ -60,11 +44,11 @@ lint:
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) demo/*.c
 
 test: $(LIB)
-	$(MAKE) -C test all
-	$(MAKE) -C demo clean all BACKEND=$(BACKEND)
+	$(MAKE) -C test test
+	$(MAKE) -C demo clean all
 
 demo: $(LIB)
-	$(MAKE) -C demo BACKEND=$(BACKEND)
+	$(MAKE) -C demo
 
 clean:
 	rm -f *.o $(LIB)

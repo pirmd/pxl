@@ -1,42 +1,38 @@
 # pxl - Unit tests
 
-TESTS = test_buf test_geom test_canvas test_draw test_draw_extra test_stepper test_input test_backend test_draw_ascii test_text test_tileset
+TST  = test_buf test_input test_backend test_canvas test_geom test_draw test_draw_ascii test_draw_extra
+TST += test_text test_tileset test_stepper
 
-PXL_SRC  = ../draw.c ../draw_ascii.c ../draw_extra.c ../text.c ../tileset.c
-PXL_SRC += ../canvas.h ../draw.h ../draw_ascii.h ../draw_extra.h ../buf.h ../geom.h ../err.h ../text.h ../tileset.h
-PXL_SRC += ../stepper.h ../input.h ../backend.h
+PXL_DIR=..
 
--include "../config.mk"
+-include $(PXL_DIR)/config.mk
 
 CC     ?= cc
 CFLAGS ?= -O0 -g -std=c99 -Wall -Wextra
-CFLAGS += -I.. -I.
-
-LDFLAGS += -L.. -lpxl
 
 X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
 SDL_LIBS   ?= -L/usr/local/lib -lSDL2
 
-BACKEND ?= x11
-.if ${BACKEND} == "x11"
-LDFLAGS += $(X11_LIBS)
-.elif ${BACKEND} == "sdl"
-LDFLAGS += $(SDL_LIBS)
-.endif
+include $(PXL_DIR)/Makefile.inc
+
+CFLAGS  += $(PXL_CFLAGS)
+CFLAGS  += -I.
+
+LDFLAGS += $(PXL_LDLIBS)
 
 all: test
 
-test: $(TESTS)
-	@for t in $(TESTS); do \
+test: $(TST)
+	@for t in $(TST); do \
 		./$${t} >/dev/null || { echo "$${t} FAIL"; exit 1; }; \
 		done
 
-.for t in $(TESTS)
-$(t): $(t).c test.h ../libpxl.a 
-	@$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
+.for t in $(TST)
+$(t): $(t).c test.h $(PXL_DIR)/libpxl.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
 .endfor
 
 clean:
-	@rm -f $(TESTS)
+	@rm -f $(TST)
 
 .PHONY: all test clean
