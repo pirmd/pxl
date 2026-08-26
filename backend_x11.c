@@ -16,6 +16,7 @@
 #include "backend.h"
 #include "input.h"
 #include "buf.h"
+#include "err.h"
 
 #define ARGB32_DEPTH    32
 #define ARGB_RED_MASK   0x00ff0000
@@ -82,7 +83,10 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     XSetLocaleModifiers("");
 
     g_x11.display = XOpenDisplay(NULL);
-    if (!g_x11.display) return PXL_E_BACKEND_INIT;
+    if (!g_x11.display) {
+        pxl_log("XOpenDisplay failed");
+        return PXL_E_BACKEND_INIT;
+    }
 
     Visual *visual = NULL;
     int depth = 0;
@@ -265,6 +269,9 @@ pxl_backend_end_frame(void) {
                                 False);
     XSync(g_x11.display, False);
     
+    if (!success) {
+        pxl_log("XShmPutImage failed");
+    }
     return success ? PXL_SUCCESS : PXL_E_BACKEND_FRAME;
 }
 

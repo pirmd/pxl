@@ -1,6 +1,7 @@
 #include "backend.h"
 #include "input.h"
 #include "buf.h"
+#include "err.h"
 
 #include <SDL.h>
 #include <assert.h>
@@ -28,6 +29,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	}
 
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+		pxl_log(SDL_GetError());
 		return PXL_E_BACKEND_INIT;
 	}
 
@@ -126,6 +128,7 @@ pxl_backend_end_frame(void) {
     SDL_RenderCopy(g_sdl.renderer, g_sdl.texture, NULL, NULL);
     
     if (SDL_RenderPresent(g_sdl.renderer) != 0) {
+        pxl_log(SDL_GetError());
         return PXL_E_BACKEND_FRAME;
     }
     return PXL_SUCCESS;

@@ -3,7 +3,7 @@
 LIB = libpxl.a
 
 HDR = err.h buf.h input.h backend.h canvas.h bitmask.h geom.h shape.h blit.h text_basic.h text.h tileset.h stepper.h
-SRC = shape.c blit.c text_basic.c text.c tileset.c
+SRC = err.c shape.c blit.c text_basic.c text.c tileset.c
 
 -include config.mk
 CC         ?= cc

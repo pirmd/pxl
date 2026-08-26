@@ -22,4 +22,14 @@ pxl_err_to_string(pxl_err_t err) {
     }
 }
 
+/* Custom log function type (can be NULL) */
+typedef void (*pxl_log_fn)(const char *msg);
+
+/* Set the log callback (NULL = silent, default) */
+void pxl_set_log_fn(pxl_log_fn fn);
+
+/* Log a raw message - just a thin wrapper, no formatting */
+void pxl_log(const char *msg);
+
+
 #endif /* PXL_ERR_H */
