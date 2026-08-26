@@ -175,72 +175,13 @@ init_sprites(fountain_t *fountain) {
     }
 }
 
-/*
- * Application
- */
-
+/* Application state */
 struct {
-	pxl_input_t in_prev;
-	pxl_input_t in_curr;
-
-	pxl_time_stepper_t stepper;
-	bool paused;
-
 	fountain_t fountain;
 	fountain_t fountain_prev;
+	bool paused;
 	int current_fps;
-} app;
-
-static inline bool
-is_pressed(pxl_input_code_t code) {
-	return pxl_input_state(&app.in_curr, code) == 1;
-}
-
-static inline bool
-was_pressed(pxl_input_code_t code) {
-	return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
-}
-
-static inline bool
-is_paused(void) {
-	bool auto_paused = pxl_input_state(&app.in_curr, PXL_WM_FOCUS_LOST) || pxl_input_state(&app.in_curr, PXL_WM_MOUSE_FOCUS_LOST);
-	app.stepper.paused = app.paused || auto_paused;
-	return app.paused || auto_paused;
-}
-
-
-static void
-handle_input(fountain_t *fountain) {
-    if (was_pressed(PXL_KEYB_1)) {
-        fountain->emit_type = PARTICLE_FIRE;
-    }
-    if (was_pressed(PXL_KEYB_2)) {
-        fountain->emit_type = PARTICLE_SMOKE;
-    }
-    if (was_pressed(PXL_KEYB_3)) {
-        fountain->emit_type = PARTICLE_SPARK;
-    }
-    if (was_pressed(PXL_KEYB_UP) || was_pressed(PXL_KEYB_K)) {
-        fountain->emit_rate += 5;
-    }
-    if (was_pressed(PXL_KEYB_DOWN) || was_pressed(PXL_KEYB_J)) {
-        fountain->emit_rate = (fountain->emit_rate > 5) ? fountain->emit_rate - 5 : 5;
-    }
-    
-    /* Change particle type with mouse buttons */
-    if (was_pressed(PXL_MOUSE_LEFT)) {
-        fountain->emit_type = (fountain->emit_type + 1) % PARTICLE_COUNT;
-    }
-    if (was_pressed(PXL_MOUSE_RIGHT)) {
-        fountain->emit_type = (fountain->emit_type - 1 + PARTICLE_COUNT) % PARTICLE_COUNT;
-    }
-    
-    /* Update source position to follow mouse cursor */
-    if (app.in_curr.mouse_x >= 0 && app.in_curr.mouse_y >= 0) {
-        fountain->source_x = (float)app.in_curr.mouse_x;
-        fountain->source_y = (float)app.in_curr.mouse_y;
-    }
-}
+} app_state;
 
 static void
 init_fountain_particles(fountain_t *fountain) {
@@ -383,7 +324,7 @@ render_particle(pxl_canvas_t *cnv, fountain_t *fountain, const particle_t *p) {
 }
 
 static void
-render_hud(pxl_canvas_t *cnv, fountain_t *fountain, int current_fps, bool paused, pxl_input_t *in) {
+render_hud(pxl_canvas_t *cnv, fountain_t *fountain, int current_fps, bool paused, const pxl_input_t *in) {
     pxl_buf_t *pb = cnv->pb;
     int m_x = in->mouse_x, m_y = in->mouse_y;
     int active_particles = count_active_particles(fountain);
@@ -440,31 +381,78 @@ main(void) {
     printf("Controls: 1/2/3=type, Left/Right click=cycle type, Up/Down=rate, P=pause, CTRL=show HUD, ESC=quit\n");
     printf("Particle fountain follows mouse cursor\n\n");
 
-    if (pxl_backend_init("PXL Fountain", W, H, 0) != PXL_SUCCESS)
+    pxl_app_t app = {
+        .title = "PXL Fountain",
+        .width = W,
+        .height = H,
+        .physics_hz = FPS,
+        .backend_flags = 0
+    };
+
+    if (pxl_app_init(&app) != PXL_SUCCESS)
         return 1;
 
-    init_fountain(&app.fountain);
-    app.fountain_prev = app.fountain;
+    init_fountain(&app_state.fountain);
+    app_state.fountain_prev = app_state.fountain;
+    app_state.paused = false;
+    app_state.current_fps = 0;
 
-    app.stepper.dt = 1.0f / FPS;
-    pxl_stepper_init(&app.stepper, pxl_backend_get_time());
-
-    while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
-        app.in_prev = app.in_curr;
-        pxl_backend_poll_events(&app.in_curr);
-
-        if (was_pressed(PXL_KEYB_P)) {
-            app.paused = !app.paused;
+    while (pxl_app_advance(&app)) {
+        if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
+            break;
         }
 
-        handle_input(&app.fountain);
+        /* Handle pause */
+        bool auto_paused = pxl_app_is_pressed(&app, PXL_WM_FOCUS_LOST) ||
+                          pxl_app_is_pressed(&app, PXL_WM_MOUSE_FOCUS_LOST);
+        app_state.paused = app_state.paused || auto_paused;
+        if (auto_paused) {
+            app.physics_ts.paused = true;
+        } else {
+            app.physics_ts.paused = app_state.paused;
+        }
 
-        pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
+        if (pxl_app_was_pressed(&app, PXL_KEYB_P)) {
+            app_state.paused = !app_state.paused;
+            app.physics_ts.paused = app_state.paused;
+        }
 
-        if (!is_paused()) {
-            while (pxl_stepper_advance(&app.stepper)) {
-                app.fountain_prev = app.fountain;
-                update_fountain(&app.fountain, (float)app.stepper.dt);
+        /* Handle input */
+        if (pxl_app_was_pressed(&app, PXL_KEYB_1)) {
+            app_state.fountain.emit_type = PARTICLE_FIRE;
+        }
+        if (pxl_app_was_pressed(&app, PXL_KEYB_2)) {
+            app_state.fountain.emit_type = PARTICLE_SMOKE;
+        }
+        if (pxl_app_was_pressed(&app, PXL_KEYB_3)) {
+            app_state.fountain.emit_type = PARTICLE_SPARK;
+        }
+        if (pxl_app_was_pressed(&app, PXL_KEYB_UP) || pxl_app_was_pressed(&app, PXL_KEYB_K)) {
+            app_state.fountain.emit_rate += 5;
+        }
+        if (pxl_app_was_pressed(&app, PXL_KEYB_DOWN) || pxl_app_was_pressed(&app, PXL_KEYB_J)) {
+            app_state.fountain.emit_rate = (app_state.fountain.emit_rate > 5) ?
+                app_state.fountain.emit_rate - 5 : 5;
+        }
+        
+        /* Change particle type with mouse buttons */
+        if (pxl_app_was_pressed(&app, PXL_MOUSE_LEFT)) {
+            app_state.fountain.emit_type = (app_state.fountain.emit_type + 1) % PARTICLE_COUNT;
+        }
+        if (pxl_app_was_pressed(&app, PXL_MOUSE_RIGHT)) {
+            app_state.fountain.emit_type = (app_state.fountain.emit_type - 1 + PARTICLE_COUNT) % PARTICLE_COUNT;
+        }
+        
+        /* Update source position to follow mouse cursor */
+        if (app.curr.mouse_x >= 0 && app.curr.mouse_y >= 0) {
+            app_state.fountain.source_x = (float)app.curr.mouse_x;
+            app_state.fountain.source_y = (float)app.curr.mouse_y;
+        }
+
+        if (!app_state.paused && !auto_paused) {
+            while (pxl_app_advance_physics(&app)) {
+                app_state.fountain_prev = app_state.fountain;
+                update_fountain(&app_state.fountain, (float)app.physics_ts.dt);
             }
         }
 
@@ -474,22 +462,23 @@ main(void) {
             pxl_canvas_init(&cnv, &pb);
 
             fountain_t fountain_interpolated;
-            interpolate_fountain(&fountain_interpolated, &app.fountain_prev, &app.fountain, app.stepper.lerp_factor);
+            interpolate_fountain(&fountain_interpolated, &app_state.fountain_prev, &app_state.fountain,
+                                app.physics_ts.lerp_factor);
             render(&cnv, &fountain_interpolated);
 
 			/* Show HUD when CTRL is pressed */
-			if (is_pressed(PXL_KEYB_LCTRL) || is_pressed(PXL_KEYB_RCTRL)) {
-				render_hud(&cnv, &fountain_interpolated, app.current_fps, is_paused(), &app.in_curr);
+			if (pxl_app_is_pressed(&app, PXL_KEYB_LCTRL) || pxl_app_is_pressed(&app, PXL_KEYB_RCTRL)) {
+				render_hud(&cnv, &fountain_interpolated, app_state.current_fps, app_state.paused, &app.curr);
 			}
 
             (void)pxl_backend_end_frame();
         }
         
-        update_fps(pxl_backend_get_time(), &app.current_fps);
+        update_fps(pxl_backend_get_time(), &app_state.current_fps);
     }
 
-    free(app.fountain.atlas.data);
-    app.fountain.atlas.data = NULL;
-    pxl_backend_deinit();
+    free(app_state.fountain.atlas.data);
+    app_state.fountain.atlas.data = NULL;
+    pxl_app_deinit(&app);
     return 0;
 }

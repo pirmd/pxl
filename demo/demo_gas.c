@@ -265,35 +265,11 @@ render_gas(pxl_canvas_t *cnv, const gas_t *gas) {
  */
 
 struct {
-	pxl_input_t in_prev;
-	pxl_input_t in_curr;
-
-	pxl_time_stepper_t stepper;
-	bool paused;
-
 	gas_t gas;
 	gas_t gas_prev;
-
+	bool paused;
 	float speed_factor;  /* 1.0 = normal, 2.0 = 2x, 4.0 = 4x, 0.5 = 0.5x */
-} app;
-
-static inline bool
-is_pressed(pxl_input_code_t code) {
-	return pxl_input_state(&app.in_curr, code) == 1;
-}
-
-static inline bool
-was_pressed(pxl_input_code_t code) {
-	return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
-}
-
-static inline bool
-is_paused(void) {
-	bool auto_paused = pxl_input_state(&app.in_curr, PXL_WM_FOCUS_LOST) || pxl_input_state(&app.in_curr, PXL_WM_MOUSE_FOCUS_LOST);
-	app.stepper.paused = app.paused || auto_paused;
-	return app.paused || auto_paused;
-}
-
+} app_state;
 
 
 static void
@@ -317,45 +293,60 @@ log_fps(double now, size_t particle_count, float speed_factor) {
 
 int
 main(void) {
-    if (pxl_backend_init("PXL Gas Demo (Spatial Grid)", W, H, 0) != PXL_SUCCESS)
-        return 1;
-
     printf("Gas simulation. Up/Down: add/remove particles, 1-4: speed, P=pause, ESC=quit\n");
 
-    gas_init(&app.gas, 200);
-    app.gas_prev = app.gas;
+    pxl_app_t app = {
+        .title = "PXL Gas Demo (Spatial Grid)",
+        .width = W,
+        .height = H,
+        .physics_hz = FPS,
+        .backend_flags = 0
+    };
 
-    app.stepper.dt = 1.0f / FPS;
-    pxl_stepper_init(&app.stepper, pxl_backend_get_time());
-    app.speed_factor = 1.0f;
+    if (pxl_app_init(&app) != PXL_SUCCESS)
+        return 1;
 
-    while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
-        app.in_prev = app.in_curr;
-        pxl_backend_poll_events(&app.in_curr);
+    gas_init(&app_state.gas, 200);
+    app_state.gas_prev = app_state.gas;
+    app_state.paused = false;
+    app_state.speed_factor = 1.0f;
 
-        if (was_pressed(PXL_KEYB_P)) {
-            app.paused = !app.paused;
+    while (pxl_app_advance(&app)) {
+        if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
+            break;
+        }
+
+        if (pxl_app_was_pressed(&app, PXL_KEYB_P)) {
+            app_state.paused = !app_state.paused;
+            app.physics_ts.paused = app_state.paused;
         }
 
         /* Speed controls */
-        if (was_pressed(PXL_KEYB_1)) app.speed_factor = 1.0f;
-        if (was_pressed(PXL_KEYB_2)) app.speed_factor = 2.0f;
-        if (was_pressed(PXL_KEYB_3)) app.speed_factor = 4.0f;
-        if (was_pressed(PXL_KEYB_4)) app.speed_factor = 0.5f;
+        if (pxl_app_was_pressed(&app, PXL_KEYB_1)) app_state.speed_factor = 1.0f;
+        if (pxl_app_was_pressed(&app, PXL_KEYB_2)) app_state.speed_factor = 2.0f;
+        if (pxl_app_was_pressed(&app, PXL_KEYB_3)) app_state.speed_factor = 4.0f;
+        if (pxl_app_was_pressed(&app, PXL_KEYB_4)) app_state.speed_factor = 0.5f;
 
-        pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
-
-        if (was_pressed(PXL_KEYB_K) || was_pressed(PXL_KEYB_UP)) {
-            gas_add_particles(&app.gas, 10);
+        /* Handle auto-pause on focus loss */
+        bool auto_paused = pxl_app_is_pressed(&app, PXL_WM_FOCUS_LOST) ||
+                          pxl_app_is_pressed(&app, PXL_WM_MOUSE_FOCUS_LOST);
+        if (auto_paused) {
+            app.physics_ts.paused = true;
+        } else {
+            app.physics_ts.paused = app_state.paused;
         }
-        if (was_pressed(PXL_KEYB_J) || was_pressed(PXL_KEYB_DOWN)) {
-            gas_remove_particles(&app.gas, 10);
+
+        if (pxl_app_was_pressed(&app, PXL_KEYB_K) || pxl_app_was_pressed(&app, PXL_KEYB_UP)) {
+            gas_add_particles(&app_state.gas, 10);
+        }
+        if (pxl_app_was_pressed(&app, PXL_KEYB_J) || pxl_app_was_pressed(&app, PXL_KEYB_DOWN)) {
+            gas_remove_particles(&app_state.gas, 10);
         }
 
-        if (!is_paused()) {
-            while (pxl_stepper_advance(&app.stepper)) {
-                app.gas_prev = app.gas;
-                update_gas(&app.gas, (float)app.stepper.dt * app.speed_factor);
+        if (!app_state.paused && !auto_paused) {
+            while (pxl_app_advance_physics(&app)) {
+                app_state.gas_prev = app_state.gas;
+                update_gas(&app_state.gas, (float)app.physics_ts.dt * app_state.speed_factor);
             }
         }
 
@@ -365,14 +356,14 @@ main(void) {
             pxl_canvas_init(&cnv, &pb);
             
             gas_t interpolated;
-            interpolate_gas(&interpolated, &app.gas_prev, &app.gas, app.stepper.lerp_factor);
+            interpolate_gas(&interpolated, &app_state.gas_prev, &app_state.gas, app.physics_ts.lerp_factor);
             render_gas(&cnv, &interpolated);
             
-            if (is_paused()) {
+            if (app_state.paused || auto_paused) {
                 printf("PAUSED | Press P to resume\r");
                 fflush(stdout);
             } else {
-                log_fps(pxl_backend_get_time(), app.gas.count, app.speed_factor);
+                log_fps(pxl_backend_get_time(), app_state.gas.count, app_state.speed_factor);
             }
             
             (void)pxl_backend_end_frame();
@@ -380,7 +371,7 @@ main(void) {
     }
 
     printf("\n");
-    gas_deinit(&app.gas);
-    pxl_backend_deinit();
+    gas_deinit(&app_state.gas);
+    pxl_app_deinit(&app);
     return 0;
 }

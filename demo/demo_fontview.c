@@ -250,38 +250,22 @@ font_view_mem_size(const font_view_t *fv) {
 	return total_size;
 }
 
-static struct {
-	pxl_input_t in_prev;
-	pxl_input_t in_curr;
-} app = {0};
-
-static inline bool
-is_pressed(pxl_input_code_t code) {
-	return pxl_input_state(&app.in_curr, code) == 1;
-}
-
-static inline bool
-was_pressed(pxl_input_code_t code) {
-	return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
-}
-
-
 static void
-handle_input(font_view_t *fv) {
-	if (was_pressed(PXL_KEYB_F)) {
+handle_input(font_view_t *fv, pxl_app_t *app) {
+	if (pxl_app_was_pressed(app, PXL_KEYB_F)) {
 		font_view_next_font(fv);
 	}
 
-	if (was_pressed(PXL_KEYB_H) || is_pressed(PXL_KEYB_LEFT)) {
+	if (pxl_app_was_pressed(app, PXL_KEYB_H) || pxl_app_is_pressed(app, PXL_KEYB_LEFT)) {
 		font_view_next_glyph(fv, -1);
 	}
-	if (was_pressed(PXL_KEYB_J) || is_pressed(PXL_KEYB_DOWN)) {
+	if (pxl_app_was_pressed(app, PXL_KEYB_J) || pxl_app_is_pressed(app, PXL_KEYB_DOWN)) {
 		font_view_next_glyph(fv, fv->cols);
 	}
-	if (was_pressed(PXL_KEYB_K) || is_pressed(PXL_KEYB_UP)) {
+	if (pxl_app_was_pressed(app, PXL_KEYB_K) || pxl_app_is_pressed(app, PXL_KEYB_UP)) {
 		font_view_next_glyph(fv, -fv->cols);
 	}
-	if (was_pressed(PXL_KEYB_L) || is_pressed(PXL_KEYB_RIGHT)) {
+	if (pxl_app_was_pressed(app, PXL_KEYB_L) || pxl_app_is_pressed(app, PXL_KEYB_RIGHT)) {
 		font_view_next_glyph(fv, 1);
 	}
 }
@@ -476,7 +460,15 @@ render(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 int
 main(void) {
-	if (pxl_backend_init("PXL Font Viewer", W, H, 0) != PXL_SUCCESS)
+	pxl_app_t app = {
+		.title = "PXL Font Viewer",
+		.width = W,
+		.height = H,
+		.physics_hz = 0,  /* No physics stepper needed */
+		.backend_flags = 0
+	};
+
+	if (pxl_app_init(&app) != PXL_SUCCESS)
 		return 1;
 
 	printf("Font Viewer. Use Arrow/HJKL keys to navigate. F to switch font family. ESC=quit\n");
@@ -484,8 +476,12 @@ main(void) {
 	font_view_t fv;
 	font_view_init(&fv);
 
-	while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
-		handle_input(&fv);
+	while (pxl_app_advance_wait(&app)) {
+		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
+			break;
+		}
+
+		handle_input(&fv, &app);
 		
 		pxl_buf_t pb;
 		if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
@@ -494,11 +490,8 @@ main(void) {
 			render(&cnv, &fv);
 			(void)pxl_backend_end_frame();
 		}
-
-		app.in_prev = app.in_curr;
-		pxl_backend_wait_events(&app.in_curr);
 	}
 
-	pxl_backend_deinit();
+	pxl_app_deinit(&app);
 	return 0;
 }

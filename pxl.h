@@ -32,4 +32,7 @@
 /* Backend (platform-specific) */
 #include "backend.h"
 
+/* App layer */
+#include "app.h"
+
 #endif /* PXL_H */

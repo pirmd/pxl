@@ -108,17 +108,13 @@ draw_text_scaled(pxl_canvas_t *cnv, const pxl_font_t *font, const char *str, int
 	}
 }
 
+/* Pong app state (separate from pxl_app_t) */
 static struct {
-	pxl_input_t in_prev;
-	pxl_input_t in_curr;
-
-	pxl_time_stepper_t stepper;
 	bool paused;
-
 	float speed_factor;  /* 1.0 = normal, 2.0 = 2x, 0.5 = 0.5x */
 	int current_fps;
 	palette_t *palette;  /* Pointer to active palette */
-} app;
+} pong_app;
 
 typedef enum {
     AI_BEGINNER,
@@ -196,51 +192,6 @@ static bool two_players_mode = false;
 
 static void ai_set_difficulty(ai_difficulty_t difficulty);
 
-static inline bool
-is_pressed(pxl_input_code_t code) {
-	return pxl_input_state(&app.in_curr, code) == 1;
-}
-
-static inline bool
-was_pressed(pxl_input_code_t code) {
-	return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
-}
-
-static inline void
-handle_input(void) {
-	/* Change AI difficulty (1-5) */
-	if (was_pressed(PXL_KEYB_1)) ai_set_difficulty(AI_BEGINNER);
-	if (was_pressed(PXL_KEYB_2)) ai_set_difficulty(AI_EASY);
-	if (was_pressed(PXL_KEYB_3)) ai_set_difficulty(AI_MEDIUM);
-	if (was_pressed(PXL_KEYB_4)) ai_set_difficulty(AI_HARD);
-	if (was_pressed(PXL_KEYB_5)) ai_set_difficulty(AI_IMPOSSIBLE);
-
-	/* Speed controls */
-	if (was_pressed(PXL_KEYB_6)) app.speed_factor = 0.5f;
-	if (was_pressed(PXL_KEYB_7)) app.speed_factor = 1.0f;
-	if (was_pressed(PXL_KEYB_8)) app.speed_factor = 2.0f;
-	if (was_pressed(PXL_KEYB_9)) app.speed_factor = 4.0f;
-
-	if (was_pressed(PXL_KEYB_T)) {
-		two_players_mode = !two_players_mode;
-	}
-
-	if (was_pressed(PXL_KEYB_J) || was_pressed(PXL_KEYB_K)) {
-		app.paused = false;
-	}
-
-	if (two_players_mode && (was_pressed(PXL_KEYB_Z) || was_pressed(PXL_KEYB_S))) {
-		app.paused = false;
-	}
-
-	if (was_pressed(PXL_KEYB_P)) {
-		app.paused = !app.paused;
-	}
-
-	bool auto_paused = is_pressed(PXL_WM_FOCUS_LOST) || is_pressed(PXL_WM_MOUSE_FOCUS_LOST);
-	app.stepper.paused = app.paused || auto_paused;
-}
-
 static void
 update_fps(double now, int *current_fps) {
 	assert(current_fps != NULL);
@@ -275,24 +226,24 @@ render_pause(pxl_canvas_t *cnv) {
 	int y = H/2 - total_h / 2;
 
 	/* Outer rectangle (fg color) */
-	pxl_canvas_set_color(cnv, app.palette->fg);
+	pxl_canvas_set_color(cnv, pong_app.palette->fg);
 	pxl_fill_rect(cnv, x - pad - border, y - pad - border,
 		total_w + 2 * pad + 2 * border,
 		total_h + 2 * pad + 2 * border);
 
 	/* Inner rectangle (bg color) */
-	pxl_canvas_set_color(cnv, app.palette->bg);
+	pxl_canvas_set_color(cnv, pong_app.palette->bg);
 	pxl_fill_rect(cnv, x - pad, y - pad,
 		total_w + 2 * pad,
 		total_h + 2 * pad);
 
 	/* Draw "PAUSE" */
-	pxl_canvas_set_color(cnv, app.palette->fg);
+	pxl_canvas_set_color(cnv, pong_app.palette->fg);
 	draw_text_scaled(cnv, font, pause_str, scale, x, y);
 }
 
 static void
-render_debug_hud(pxl_canvas_t *cnv, int fps, pxl_input_t *in) {
+render_debug_hud(pxl_canvas_t *cnv, int fps, const pxl_input_t *in) {
 	assert(cnv != NULL && in != NULL);
 	pxl_buf_t *pb = cnv->pb;
 	int m_x = in->mouse_x, m_y = in->mouse_y;
@@ -302,13 +253,13 @@ render_debug_hud(pxl_canvas_t *cnv, int fps, pxl_input_t *in) {
 	if (m_x >= 0 && m_x < pb->width && m_y >= 0 && m_y < pb->height) {
 		pxl_t color = *pxl_buf_ptr(pb, m_x, m_y);
 		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Speed: x%.1f | AI: %s | Mouse: %d,%d | Pixel: #%06X",
-			fps, app.speed_factor, ai_difficulty_names[ai_difficulty], m_x, m_y, color & 0x00FFFFFF);
+			fps, pong_app.speed_factor, ai_difficulty_names[ai_difficulty], m_x, m_y, color & 0x00FFFFFF);
 	} else {
 		snprintf(hud_str, sizeof(hud_str), "FPS: %d | Speed: x%.1f | AI: %s | Mouse: n/a | Pixel: n/a",
-			fps, app.speed_factor, ai_difficulty_names[ai_difficulty]);
+			fps, pong_app.speed_factor, ai_difficulty_names[ai_difficulty]);
 	}
 
-	pxl_canvas_set_color(cnv, app.palette->fg);
+	pxl_canvas_set_color(cnv, pong_app.palette->fg);
 	pxl_draw_str(cnv, 10, H - 15, hud_str);
 }
 
@@ -441,15 +392,17 @@ typedef struct {
  * instead, once per fixed step, see main()).
  */
 static pong_input_t
-read_player_input(void) {
+read_player_input(pxl_app_t *app) {
 	pong_input_t in = {0};
 
-	if (is_pressed(PXL_KEYB_K) || is_pressed(PXL_KEYB_UP))   in.p1_dir = -1.0f;
-	if (is_pressed(PXL_KEYB_J) || is_pressed(PXL_KEYB_DOWN)) in.p1_dir =  1.0f;
+	if (pxl_app_is_pressed(app, PXL_KEYB_K) || pxl_app_is_pressed(app, PXL_KEYB_UP))
+		in.p1_dir = -1.0f;
+	if (pxl_app_is_pressed(app, PXL_KEYB_J) || pxl_app_is_pressed(app, PXL_KEYB_DOWN))
+		in.p1_dir =  1.0f;
 
 	if (two_players_mode) {
-		if (is_pressed(PXL_KEYB_Z)) in.p2_dir = -1.0f;
-		if (is_pressed(PXL_KEYB_S)) in.p2_dir =  1.0f;
+		if (pxl_app_is_pressed(app, PXL_KEYB_Z)) in.p2_dir = -1.0f;
+		if (pxl_app_is_pressed(app, PXL_KEYB_S)) in.p2_dir =  1.0f;
 	}
 
 	return in;
@@ -493,7 +446,7 @@ draw_score(pxl_canvas_t *cnv, const pong_t *p) {
 	const int score_y = 30;
 	char score_str[8];
 
-	pxl_canvas_set_color(cnv, app.palette->fg);
+	pxl_canvas_set_color(cnv, pong_app.palette->fg);
 
 	/* Left score */
 	snprintf(score_str, sizeof(score_str), "%d", p->score_left);
@@ -510,14 +463,14 @@ static void
 render_pong(pxl_canvas_t *cnv, const pong_t *p) {
 	assert(cnv != NULL && p != NULL);
 	/* Clear */
-	pxl_canvas_set_color(cnv, app.palette->bg);
+	pxl_canvas_set_color(cnv, pong_app.palette->bg);
 	pxl_canvas_clear(cnv);
 
 	/* Draw score */
 	draw_score(cnv, p);
 
 	/* Draw center line, paddles, ball */
-	pxl_canvas_set_color(cnv, app.palette->fg);
+	pxl_canvas_set_color(cnv, pong_app.palette->fg);
 	for (int y = 0; y < H; y += 30) {
 		pxl_fill_rect(cnv, W/2 - 2, y, 4, 20);
 	}
@@ -530,6 +483,42 @@ render_pong(pxl_canvas_t *cnv, const pong_t *p) {
 
 	/* Draw ball */
 	pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, p->ball.radius);
+}
+
+static void
+handle_input(pxl_app_t *app) {
+	/* Change AI difficulty (1-5) */
+	if (pxl_app_was_pressed(app, PXL_KEYB_1)) ai_set_difficulty(AI_BEGINNER);
+	if (pxl_app_was_pressed(app, PXL_KEYB_2)) ai_set_difficulty(AI_EASY);
+	if (pxl_app_was_pressed(app, PXL_KEYB_3)) ai_set_difficulty(AI_MEDIUM);
+	if (pxl_app_was_pressed(app, PXL_KEYB_4)) ai_set_difficulty(AI_HARD);
+	if (pxl_app_was_pressed(app, PXL_KEYB_5)) ai_set_difficulty(AI_IMPOSSIBLE);
+
+	/* Speed controls */
+	if (pxl_app_was_pressed(app, PXL_KEYB_6)) pong_app.speed_factor = 0.5f;
+	if (pxl_app_was_pressed(app, PXL_KEYB_7)) pong_app.speed_factor = 1.0f;
+	if (pxl_app_was_pressed(app, PXL_KEYB_8)) pong_app.speed_factor = 2.0f;
+	if (pxl_app_was_pressed(app, PXL_KEYB_9)) pong_app.speed_factor = 4.0f;
+
+	if (pxl_app_was_pressed(app, PXL_KEYB_T)) {
+		two_players_mode = !two_players_mode;
+	}
+
+	if (pxl_app_was_pressed(app, PXL_KEYB_J) || pxl_app_was_pressed(app, PXL_KEYB_K)) {
+		pong_app.paused = false;
+	}
+
+	if (two_players_mode && (pxl_app_was_pressed(app, PXL_KEYB_Z) || pxl_app_was_pressed(app, PXL_KEYB_S))) {
+		pong_app.paused = false;
+	}
+
+	if (pxl_app_was_pressed(app, PXL_KEYB_P)) {
+		pong_app.paused = !pong_app.paused;
+	}
+
+	bool auto_paused = pxl_app_is_pressed(app, PXL_WM_FOCUS_LOST) ||
+	                  pxl_app_is_pressed(app, PXL_WM_MOUSE_FOCUS_LOST);
+	app->physics_ts.paused = pong_app.paused || auto_paused;
 }
 
 static void
@@ -594,20 +583,27 @@ int
 main(void) {
 	printf("Pong game. Vim keys: J=down, K=up. Player 2: Z=up, S=down. T=2P mode. 6-9=speed, 1-5=AI difficulty, CTRL=HUD, P=pause, ESC=quit\n");
 
-	if (pxl_backend_init("PXL Pong", W, H, PXL_BACKEND_CENTERED) != PXL_SUCCESS)
+	pxl_app_t app = {
+		.title = "PXL Pong",
+		.width = W,
+		.height = H,
+		.physics_hz = FPS,
+		.backend_flags = PXL_BACKEND_CENTERED
+	};
+
+	if (pxl_app_init(&app) != PXL_SUCCESS)
 		return 1;
 
-	app.current_fps = 0;
-	app.stepper.dt = 1.0f / FPS;
-	app.speed_factor = 1.0f;
-	pxl_stepper_init(&app.stepper, pxl_backend_get_time());
+	pong_app.current_fps = 0;
+	pong_app.speed_factor = 1.0f;
 
 	/* Initialize palettes */
 	palette_paused = (palette_t){
 		.fg = color_grayscale(palette_normal.fg),
 		.bg = color_grayscale(palette_normal.bg)
 	};
-	app.palette = &palette_normal;
+	pong_app.palette = &palette_normal;
+	pong_app.paused = false;
 
 	/* Initialize AI */
 	ai_set_difficulty(AI_MEDIUM);
@@ -616,11 +612,12 @@ main(void) {
 	init_pong(&pong);
 	pong_t pong_prev = pong;
 
-	while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
-		app.in_prev = app.in_curr;
-		pxl_backend_poll_events(&app.in_curr);
+	while (pxl_app_advance(&app)) {
+		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
+			break;
+		}
 
-		handle_input();
+		handle_input(&app);
 
 		/* Player intent, read once per frame; applied to the model right
 		 * away for the left paddle (and the right paddle too in 2P mode).
@@ -628,21 +625,19 @@ main(void) {
 		 * per fixed step since it needs to react to the ball's position
 		 * as it evolves across steps, not just once per rendered frame.
 		 */
-		pong_input_t pinput = read_player_input();
+		pong_input_t pinput = read_player_input(&app);
 		apply_pong_input(&pong, pinput);
 
 		/* Update palette based on pause state */
-		app.palette = app.stepper.paused ? &palette_paused : &palette_normal;
+		pong_app.palette = app.physics_ts.paused ? &palette_paused : &palette_normal;
 
-		pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
-
-		while (pxl_stepper_advance(&app.stepper)) {
+		while (pxl_app_advance_physics(&app)) {
 			if (!two_players_mode) {
 				pong.paddle_right.vy = ai_decide(&pong) * pong.paddle_right.speed;
 			}
 
 			pong_prev = pong;
-			update_pong(&pong, (float)app.stepper.dt * app.speed_factor);
+			update_pong(&pong, (float)app.physics_ts.dt * pong_app.speed_factor);
 		}
 
 		pxl_buf_t pb;
@@ -651,26 +646,26 @@ main(void) {
 			pxl_canvas_init(&cnv, &pb);
 
 			pong_t pong_interpolated;
-			interpolate_pong(&pong_interpolated, &pong_prev, &pong, app.stepper.lerp_factor);
+			interpolate_pong(&pong_interpolated, &pong_prev, &pong, app.physics_ts.lerp_factor);
 			render_pong(&cnv, &pong_interpolated);
 
 			/* Show HUD when CTRL is pressed */
-			if (is_pressed(PXL_KEYB_LCTRL) || is_pressed(PXL_KEYB_RCTRL)) {
-				render_debug_hud(&cnv, app.current_fps, &app.in_curr);
+			if (pxl_app_is_pressed(&app, PXL_KEYB_LCTRL) || pxl_app_is_pressed(&app, PXL_KEYB_RCTRL)) {
+				render_debug_hud(&cnv, pong_app.current_fps, &app.curr);
 			}
 
 			/* Draw pause overlay */
-			if (app.stepper.paused) {
+			if (app.physics_ts.paused) {
 				render_pause(&cnv);
 			}
 
 			(void)pxl_backend_end_frame();
 		}
 
-		update_fps(pxl_backend_get_time(), &app.current_fps);
+		update_fps(pxl_backend_get_time(), &pong_app.current_fps);
 	}
 
 	printf("Final Score: %d - %d (AI: %s)\n", pong.score_left, pong.score_right, ai_difficulty_names[ai_difficulty]);
-	pxl_backend_deinit();
+	pxl_app_deinit(&app);
 	return 0;
 }

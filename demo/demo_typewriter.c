@@ -44,9 +44,9 @@ typedef struct {
 
     int carriage_i, carriage_j;
 
-	double   printing_dt;
-	uint32_t is_printing;
-	double   is_printing_acc;
+    double   printing_dt;
+    uint32_t is_printing;
+    double   is_printing_acc;
 } typewriter_t;
 
 static void
@@ -170,71 +170,52 @@ render_typewriter(pxl_canvas_t *cnv, typewriter_t *tw) {
 	}
 }
 
-
-/*
- * Application state
- */
-struct app_s {
-    pxl_input_t in_prev;
-    pxl_input_t in_curr;
-
-    pxl_time_stepper_t stepper;
-    typewriter_t tw;
-} app = {
-    .stepper = { .dt = 1.0f / FPS }
-};
-
-static inline bool
-is_pressed(pxl_input_code_t code) {
-    return pxl_input_state(&app.in_curr, code) == 1;
-}
-
-static inline bool
-was_pressed(pxl_input_code_t code) {
-    return (pxl_input_state(&app.in_prev, code) == 0) && (pxl_input_state(&app.in_curr, code) == 1);
-}
-
-/* Detects whether any printable key is physically held down, using raw key
- * state rather than the typed-text event stream. Typed-text events fire on
- * the OS's key-repeat schedule, which varies by platform/user settings and
- * cannot reliably signal "key is still held" -- physical key state can. */
-static inline bool
-any_printable_key_held(void) {
+/* Detects whether any printable key is physically held down */
+static bool
+any_printable_key_held(const pxl_app_t *app) {
     for (pxl_input_code_t c = PXL_KEYB_SPACE; c <= PXL_KEYB_Z; ++c) {
-        if (is_pressed(c)) return true;
+        if (pxl_app_is_pressed(app, c)) return true;
     }
     return false;
 }
+
+/*
+ *  Application state
+ */
+struct {
+    typewriter_t tw;
+} app_state;
+
 
 /*
  *  Keyboard handling
  */
 
 static void
-handle_input(void) {
+handle_input(pxl_app_t *app) {
     /* Handle special keys for cursor movement */
-    if (was_pressed(PXL_KEYB_LEFT)) {
-		carriage_left(&app.tw);
+    if (pxl_app_was_pressed(app, PXL_KEYB_LEFT)) {
+		carriage_left(&app_state.tw);
     }
 
-    if (was_pressed(PXL_KEYB_RIGHT)) {
-		carriage_right(&app.tw);
+    if (pxl_app_was_pressed(app, PXL_KEYB_RIGHT)) {
+		carriage_right(&app_state.tw);
     }
 
-    if (was_pressed(PXL_KEYB_UP)) {
-		carriage_up(&app.tw);
+    if (pxl_app_was_pressed(app, PXL_KEYB_UP)) {
+		carriage_up(&app_state.tw);
     }
 
-    if (was_pressed(PXL_KEYB_DOWN)) {
-		carriage_down(&app.tw);
+    if (pxl_app_was_pressed(app, PXL_KEYB_DOWN)) {
+		carriage_down(&app_state.tw);
     }
 
-    if (was_pressed(PXL_KEYB_HOME)) {
-		carriage_home(&app.tw);
+    if (pxl_app_was_pressed(app, PXL_KEYB_HOME)) {
+		carriage_home(&app_state.tw);
     }
 
-    if (was_pressed(PXL_KEYB_ENTER)) {
-		carriage_return(&app.tw);
+    if (pxl_app_was_pressed(app, PXL_KEYB_ENTER)) {
+		carriage_return(&app_state.tw);
     }
 
     /* Process typed text from backend (UTF-8 or Latin-1) */
@@ -249,7 +230,7 @@ handle_input(void) {
             int consumed = pxl_utf8_decode(ptr, &rune);
             /* Filter out control characters (handled by special keys) */
             if (rune >= ' ' && rune != 127) {
-                press_rune(&app.tw, rune);
+                press_rune(&app_state.tw, rune);
             }
             ptr += consumed;
         }
@@ -262,7 +243,15 @@ handle_input(void) {
 
 int
 main(void) {
-    if (pxl_backend_init("PXL Typewriter", W, H, 0) != PXL_SUCCESS)
+    pxl_app_t app = {
+        .title = "PXL Typewriter",
+        .width = W,
+        .height = H,
+        .physics_hz = FPS,
+        .backend_flags = 0
+    };
+
+    if (pxl_app_init(&app) != PXL_SUCCESS)
         return 1;
 
     printf("Typewriter demo. Type text, use arrows to navigate.\n");
@@ -274,36 +263,33 @@ main(void) {
     assert(font_9x15_latin.glyph_height == CHAR_H);
     assert(font_9x15_latin.leading == LEADING);
 
-    init_typewriter(&app.tw);
+    init_typewriter(&app_state.tw);
 
-    pxl_stepper_init(&app.stepper, pxl_backend_get_time());
-
-    while (!is_pressed(PXL_KEYB_ESCAPE) && !is_pressed(PXL_WM_QUIT)) {
-        app.in_prev = app.in_curr;
-        pxl_backend_poll_events(&app.in_curr);
-
-		handle_input();
-
-        pxl_stepper_sync_time(&app.stepper, pxl_backend_get_time());
-
-		bool key_held = any_printable_key_held();
-		while (pxl_stepper_advance(&app.stepper)) {
-			update_typewriter(&app.tw, (float)app.stepper.dt, key_held);
+    while (pxl_app_advance(&app)) {
+		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
+			break;
 		}
 
-        pxl_buf_t pb;
-        if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
-            pxl_canvas_t cnv;
-            pxl_canvas_init(&cnv, &pb);
+		handle_input(&app);
 
-            render_typewriter(&cnv, &app.tw);
+		bool key_held = any_printable_key_held(&app);
+		while (pxl_app_advance_physics(&app)) {
+			update_typewriter(&app_state.tw, (float)app.physics_ts.dt, key_held);
+		}
 
-            (void)pxl_backend_end_frame();
-        }
+		pxl_buf_t pb;
+		if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
+			pxl_canvas_t cnv;
+			pxl_canvas_init(&cnv, &pb);
+
+			render_typewriter(&cnv, &app_state.tw);
+
+			(void)pxl_backend_end_frame();
+		}
     }
 
 	printf("\n");
 
-    pxl_backend_deinit();
+    pxl_app_deinit(&app);
     return 0;
 }

@@ -18,7 +18,7 @@ Build:
   make demo     # demos
   make clean    # cleaning
 
-  Configuration posible using config.mk.
+  Configuration possible using config.mk.
   'Release mode' (remove "asserts") via PXL_BUILD_MODE=release.
   Backend selection via PXL_BACKEND=sdl or PXL_BACKEND=x11 (default).
 
@@ -26,28 +26,34 @@ Build:
   environment variables.
 
 Quick start:
-    pxl_input_t in = {0};
-    pxl_backend_init("Title", 800, 600, 0);
-    while (pxl_input_state(&in, PXL_KEYB_ESCAPE) == 0 &&
-           pxl_input_state(&in, PXL_WM_QUIT) == 0) {
-        pxl_backend_poll_events(&in);
+    pxl_app_t app = {
+        .title = "Hello World",
+        .width = 800,
+        .height = 600,
+        .physics_hz = 60
+    };
+    if (pxl_app_init(&app) != PXL_SUCCESS) return 1;
+    while (pxl_app_advance(&app)) {
+        if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) break;
 
+        handle_input(&app);
+        while (pxl_app_advance_physics(&app)) {
+            update_physics(&app);
+        }
         pxl_buf_t pb;
         if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
-            pxl_canvas_t cnv;
-            pxl_canvas_init(&cnv, &pb);
-            /* drawing: pxl_draw_*(), pxl_fill_*(), pxl_canvas_clear() */
+            render_frame(&pb);
             (void)pxl_backend_end_frame();
         }
     }
-    pxl_backend_deinit();
+    pxl_app_deinit(&app);
 
 Demos:
-  - demo_hello_world.c - Minimal static example: colored rect + text
-  - demo_pong.c       - Pong game
-  - demo_gas.c        - Boltzmann gas simulation
-  - demo_typewriter.c - Text typing animation
-  - demo_fountain.c   - Particle fountain with tileset/sprite
+  - demo_hello_world.c - Minimal example: colored rect + text
+  - demo_pong.c        - Pong game
+  - demo_gas.c         - Boltzmann-like gas simulation
+  - demo_typewriter.c  - Text typing animation
+  - demo_fountain.c    - Particle fountain with tileset/sprite
 
 
 Architecture:
@@ -59,29 +65,26 @@ Architecture:
                      (A:24-31, R:16-23, G:8-15, B:0-7).
 
   Backend:
-    input.h       - Input state handling (keyboard, mouse, window events)
-    backend.h     - Backend interface. All backends MUST use ARGB8888 pixel format
-                    (A:24-31, R:16-23, G:8-15, B:0-7). Supports both little-endian and
-                    big-endian architectures via color.h helpers (pxl_argb, pxl_a, etc.).
-                    Only one window is supported at the moment.
     backend_sdl.c - SDL2 backend (do not activate VSYNC)
-    backend_x11.c - X11 backend
+    backend_x11.c - X11 backend (uses SHM, XIC extensions for performance)
 
   Gfx:
     bitmask.h      - 1-bit per pixel mask for stencil/clip operations
+    color.h        - ARGB8888 color creation and component extraction
     canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
     geom.h         - Geometry primitives (rect, span, point) and clipping
-    shape.h/c      - 2D primitives (line, rect, circle, triangle, outline + filled)
     blit.h/c       - Pixel operations (blit, bitmask drawing)
+    shape.h/c      - 2D primitives (line, rect, circle, triangle, outline + filled)
     text_basic.h/c - ASCII text rendering with built-in 8x8 font (char, string, bounds)
-    color.h        - ARGB8888 color creation and component extraction
 
   Framework:
+    app.h          - Optional app layer: frame management, input, poll/wait event modes
     stepper.h      - Time-stepped physics loop helper (fixed timestep, interpolation)
     text.h/text.c  - Text rendering with mono or proportional LSB bitmask font
     tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
 
-  Note: pxl.h is an umbrella header that includes all public headers. For finer granularity, users may include individual headers (e.g., "buf.h", "canvas.h") directly.
+  pxl.h - umbrella header that includes all public headers. For finer
+          granularity, users may include individual headers directly.
 
 Tools:
   - bdf2pxl - Convert BDF font files to pxl_font_t C header

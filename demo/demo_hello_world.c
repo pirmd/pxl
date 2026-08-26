@@ -2,12 +2,18 @@
 
 int
 main(void) {
-	pxl_input_t in = {0};
-	pxl_backend_init("Hello World - PXL", 800, 600, 0);
+	pxl_app_t app = {
+		.title = "Hello World - PXL",
+		.width = 800,
+		.height = 600,
+	};
 
-	while (pxl_input_state(&in, PXL_KEYB_ESCAPE) == 0 &&
-	       pxl_input_state(&in, PXL_WM_QUIT) == 0) {
-		pxl_backend_poll_events(&in);
+	if (pxl_app_init(&app) != PXL_SUCCESS)
+		return 1;
+
+	while (pxl_app_advance_wait(&app)) {
+		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE))
+			break;
 
 		pxl_buf_t pb;
 		if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
@@ -30,6 +36,6 @@ main(void) {
 		}
 	}
 
-	pxl_backend_deinit();
+	pxl_app_deinit(&app);
 	return 0;
 }
