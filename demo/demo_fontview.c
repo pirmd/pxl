@@ -492,7 +492,7 @@ main(void) {
 			pxl_canvas_t cnv;
 			pxl_canvas_init(&cnv, &pb);
 			render(&cnv, &fv);
-			pxl_backend_end_frame();
+			(void)pxl_backend_end_frame();
 		}
 
 		app.in_prev = app.in_curr;

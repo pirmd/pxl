@@ -482,7 +482,7 @@ main(void) {
 				render_hud(&cnv, &fountain_interpolated, app.current_fps, is_paused(), &app.in_curr);
 			}
 
-            pxl_backend_end_frame();
+            (void)pxl_backend_end_frame();
         }
         
         update_fps(pxl_backend_get_time(), &app.current_fps);

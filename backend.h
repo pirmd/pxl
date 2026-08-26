@@ -49,8 +49,8 @@ pxl_backend_deinit(void);
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb);
 
-/* End frame - present to screen */
-void
+/* End frame - present to screen. Returns error if rendering fails. */
+pxl_err_t
 pxl_backend_end_frame(void);
 
 /* Get time returns monotonically increasing time in seconds since start of

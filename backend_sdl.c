@@ -119,12 +119,16 @@ pxl_backend_begin_frame(pxl_buf_t *out_pb) {
     return PXL_SUCCESS;
 }
 
-void
+pxl_err_t
 pxl_backend_end_frame(void) {
     SDL_UnlockTexture(g_sdl.texture);
     SDL_RenderClear(g_sdl.renderer);
     SDL_RenderCopy(g_sdl.renderer, g_sdl.texture, NULL, NULL);
-    SDL_RenderPresent(g_sdl.renderer);
+    
+    if (SDL_RenderPresent(g_sdl.renderer) != 0) {
+        return PXL_E_BACKEND_FRAME;
+    }
+    return PXL_SUCCESS;
 }
 
 double

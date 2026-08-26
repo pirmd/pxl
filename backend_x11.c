@@ -256,14 +256,16 @@ pxl_backend_begin_frame(pxl_buf_t *out_pb) {
     return PXL_SUCCESS;
 }
 
-void
+pxl_err_t
 pxl_backend_end_frame(void) {
     assert(g_x11.display && g_x11.img && g_x11.img->data);
 
-    XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
-                 g_x11.img, 0, 0, 0, 0, g_x11.width, g_x11.height,
-                 False);
+    Bool success = XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
+                                g_x11.img, 0, 0, 0, 0, g_x11.width, g_x11.height,
+                                False);
     XSync(g_x11.display, False);
+    
+    return success ? PXL_SUCCESS : PXL_E_BACKEND_FRAME;
 }
 
 double

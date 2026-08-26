@@ -298,7 +298,7 @@ main(void) {
 
             render_typewriter(&cnv, &app.tw);
 
-            pxl_backend_end_frame();
+            (void)pxl_backend_end_frame();
         }
     }
 

@@ -37,7 +37,7 @@ Quick start:
             pxl_canvas_t cnv;
             pxl_canvas_init(&cnv, &pb);
             /* drawing: pxl_draw_*(), pxl_fill_*(), pxl_canvas_clear() */
-            pxl_backend_end_frame();
+            (void)pxl_backend_end_frame();
         }
     }
     pxl_backend_deinit();

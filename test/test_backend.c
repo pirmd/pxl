@@ -108,7 +108,7 @@ test_pxl_backend_frame_flow(void) {
 			ASSERT(pb.data != NULL);
 		}
 
-		pxl_backend_end_frame();
+		ASSERT(pxl_backend_end_frame() == PXL_SUCCESS);
 	}
 
 	pxl_backend_deinit();

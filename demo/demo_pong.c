@@ -664,7 +664,7 @@ main(void) {
 				render_pause(&cnv);
 			}
 
-			pxl_backend_end_frame();
+			(void)pxl_backend_end_frame();
 		}
 
 		update_fps(pxl_backend_get_time(), &app.current_fps);

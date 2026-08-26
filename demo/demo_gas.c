@@ -375,7 +375,7 @@ main(void) {
                 log_fps(pxl_backend_get_time(), app.gas.count, app.speed_factor);
             }
             
-            pxl_backend_end_frame();
+            (void)pxl_backend_end_frame();
         }
     }
 
