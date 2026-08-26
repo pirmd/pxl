@@ -256,7 +256,8 @@ init_fountain(fountain_t *fountain) {
         .atlas = &fountain->atlas,
         .tile_w = PARTICLE_TILE_SIZE,
         .tile_h = PARTICLE_TILE_SIZE,
-        .cols = ATLAS_COLS
+        .cols = ATLAS_COLS,
+        .rows = ATLAS_ROWS
     };
 
     init_sprites(fountain);

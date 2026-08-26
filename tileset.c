@@ -1,18 +1,27 @@
 #include <assert.h>
+#include <limits.h>  /* for INT_MAX */
 
 #include "draw.h"
 #include "tileset.h"
 
 /* Draw a tile from a tileset to canvas at (x, y).
- * Uses pxl_blit_rect internally. Respects canvas offset and scissor. */
+ * Uses pxl_blit_rect internally. Respects canvas offset and scissor.
+ */
 
 void
 pxl_draw_tile(pxl_canvas_t *cnv, const pxl_tileset_t *ts, int tile_idx, int x, int y) {
 	assert(cnv && cnv->pb);
 	assert(ts && ts->atlas && ts->atlas->data);
-	assert(ts->tile_w > 0 && ts->tile_h > 0 && ts->cols > 0);
-	assert(tile_idx >= 0 && tile_idx < ts->cols * (ts->atlas->height / ts->tile_h));
+	assert(ts->tile_w > 0 && ts->tile_h > 0);
+	assert(ts->cols > 0 && ts->rows > 0);
+	/* Prevent integer overflow in tile coordinate calculations */
+	assert(ts->tile_w <= INT_MAX / ts->cols);
+	assert(ts->tile_h <= INT_MAX / ts->rows);
+	assert(ts->tile_w * ts->cols <= ts->atlas->width);
+	assert(ts->tile_h * ts->rows <= ts->atlas->height);
+	assert(tile_idx >= 0 && tile_idx < ts->cols * ts->rows);
 
+	// Map linear tile index to grid coordinates: column = idx % cols, row = idx / cols
 	int col = tile_idx % ts->cols;
 	int row = tile_idx / ts->cols;
 
