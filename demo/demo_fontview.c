@@ -1,3 +1,18 @@
+/*
+ * PXL Demo: Font Viewer
+ *
+ * Static font visualization demo showcasing PXL's font system:
+ *   - Font loading and rendering (pxl_font_t, pxl_writer_t)
+ *   - Bitmask font rendering
+ *   - Canvas with scissor regions
+ *   - UTF-8/rune support
+ *
+ * This is a STATIC demo (no physics loop) using pxl_app_advance_wait().
+ * For interactive demos with movement/physics, see demo_pong.c.
+ *
+ * Note: font_9x15.h and font_wqy_13pts.h are generated font headers (see tool/bdf2pxl).
+ */
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -5,6 +20,7 @@
 #include <string.h>
 
 #include "pxl.h"
+#include "demo_helpers.h"
 
 #include "font_9x15.h"
 #include "font_wqy_13pts.h"
@@ -55,11 +71,17 @@ static const char *font_family_names[] = {
 #define FOOTER_BG            GRID_VIEW_BG
 #define FOOTER_FG            GRID_VIEW_FG
 
+/* Lorem ipsum texts for each font family */
+static const char *lorem_texts[] = {
+    "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do",
+    "中文字体测试文本用于展示字体效果和排版"
+};
+
 #define W_PADDING 8
 #define H_PADDING 16
 
 #define TITLE_X GRID_VIEW_X
-#define TITLE_Y ((H - TITLE_H - H_PADDING - GRID_H - H_PADDING - GLYPH_ZOOM_H - H_PADDING - FOOTER_H) / 2)
+#define TITLE_Y ((H - TITLE_H - H_PADDING - GRID_H - H_PADDING - GLYPH_ZOOM_H - H_PADDING - TEXT_PREVIEW_H - H_PADDING - FOOTER_H) / 2)
 #define TITLE_W GRID_W
 #define TITLE_H 16
 
@@ -91,8 +113,15 @@ static const char *font_family_names[] = {
 #define GLYPH_W (GRID_W - GLYPH_ZOOM_W - W_PADDING)
 #define GLYPH_H GLYPH_ZOOM_H
 
+#define TEXT_PREVIEW_X    GRID_VIEW_X
+#define TEXT_PREVIEW_Y    (GLYPH_Y + GLYPH_H + H_PADDING)
+#define TEXT_PREVIEW_W    GRID_W
+#define TEXT_PREVIEW_H    40
+#define TEXT_PREVIEW_BG   GRID_VIEW_BG
+#define TEXT_PREVIEW_FG   GRID_VIEW_FG
+
 #define FOOTER_X GRID_VIEW_X
-#define FOOTER_Y GLYPH_ZOOM_Y + GLYPH_ZOOM_H + H_PADDING
+#define FOOTER_Y (TEXT_PREVIEW_Y + TEXT_PREVIEW_H + H_PADDING)
 #define FOOTER_W GRID_W
 #define FOOTER_H TITLE_H
 
@@ -315,24 +344,7 @@ render_font_view(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_canvas_reset_offset(cnv);
 }
 
-void pxl_draw_bitmask_scaled(pxl_canvas_t *cnv, int scale, const pxl_bitmask_t *bm,
-		pxl_rect_t bm_r, int cnv_x, int cnv_y) {
-	uint32_t color = cnv->color;
-	for (int gy = 0; gy < bm_r.h; gy++) {
-		for (int gx = 0; gx < bm_r.w; gx++) {
-			int byte_idx = (bm_r.y + gy) * bm->stride + (bm_r.x + gx) / 8;
-			uint8_t byte = bm->data[byte_idx];
-			int bit = (bm_r.x + gx) % 8;
-			if (byte & (1 << bit)) {
-				for (int sy = 0; sy < scale; sy++) {
-					for (int sx = 0; sx < scale; sx++) {
-						*pxl_buf_ptr(cnv->pb, cnv_x + gx * scale + sx, cnv_y + gy * scale + sy) = color;
-					}
-				}
-			}
-		}
-	}
-}
+
 
 static void
 render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
@@ -347,7 +359,7 @@ render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
 	int zoom_y = GLYPH_ZOOM_Y + (GLYPH_ZOOM_H - glyph.height * GLYPH_ZOOM_FACTOR) / 2;
 
 	pxl_canvas_set_color(cnv, GLYPH_ZOOM_FG);
-	pxl_draw_bitmask_scaled(cnv, GLYPH_ZOOM_FACTOR, glyph.bitmask, glyph.bitmask_r, zoom_x, zoom_y);
+	 demo_draw_bitmask_scaled(cnv, GLYPH_ZOOM_FACTOR, glyph.bitmask, glyph.bitmask_r, zoom_x, zoom_y);
 }
 
 static void
@@ -410,52 +422,81 @@ render_footer(pxl_canvas_t *cnv, const font_view_t *fv) {
 }
 
 static void
+render_text_preview(pxl_canvas_t *cnv, const font_view_t *fv) {
+	pxl_canvas_set_color(cnv, TEXT_PREVIEW_BG);
+	pxl_canvas_clear(cnv);
+
+	const char *text = lorem_texts[fv->family_idx];
+	pxl_writer_t w;
+	pxl_writer_init(&w, fv->font_family, fv->font_family_size);
+	pxl_canvas_set_color(cnv, TEXT_PREVIEW_FG);
+
+	pxl_writer_set_cursor(&w, TEXT_PREVIEW_X + 5, TEXT_PREVIEW_Y + 5);
+	pxl_draw_text(cnv, &w, text);
+}
+
+static void
 render(pxl_canvas_t *cnv, const font_view_t *fv) {
 	/* Clear background */
 	pxl_canvas_set_color(cnv, BG);
 	pxl_canvas_clear(cnv);
 
+	/* Setup viewports for each area */
+	pxl_canvas_t cnv_title = *cnv;
+	pxl_canvas_set_scissor(&cnv_title, TITLE_X, TITLE_Y, TITLE_W, TITLE_H);
+
+	pxl_canvas_t cnv_grid = *cnv;
+	pxl_canvas_set_scissor(&cnv_grid, GRID_VIEW_X, GRID_VIEW_Y, GRID_VIEW_W, GRID_VIEW_H);
+
+	pxl_canvas_t cnv_scrollbar = *cnv;
+	pxl_canvas_set_scissor(&cnv_scrollbar, SCROLLBAR_X, SCROLLBAR_Y, SCROLLBAR_W, SCROLLBAR_H);
+
+	pxl_canvas_t cnv_glyph_zoom = *cnv;
+	pxl_canvas_set_scissor(&cnv_glyph_zoom, GLYPH_ZOOM_X, GLYPH_ZOOM_Y, GLYPH_ZOOM_W, GLYPH_ZOOM_H);
+
+	pxl_canvas_t cnv_glyph = *cnv;
+	pxl_canvas_set_scissor(&cnv_glyph, GLYPH_X, GLYPH_Y, GLYPH_W, GLYPH_H);
+
+	pxl_canvas_t cnv_text_preview = *cnv;
+	pxl_canvas_set_scissor(&cnv_text_preview, TEXT_PREVIEW_X, TEXT_PREVIEW_Y, TEXT_PREVIEW_W, TEXT_PREVIEW_H);
+
+	pxl_canvas_t cnv_footer = *cnv;
+	pxl_canvas_set_scissor(&cnv_footer, FOOTER_X, FOOTER_Y, FOOTER_W, FOOTER_H);
+
 	/* Draw title */
-	pxl_canvas_set_scissor(cnv, TITLE_X, TITLE_Y, TITLE_W, TITLE_H);
-	pxl_canvas_set_color(cnv, TITLE_BG);
-	pxl_canvas_clear(cnv);
+	pxl_canvas_set_color(&cnv_title, TITLE_BG);
+	pxl_canvas_clear(&cnv_title);
+	render_title(&cnv_title, fv);
 
-	render_title(cnv, fv);
+	/* Draw glyph grid */
+	pxl_canvas_set_color(&cnv_grid, GRID_VIEW_BG);
+	pxl_canvas_clear(&cnv_grid);
+	render_font_view(&cnv_grid, fv);
 
-	/* Draw glyph */
-	pxl_canvas_set_scissor(cnv, GRID_VIEW_X, GRID_VIEW_Y, GRID_VIEW_W, GRID_VIEW_H);
-	pxl_canvas_set_color(cnv, GRID_VIEW_BG);
-	pxl_canvas_clear(cnv);
-
-	render_font_view(cnv, fv);
-	
 	/* Draw scrollbar */
-	pxl_canvas_set_scissor(cnv, SCROLLBAR_X, SCROLLBAR_Y, SCROLLBAR_W, SCROLLBAR_H);
-	pxl_canvas_set_color(cnv, SCROLLBAR_BG);
-	pxl_canvas_clear(cnv);
-
-	render_scrollbar(cnv, fv);
+	pxl_canvas_set_color(&cnv_scrollbar, SCROLLBAR_BG);
+	pxl_canvas_clear(&cnv_scrollbar);
+	render_scrollbar(&cnv_scrollbar, fv);
 
 	/* Draw selected glyph bitmask */
-	pxl_canvas_set_scissor(cnv, GLYPH_ZOOM_X, GLYPH_ZOOM_Y, GLYPH_ZOOM_W, GLYPH_ZOOM_H);
-	pxl_canvas_set_color(cnv, GLYPH_ZOOM_BG);
-	pxl_canvas_clear(cnv);
-
-	render_glyph_zoom(cnv, fv);
+	pxl_canvas_set_color(&cnv_glyph_zoom, GLYPH_ZOOM_BG);
+	pxl_canvas_clear(&cnv_glyph_zoom);
+	render_glyph_zoom(&cnv_glyph_zoom, fv);
 
 	/* Draw selected glyph characteristics */
-	pxl_canvas_set_scissor(cnv, GLYPH_X, GLYPH_Y, GLYPH_W, GLYPH_H);
-	pxl_canvas_set_color(cnv, GLYPH_BG);
-	pxl_canvas_clear(cnv);
+	pxl_canvas_set_color(&cnv_glyph, GLYPH_BG);
+	pxl_canvas_clear(&cnv_glyph);
+	render_glyph_characteristics(&cnv_glyph, fv);
 
-	render_glyph_characteristics(cnv, fv);
+	/* Draw text preview */
+	pxl_canvas_set_color(&cnv_text_preview, TEXT_PREVIEW_BG);
+	pxl_canvas_clear(&cnv_text_preview);
+	render_text_preview(&cnv_text_preview, fv);
 
 	/* Draw footer */
-	pxl_canvas_set_scissor(cnv, FOOTER_X, FOOTER_Y, FOOTER_W, FOOTER_H);
-	pxl_canvas_set_color(cnv, FOOTER_BG);
-	pxl_canvas_clear(cnv);
-
-	render_footer(cnv, fv);
+	pxl_canvas_set_color(&cnv_footer, FOOTER_BG);
+	pxl_canvas_clear(&cnv_footer);
+	render_footer(&cnv_footer, fv);
 }
 
 int
@@ -471,10 +512,14 @@ main(void) {
 	if (pxl_app_init(&app) != PXL_SUCCESS)
 		return 1;
 
-	printf("Font Viewer. Use Arrow/HJKL keys to navigate. F to switch font family. ESC=quit\n");
+	printf("Font Viewer.\n"
+	       "Arrow/HJKL=navigate, F=switch font family.\n"
+	       "ESC=quit\n");
 
 	font_view_t fv;
 	font_view_init(&fv);
+
+	int fps = 0;
 
 	while (pxl_app_advance_wait(&app)) {
 		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
@@ -488,8 +533,22 @@ main(void) {
 			pxl_canvas_t cnv;
 			pxl_canvas_init(&cnv, &pb);
 			render(&cnv, &fv);
+
+			/* Draw FPS in bottom right corner */
+			if (fps > 0) {
+				char fps_str[16];
+				snprintf(fps_str, sizeof(fps_str), "FPS: %d", fps);
+				pxl_rect_t fps_bounds = demo_text_bounds_scaled(&font_9x15_latin, fps_str, 1);
+				uint32_t fg = 0xFFFFFFFF;
+				pxl_canvas_set_color(&cnv, fg);
+				 demo_draw_text_scaled(&cnv, &font_9x15_latin, fps_str, 1,
+					W - fps_bounds.w - 10, H - fps_bounds.h - 10);
+			}
+
 			(void)pxl_backend_end_frame();
 		}
+		
+		 demo_update_fps(pxl_backend_get_time(), &fps);
 	}
 
 	pxl_app_deinit(&app);

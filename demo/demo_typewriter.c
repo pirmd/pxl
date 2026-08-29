@@ -1,11 +1,38 @@
+/*
+ * PXL Demo: Typewriter
+ *
+ * This is a COMPLETE text input demo showcasing PXL's core features:
+ *   - Window and event loop (pxl_app_init/deinit)
+ *   - Canvas-based rendering with scissor regions
+ *   - Input handling (is_pressed vs was_pressed)
+ *   - UTF-8 text input processing
+ *   - PXL writer API for text rendering
+ *
+ * This is a STATIC demo (no physics loop) using pxl_app_advance_wait().
+ * For interactive demos with movement/physics, see demo_pong.c.
+ *
+ * Architecture:
+ *   Typewriter state is updated each frame (update_typewriter),
+ *   then rendered directly (no interpolation needed for this demo).
+ *
+ * To use as a boilerplate:
+ *   1. Copy the main() structure
+ *   2. Replace typewriter_t with your state
+ *   3. Keep pxl_* calls and frame-based updates
+ *
+ * Note: demo_helpers.h contains demo-specific utilities (NOT part of PXL core).
+ *       font_9x15.h is a generated font (see tool/bdf2pxl).
+ */
+
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "pxl.h"
+#include "demo_helpers.h"
 #include "font_9x15.h"
 
 #define W 800
@@ -34,7 +61,6 @@
 #define PAGE_H   ((PAPER_H - 2 * PAPER_MARGIN) / (CHAR_H + LEADING))
 
 #define PRINT_DURATION  0.5   /* Duration of printing in s */
-
 
 /*
  *  Typewriter state
@@ -180,61 +206,53 @@ any_printable_key_held(const pxl_app_t *app) {
 }
 
 /*
- *  Application state
- */
-struct {
-    typewriter_t tw;
-} app_state;
-
-
-/*
  *  Keyboard handling
  */
 
 static void
-handle_input(pxl_app_t *app) {
-    /* Handle special keys for cursor movement */
-    if (pxl_app_was_pressed(app, PXL_KEYB_LEFT)) {
-		carriage_left(&app_state.tw);
-    }
+handle_input(pxl_app_t *app, typewriter_t *tw) {
+	/* Handle special keys for cursor movement */
+	if (pxl_app_was_pressed(app, PXL_KEYB_LEFT)) {
+		carriage_left(tw);
+	}
 
-    if (pxl_app_was_pressed(app, PXL_KEYB_RIGHT)) {
-		carriage_right(&app_state.tw);
-    }
+	if (pxl_app_was_pressed(app, PXL_KEYB_RIGHT)) {
+		carriage_right(tw);
+	}
 
-    if (pxl_app_was_pressed(app, PXL_KEYB_UP)) {
-		carriage_up(&app_state.tw);
-    }
+	if (pxl_app_was_pressed(app, PXL_KEYB_UP)) {
+		carriage_up(tw);
+	}
 
-    if (pxl_app_was_pressed(app, PXL_KEYB_DOWN)) {
-		carriage_down(&app_state.tw);
-    }
+	if (pxl_app_was_pressed(app, PXL_KEYB_DOWN)) {
+		carriage_down(tw);
+	}
 
-    if (pxl_app_was_pressed(app, PXL_KEYB_HOME)) {
-		carriage_home(&app_state.tw);
-    }
+	if (pxl_app_was_pressed(app, PXL_KEYB_HOME)) {
+		carriage_home(tw);
+	}
 
-    if (pxl_app_was_pressed(app, PXL_KEYB_ENTER)) {
-		carriage_return(&app_state.tw);
-    }
+	if (pxl_app_was_pressed(app, PXL_KEYB_ENTER)) {
+		carriage_return(tw);
+	}
 
-    /* Process typed text from backend (UTF-8 or Latin-1) */
-    char utf8_buf[32];
-    int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
-    if (len > 0) {
-        const char *ptr = utf8_buf;
-        const char *end = utf8_buf + len;
-        
-        while (ptr < end) {
-            uint32_t rune;
-            int consumed = pxl_utf8_decode(ptr, &rune);
-            /* Filter out control characters (handled by special keys) */
-            if (rune >= ' ' && rune != 127) {
-                press_rune(&app_state.tw, rune);
-            }
-            ptr += consumed;
-        }
-    }
+	/* Process typed text from backend (UTF-8 or Latin-1) */
+	char utf8_buf[32];
+	int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
+	if (len > 0) {
+		const char *ptr = utf8_buf;
+		const char *end = utf8_buf + len;
+		
+		while (ptr < end) {
+			uint32_t rune;
+			int consumed = pxl_utf8_decode(ptr, &rune);
+			/* Filter out control characters (handled by special keys) */
+			if (rune >= ' ' && rune != 127) {
+				press_rune(tw, rune);
+			}
+			ptr += consumed;
+		}
+	}
 }
 
 /*
@@ -247,15 +265,16 @@ main(void) {
         .title = "PXL Typewriter",
         .width = W,
         .height = H,
-        .physics_hz = FPS,
         .backend_flags = 0
     };
 
     if (pxl_app_init(&app) != PXL_SUCCESS)
         return 1;
 
-    printf("Typewriter demo. Type text, use arrows to navigate.\n");
-    printf("R=carriage return, Arrows=move cursor, ESC=quit\n");
+    printf("Typewriter Demo.\n"
+           "Type text, use arrows to navigate.\n"
+           "Home=start of line, Enter=carriage return.\n"
+           "ESC=quit\n");
 
     /* CHAR_H+LEADING drives the compile-time paper[][] sizing (PAGE_H), so
      * they can't be derived from the font struct directly -- catch any
@@ -263,29 +282,44 @@ main(void) {
     assert(font_9x15_latin.glyph_height == CHAR_H);
     assert(font_9x15_latin.leading == LEADING);
 
-    init_typewriter(&app_state.tw);
+	/* Initialize typewriter */
+	typewriter_t tw;
+	init_typewriter(&tw);
 
-    while (pxl_app_advance(&app)) {
+	int fps = 0;
+
+    while (pxl_app_advance_wait(&app)) {
 		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 
-		handle_input(&app);
+		handle_input(&app, &tw);
 
 		bool key_held = any_printable_key_held(&app);
-		while (pxl_app_advance_physics(&app)) {
-			update_typewriter(&app_state.tw, (float)app.physics_ts.dt, key_held);
-		}
+		update_typewriter(&tw, 1.0f / FPS, key_held);
 
 		pxl_buf_t pb;
 		if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
 			pxl_canvas_t cnv;
 			pxl_canvas_init(&cnv, &pb);
 
-			render_typewriter(&cnv, &app_state.tw);
+			render_typewriter(&cnv, &tw);
+
+			/* Draw FPS in bottom right corner */
+			if (fps > 0) {
+				char fps_str[16];
+				snprintf(fps_str, sizeof(fps_str), "FPS: %d", fps);
+				pxl_rect_t fps_bounds = demo_text_bounds_scaled(&font_9x15_latin, fps_str, 1);
+				uint32_t fg = 0xFFFFFFFF;
+				pxl_canvas_set_color(&cnv, fg);
+				demo_draw_text_scaled(&cnv, &font_9x15_latin, fps_str, 1,
+					W - fps_bounds.w - 10, H - fps_bounds.h - 10);
+			}
 
 			(void)pxl_backend_end_frame();
 		}
+		
+		demo_update_fps(pxl_backend_get_time(), &fps);
     }
 
 	printf("\n");

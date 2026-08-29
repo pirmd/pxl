@@ -14,20 +14,19 @@ SDL_LIBS   ?= -L/usr/local/lib -lSDL2
 include $(PXL_DIR)/Makefile.inc
 
 CFLAGS  += $(PXL_CFLAGS)
-CLFAGS  += -I.
+CFLAGS  += -I.
 
 LDFLAGS += $(PXL_LDLIBS)
 LDFLAGS += -lm
 
-
 all: $(DEMO)
 
 .for d in $(DEMO)
-$(d): $(d).c $(PXL_DIR)/libpxl.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(d).c
+$(d): $(d).c demo_helpers.c $(PXL_DIR)/libpxl.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(d).c demo_helpers.c
 .endfor
 
 clean:
-	rm -f $(DEMO)
+	rm -f $(DEMO) demo_helpers.o
 
 .PHONY: all clean
