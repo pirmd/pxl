@@ -1,10 +1,13 @@
 #ifndef PXL_TEXT_H
 #define PXL_TEXT_H
 
-#include <stdint.h>
+#include <assert.h>   /* for assert */
+#include <stddef.h>   /* for size_t */
+#include <stdint.h>   /* for uint32_t, int8_t, uint8_t */
 
 #include "bitmask.h"
 #include "canvas.h"
+#include "geom.h"     /* for pxl_rect_t */
 
 /* Font: bitmask (LSB) + metadata. Characters stored sequentially by rune.
  * Optional arrays enable proportional-like fonts (NULL = monospace).

@@ -1,8 +1,6 @@
 #ifndef PXL_BACKEND_H
 #define PXL_BACKEND_H
 
-#include <stdbool.h>
-#include <stdint.h>
 #include "err.h"
 #include "buf.h"
 #include "input.h"

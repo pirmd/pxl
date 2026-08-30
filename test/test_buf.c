@@ -1,3 +1,4 @@
+#include <stddef.h>  /* for ptrdiff_t */
 #include <string.h>
 #include "test.h"
 #include "buf.h"

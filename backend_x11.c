@@ -1,14 +1,14 @@
 #include <assert.h>
 #include <limits.h>
+#include <stdbool.h>  /* for bool, false, true */
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/X.h>       /* for Atom, None, ClientMessage, KeySym */
 #include <X11/keysym.h>
 #include <X11/extensions/XShm.h>
-#include <X11/Xatom.h>
 #include <X11/XKBlib.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#include <stdlib.h>
 #include <time.h>
 #include <string.h>
 #include <locale.h>

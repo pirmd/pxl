@@ -2,6 +2,7 @@
 #include <limits.h>  /* for INT_MAX */
 
 #include "blit.h"
+#include "geom.h"  /* for pxl_rect_t */
 #include "tileset.h"
 
 /* Draw a tile from a tileset to canvas at (x, y).

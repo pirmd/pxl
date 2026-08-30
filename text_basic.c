@@ -1,5 +1,7 @@
 #include <assert.h>
+#include <stdint.h>  /* for uint8_t */
 
+#include "bitmask.h"
 #include "blit.h"
 #include "canvas.h"
 #include "geom.h"

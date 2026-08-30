@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <stdbool.h>
 
-#include "buf.h"
 #include "err.h"
 #include "backend.h"
 #include "input.h"

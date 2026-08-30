@@ -28,8 +28,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "pxl.h"
 #include "demo_helpers.h"

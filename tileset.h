@@ -3,8 +3,11 @@
 #ifndef PXL_TILESET_H
 #define PXL_TILESET_H
 
-#include "canvas.h"
+#include <assert.h>  /* for assert */
+#include <stdint.h>  /* for uint16_t */
+
 #include "buf.h"
+#include "canvas.h"
 
 /* Tileset: grid of equally-sized tiles from a single image buffer.
  * Tiles are arranged in a grid: tile (i) at column (i % cols), row (i / cols).

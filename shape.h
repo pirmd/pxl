@@ -2,7 +2,6 @@
 #define PXL_SHAPE_H
 
 #include "canvas.h"
-#include "geom.h"
 
 /* Outline primitives */
 void pxl_draw_line(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1);

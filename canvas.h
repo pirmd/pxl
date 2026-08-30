@@ -2,9 +2,8 @@
 #define PXL_CANVAS_H
 
 #include <assert.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <string.h>
+#include <limits.h>  /* for INT_MAX */
+#include <string.h>  /* for memset, size_t */
 
 #include "buf.h"
 #include "geom.h"

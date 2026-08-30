@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>  /* for uint8_t */
 #include <string.h>
 
 #include "bitmask.h"

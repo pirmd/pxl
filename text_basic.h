@@ -2,6 +2,7 @@
 #define PXL_FONT_ASCII_H
 
 #include "canvas.h"
+#include "geom.h"  /* for pxl_rect_t */
 
 /*
  * Draw a single ASCII character (0-127) at (x, y) on canvas using the built-in 8x8 bitmap font.

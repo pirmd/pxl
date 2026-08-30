@@ -1,9 +1,8 @@
 #ifndef PXL_BUF_H
 #define PXL_BUF_H
 
-#include <assert.h>
-#include <stddef.h>
-#include <stdint.h>
+#include <assert.h>  /* for assert */
+#include <stdint.h>  /* for uint32_t */
 
 typedef uint32_t pxl_t;  /* 32-bit ARGB pixel */
 

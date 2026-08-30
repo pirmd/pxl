@@ -1,7 +1,7 @@
 #include <assert.h>
+#include <stdbool.h>  /* for bool, true, false */
 
 #include "blit.h"
-#include "shape.h"
 #include "geom.h"
 #include "text.h"
 
