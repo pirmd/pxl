@@ -5,20 +5,6 @@
 uint32_t demo_rng_state = 0;
 
 /* =========================================================================
- * Color utilities
- * ========================================================================= */
-
-pxl_t
-demo_color_grayscale(pxl_t color) {
-	uint8_t r = pxl_r(color);
-	uint8_t g = pxl_g(color);
-	uint8_t b = pxl_b(color);
-	uint8_t a = pxl_a(color);
-	uint8_t y = (uint8_t)(0.299f * r + 0.587f * g + 0.114f * b);
-	return pxl_argb(a, y, y, y);
-}
-
-/* =========================================================================
  * Scaled drawing utilities
  * ========================================================================= */
 

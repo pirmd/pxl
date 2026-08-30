@@ -38,15 +38,6 @@ demo_rng_float_range(float min, float max) {
 }
 
 /* =========================================================================
- * Color utilities
- * ========================================================================= */
-
-/* Convert color to grayscale using perceptual luminance:
- *   Y = 0.299*R + 0.587*G + 0.114*B */
-pxl_t
-demo_color_grayscale(pxl_t color);
-
-/* =========================================================================
  * Scaled drawing utilities (for bitmask fonts)
  * ========================================================================= */
 

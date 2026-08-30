@@ -27,7 +27,7 @@
 #include <math.h>
 
 #include "pxl.h"              /* Core PXL library (includes all public headers) */
-#include "demo_helpers.h"     /* Demo-specific: demo_rng(), demo_draw_text_scaled(), demo_text_bounds_scaled(), demo_color_grayscale() */
+#include "demo_helpers.h"     /* Demo-specific: demo_rng(), demo_draw_text_scaled(), demo_text_bounds_scaled() */
 #include "font_9x15.h"        /* Auto-generated font header (see tool/bdf2pxl) */
 
 #define W 800
@@ -40,8 +40,6 @@
 
 #define FG_COLOR 0xFFFFFFFF
 #define BG_COLOR 0xFF000080
-#define FG_PAUSED demo_color_grayscale(FG_COLOR)
-#define BG_PAUSED demo_color_grayscale(BG_COLOR)
 
 typedef enum {
 	GAME_1P,
@@ -295,8 +293,7 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	const int viewport_w = cnv->scissor.w;
 	const int viewport_h = cnv->scissor.h;
 
-	uint32_t fg = ui->show_pause ? FG_PAUSED : FG_COLOR;
-	pxl_canvas_set_color(cnv, fg);
+	pxl_canvas_set_color(cnv, FG_COLOR);
 
 	/* Left score */
 	char score_str[8];
@@ -319,10 +316,9 @@ render_game(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	assert(cnv != NULL && p != NULL && ui != NULL);
 
 	const int viewport_h = cnv->scissor.h;
-	uint32_t fg = ui->show_pause ? FG_PAUSED : FG_COLOR;
 
 	/* Draw center line */
-	pxl_canvas_set_color(cnv, fg);
+	pxl_canvas_set_color(cnv, FG_COLOR);
 	for (int y = 0; y < viewport_h; y += 30) {
 		pxl_fill_rect(cnv, cnv->scissor.w / 2 - 2, y, 4, 20);
 	}
@@ -500,7 +496,7 @@ main(void) {
 			pxl_canvas_set_scissor(&cnv_game, 0, 0, W, H);
 
 			/* Clear */
-			pxl_canvas_set_color(&cnv, ui.show_pause ? BG_PAUSED : BG_COLOR);
+			pxl_canvas_set_color(&cnv, BG_COLOR);
 			pxl_canvas_clear(&cnv);
 
 			/* Smooth rendering via interpolation:
@@ -520,8 +516,7 @@ main(void) {
 				char fps_str[16];
 				snprintf(fps_str, sizeof(fps_str), "FPS: %d", fps);
 				pxl_rect_t fps_bounds = demo_text_bounds_scaled(ui.font, fps_str, 1);
-				uint32_t fg = ui.show_pause ? FG_PAUSED : FG_COLOR;
-				pxl_canvas_set_color(&cnv_game, fg);
+				pxl_canvas_set_color(&cnv_game, FG_COLOR);
 				demo_draw_text_scaled(&cnv_game, ui.font, fps_str, 1,
 					W - fps_bounds.w - 10, H - fps_bounds.h - 10);
 			}

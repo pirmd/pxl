@@ -26,34 +26,41 @@ Build:
   environment variables.
 
 Quick start:
+    /* Minimal PXL application */
     pxl_app_t app = {
-        .title = "Hello World",
+        .title = "My App",
         .width = 800,
-        .height = 600,
-        .physics_hz = 60
+        .height = 600
     };
+
     if (pxl_app_init(&app) != PXL_SUCCESS) return 1;
-    while (pxl_app_advance(&app)) {
+
+    while (pxl_app_advance_wait(&app)) {
         if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) break;
 
-        handle_input(&app);
-        while (pxl_app_advance_physics(&app)) {
-            update_physics(&app);
-        }
         pxl_buf_t pb;
         if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
-            render_frame(&pb);
+            pxl_canvas_t cnv;
+            pxl_canvas_init(&cnv, &pb);
+            pxl_canvas_clear(&cnv);
+
+            /* Draw here */
+            pxl_draw_str(&cnv, 100, 100, "Hello, PXL!");
+
             (void)pxl_backend_end_frame();
         }
     }
+
     pxl_app_deinit(&app);
 
+    /* For games with physics/stepper: see demo_pong.c */
+
 Demos:
-  - demo_hello_world.c - Minimal example: colored rect + text
-  - demo_pong.c        - Pong game
-  - demo_gas.c         - Boltzmann-like gas simulation
-  - demo_typewriter.c  - Text typing animation
-  - demo_fountain.c    - Particle fountain with tileset/sprite
+  - demo_hello_world.c - Minimal example: static drawing (colored rect + text)
+  - demo_pong.c        - Complete game: physics, input, rendering, interpolation
+  - demo_gas.c         - Particle simulation with stats
+  - demo_typewriter.c  - Text rendering and animation
+  - demo_fountain.c    - Sprite and tileset usage
 
 
 Architecture:
