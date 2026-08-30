@@ -26,7 +26,7 @@
  *   - pxl_app_advance_wait(): Uses backend_wait_events (passive loop, low CPU)
  *     Suitable for editors/viewers that only need to update on input
  *
- * Physics stepper is optional: set physics_hz to 0 to disable.
+ * Physics stepper is optional: set physics_dt to 0 to disable.
  */
 
 typedef struct {
@@ -35,13 +35,13 @@ typedef struct {
 	int width, height;
 	pxl_backend_flags_t backend_flags;
 
-	float physics_hz;              /* 0 = disable physics stepper */
+	double physics_dt;              /* Fixed timestep in seconds. 0 = disable physics stepper */
 	
 	/* Internal managed */
 	pxl_input_t curr;
 	pxl_input_t prev;
 	
-	pxl_time_stepper_t physics_ts;  /* only valid if physics_hz > 0 */
+	pxl_time_stepper_t physics_ts;  /* stepper state (disabled if physics_dt == 0) */
 } pxl_app_t;
 
 /* Initialize the app and backend */
@@ -56,11 +56,9 @@ pxl_app_init(pxl_app_t *app) {
 	app->curr = (pxl_input_t){0};
 	app->prev = (pxl_input_t){0};
 	
-	/* Initialize physics stepper only if enabled */
-	if (app->physics_hz > 0) {
-		app->physics_ts.dt = 1.0f / app->physics_hz;
-		pxl_stepper_init(&app->physics_ts, pxl_backend_get_time());
-	}
+	/* Initialize physics stepper (dt = 0 means disabled) */
+	app->physics_ts.dt = app->physics_dt;
+	pxl_stepper_init(&app->physics_ts, pxl_backend_get_time());
 	
 	return PXL_SUCCESS;
 }
@@ -84,9 +82,7 @@ static inline bool
 pxl_app_advance(pxl_app_t *app) {
 	assert(app);
 	
-	if (app->physics_hz > 0) {
-		pxl_stepper_sync_time(&app->physics_ts, pxl_backend_get_time());
-	}
+	pxl_stepper_sync_time(&app->physics_ts, pxl_backend_get_time());
 
 	app->prev = app->curr;
 	app->curr.mouse_wheel_x = 0;
@@ -102,9 +98,7 @@ static inline bool
 pxl_app_advance_wait(pxl_app_t *app) {
 	assert(app);
 	
-	if (app->physics_hz > 0) {
-		pxl_stepper_sync_time(&app->physics_ts, pxl_backend_get_time());
-	}
+	pxl_stepper_sync_time(&app->physics_ts, pxl_backend_get_time());
 
 	app->prev = app->curr;
 	app->curr.mouse_wheel_x = 0;
@@ -116,13 +110,10 @@ pxl_app_advance_wait(pxl_app_t *app) {
 }
 
 /* Advance physics stepper by one fixed step.
- * Returns false if no physics stepper is configured (physics_hz == 0). */
+ * Returns false if physics is disabled (physics_dt == 0) or if interpolating. */
 static inline bool
 pxl_app_advance_physics(pxl_app_t *app) {
 	assert(app);
-	if (app->physics_hz <= 0) {
-		return false;
-	}
 	return pxl_stepper_advance(&app->physics_ts);
 }
 

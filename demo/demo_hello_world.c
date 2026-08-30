@@ -18,7 +18,7 @@ main(void) {
 		.title = "Hello World - PXL",
 		.width = 800,
 		.height = 600
-		/* physics_hz not needed for static drawing */
+		/* physics_dt not needed for static drawing (defaults to 0) */
 	};
 
 	if (pxl_app_init(&app) != PXL_SUCCESS)

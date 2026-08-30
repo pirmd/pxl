@@ -6,7 +6,7 @@ test_app_transitions_pressed(void) {
 	pxl_app_t app = {0};
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
-	app.physics_hz = 0;  /* Disable physics for unit tests */
+	app.physics_dt = 0;  /* Disable physics for unit tests */
 
 	/* Previous frame: A was up, current frame: A is down */
 	pxl_input_press(&app.curr, PXL_KEYB_A);
@@ -21,7 +21,7 @@ test_app_transitions_released(void) {
 	pxl_app_t app = {0};
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
-	app.physics_hz = 0;  /* Disable physics for unit tests */
+	app.physics_dt = 0;  /* Disable physics for unit tests */
 
 	/* Previous frame: A was down */
 	pxl_input_press(&app.prev, PXL_KEYB_A);
@@ -37,7 +37,7 @@ test_app_transitions_no_change(void) {
 	pxl_app_t app = {0};
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
-	app.physics_hz = 0;  /* Disable physics for unit tests */
+	app.physics_dt = 0;  /* Disable physics for unit tests */
 
 	/* A is down in both frames */
 	pxl_input_press(&app.prev, PXL_KEYB_A);
@@ -61,7 +61,7 @@ test_app_transitions_multiple_keys(void) {
 	pxl_app_t app = {0};
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
-	app.physics_hz = 0;  /* Disable physics for unit tests */
+	app.physics_dt = 0;  /* Disable physics for unit tests */
 
 	/* Previous: A down, B up. Current: A up, B down */
 	pxl_input_press(&app.prev, PXL_KEYB_A);
@@ -78,7 +78,7 @@ test_app_mouse_wheel_reset(void) {
 	pxl_app_t app = {0};
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
-	app.physics_hz = 0;  /* Disable physics for unit tests */
+	app.physics_dt = 0;  /* Disable physics for unit tests */
 
 	/* Simulate wheel movement in current frame */
 	app.curr.mouse_wheel_x = 5;
@@ -100,7 +100,7 @@ test_app_should_close(void) {
 	pxl_app_t app = {0};
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
-	app.physics_hz = 0;
+	app.physics_dt = 0;
 
 	/* No quit condition */
 	ASSERT(pxl_app_should_close(&app) == false);
@@ -118,9 +118,19 @@ test_app_should_close(void) {
 static void
 test_app_physics_disabled(void) {
 	pxl_app_t app = {0};
-	app.physics_hz = 0;
+	app.physics_dt = 0;
 
 	/* advance_physics should return false when physics disabled */
+	ASSERT(pxl_app_advance_physics(&app) == false);
+}
+
+static void
+test_app_physics_stepper_transparent(void) {
+	pxl_app_t app = {0};
+	app.physics_dt = 0;  /* Disabled */
+	app.physics_ts.dt = 0;  /* Ensure stepper is disabled */
+
+	/* advance_physics should return false when stepper is disabled */
 	ASSERT(pxl_app_advance_physics(&app) == false);
 }
 
@@ -134,6 +144,7 @@ main(void) {
 	test_app_mouse_wheel_reset();
 	test_app_should_close();
 	test_app_physics_disabled();
+	test_app_physics_stepper_transparent();
 
 	return 0;
 }

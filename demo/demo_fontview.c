@@ -504,9 +504,8 @@ main(void) {
 	pxl_app_t app = {
 		.title = "PXL Font Viewer",
 		.width = W,
-		.height = H,
-		.physics_hz = 0,  /* No physics stepper needed */
-		.backend_flags = 0
+		.height = H
+		/* physics_dt defaults to 0 (no physics stepper) */
 	};
 
 	if (pxl_app_init(&app) != PXL_SUCCESS)

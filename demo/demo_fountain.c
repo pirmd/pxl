@@ -593,8 +593,7 @@ main(void) {
 		.title = "PXL Fountain",
 		.width = W,
 		.height = H,
-		.physics_hz = FPS,
-		.backend_flags = 0
+		.physics_dt = 1.0 / FPS
 	};
 
 	if (pxl_app_init(&app) != PXL_SUCCESS)

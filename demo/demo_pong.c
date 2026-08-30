@@ -438,7 +438,7 @@ main(void) {
 		.title = "PXL Pong",
 		.width = W,
 		.height = H,
-		.physics_hz = FPS,
+		.physics_dt = 1.0 / FPS,
 	};
 
 	if (pxl_app_init(&app) != PXL_SUCCESS)

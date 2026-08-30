@@ -27,11 +27,11 @@ typedef struct {
 } pxl_time_stepper_t;
 
 /* Initialize time stepper with current time.
-   ts->dt must be set to a positive value before calling. */
+   ts->dt must be set before calling (0 or negative = disabled). */
 static inline void
 pxl_stepper_init(pxl_time_stepper_t *ts, double now) {
 	assert(ts);
-	assert(ts->dt > 0);
+	assert(ts->dt >= 0);
 	
 	ts->current_time = now;
 	ts->accumulator  = 0;
@@ -49,13 +49,14 @@ pxl_stepper_reinit(pxl_time_stepper_t *ts, double now) {
 
 /* Sync time stepper with current time (clamps max frame time to PXL_STEPPER_MAX_FRAME_TIME).
    Call this at the start of each frame before pxl_stepper_advance().
-   If paused, only updates current_time without accumulating. */
+   If paused or disabled (dt <= 0), only updates current_time without accumulating. */
 static inline void
 pxl_stepper_sync_time(pxl_time_stepper_t *ts, double now) {
 	assert(ts);
 	assert(ts->current_time >= 0);
 	
-	if (ts->paused) {
+	/* If disabled or paused, only update current_time */
+	if (ts->dt <= 0 || ts->paused) {
 		ts->current_time = now;
 		return;
 	}
@@ -70,12 +71,16 @@ pxl_stepper_sync_time(pxl_time_stepper_t *ts, double now) {
 
 /* Advance time stepper by one fixed step.
    Returns true if a full dt step has accumulated (update game logic).
-   Returns false if interpolating (render intermediate state).
+   Returns false if disabled (dt <= 0) or interpolating (render intermediate state).
    Sets lerp_factor for interpolation between frames. */
 static inline bool
 pxl_stepper_advance(pxl_time_stepper_t *ts) {
 	assert(ts);
-	assert(ts->dt > 0);
+	
+	/* If disabled, always return false */
+	if (ts->dt <= 0) {
+		return false;
+	}
 	
 	if (ts->accumulator >= ts->dt) {
 		ts->accumulator -= ts->dt;

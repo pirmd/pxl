@@ -264,8 +264,7 @@ main(void) {
     pxl_app_t app = {
         .title = "PXL Typewriter",
         .width = W,
-        .height = H,
-        .backend_flags = 0
+        .height = H
     };
 
     if (pxl_app_init(&app) != PXL_SUCCESS)

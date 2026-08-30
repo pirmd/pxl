@@ -122,6 +122,28 @@ test_pxl_stepper_reinit(void) {
 	ASSERT(ts.time_scale == 1.0f);
 }
 
+/* Disabled stepper tests (dt = 0) */
+
+static void
+test_pxl_stepper_disabled_sync_time(void) {
+	pxl_time_stepper_t ts = {.dt = 0.0};  /* Disabled */
+	pxl_stepper_init(&ts, 0.001);
+
+	pxl_stepper_sync_time(&ts, 0.1);
+	ASSERT(ts.current_time == 0.1);
+	ASSERT(ts.accumulator == 0.0);  /* Must NOT accumulate when disabled */
+}
+
+static void
+test_pxl_stepper_disabled_advance(void) {
+	pxl_time_stepper_t ts = {.dt = 0.0};  /* Disabled */
+	pxl_stepper_init(&ts, 0.001);
+
+	pxl_stepper_sync_time(&ts, 0.1);
+	ASSERT(pxl_stepper_advance(&ts) == false);
+	ASSERT(ts.accumulator == 0.0);
+}
+
 /* Main */
 
 int
