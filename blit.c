@@ -38,7 +38,7 @@ pxl_blit_rect(pxl_canvas_t *cnv, const pxl_buf_t *pb,
 
     assert(dst_rect.w <= pb_stride);
     for (int y = 0; y < dst_rect.h; ++y) {
-        memcpy(cnv_row, pb_row, dst_rect.w * sizeof(pxl_t));
+        memcpy(cnv_row, pb_row, (size_t)dst_rect.w * sizeof(pxl_t));
         pb_row += pb_stride;
         cnv_row += cnv_stride;
     }
@@ -87,12 +87,12 @@ pxl_draw_bitmask(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 			                 8 - (int)leading_bit_off : dst_rect.w - i;
 
 			for (int bit = 0; bit < bits_to_do; ++bit) {
-				if (m & (1U << (leading_bit_off + bit))) {
+				if (m & (1U << (leading_bit_off + (unsigned)bit))) {
 					dst[i + bit] = color;
 				}
 			}
 			i += bits_to_do;
-			bit_offset += bits_to_do;
+			bit_offset += (size_t)bits_to_do;
 		}
 
 		/* Full bytes (fast path for 0x00 and 0xFF) */

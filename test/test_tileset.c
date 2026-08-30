@@ -52,7 +52,7 @@ fixture_setup(void) {
 			uint8_t r_val = (uint8_t)((tile_idx * 17) % 256);
 			uint8_t g_val = (uint8_t)((tile_idx * 31) % 256);
 			uint8_t b_val = (uint8_t)((tile_idx * 59) % 256);
-			pxl_t color = (pxl_t)(0xFF000000U | (r_val << 16) | (g_val << 8) | b_val);
+			pxl_t color = (pxl_t)(0xFF000000U | ((unsigned int)r_val << 16) | ((unsigned int)g_val << 8) | (unsigned int)b_val);
 
 			for (int ty = 0; ty < TILE_H; ty++) {
 				pxl_t *dst_row = pxl_buf_ptr(&g_atlas, c * TILE_W, r * TILE_H + ty);
@@ -235,7 +235,7 @@ test_pxl_draw_tile_last_tile(void) {
 	uint8_t expected_r = (uint8_t)((15 * 17) % 256);
 	uint8_t expected_g = (uint8_t)((15 * 31) % 256);
 	uint8_t expected_b = (uint8_t)((15 * 59) % 256);
-	pxl_t expected_color = (pxl_t)(0xFF000000U | (expected_r << 16) | (expected_g << 8) | expected_b);
+	pxl_t expected_color = (pxl_t)(0xFF000000U | ((unsigned int)expected_r << 16) | ((unsigned int)expected_g << 8) | (unsigned int)expected_b);
 	ASSERT(color == expected_color);
 }
 

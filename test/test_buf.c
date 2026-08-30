@@ -87,7 +87,7 @@ test_pxl_buf_ptr_stride_calculation(void) {
 	pxl_t *ptr_row0 = pxl_buf_ptr(&g_buf, 0, 0);
 	pxl_t *ptr_row1 = pxl_buf_ptr(&g_buf, 0, 1);
 	ptrdiff_t diff = (char *)ptr_row1 - (char *)ptr_row0;
-	ASSERT(diff == (ptrdiff_t)(g_buf.stride * sizeof(pxl_t)));
+	ASSERT(diff == (ptrdiff_t)((size_t)g_buf.stride * sizeof(pxl_t)));
 }
 
 static void

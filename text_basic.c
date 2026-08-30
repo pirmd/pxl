@@ -180,7 +180,7 @@ pxl_draw_str(pxl_canvas_t *cnv, int x, int y, const char *str) {
 			int remainder = cur_x % tab_stop;
 			cur_x += tab_stop - remainder;
 		} else {
-			pxl_draw_char(cnv, cur_x, y, *str);
+			pxl_draw_char(cnv, cur_x, y, (unsigned char)*str);
 			cur_x += ASCII_ADVANCE_X;
 		}
 

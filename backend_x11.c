@@ -111,7 +111,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 
     g_x11.window = XCreateWindow(
         g_x11.display, root,
-        x, y, w, h, 0,
+        x, y, (unsigned int)w, (unsigned int)h, 0u,
         depth, InputOutput, visual,
         CWColormap | CWBackPixel | CWBorderPixel,
         &attrs
@@ -143,8 +143,8 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     XMapWindow(g_x11.display, g_x11.window);
     XSync(g_x11.display, False);
 
-    g_x11.img = XShmCreateImage(g_x11.display, visual, depth, ZPixmap, NULL,
-                                &g_x11.shm, w, h);
+    g_x11.img = XShmCreateImage(g_x11.display, visual, (unsigned int)depth, ZPixmap, NULL,
+                                &g_x11.shm, (unsigned int)w, (unsigned int)h);
     if (!g_x11.img) goto fail;
 
 	/* ensure we are pixel-aligned */
@@ -156,7 +156,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	}
 
     g_x11.shm.shmid = shmget(IPC_PRIVATE,
-                             g_x11.img->bytes_per_line * h,
+                             (size_t)g_x11.img->bytes_per_line * (size_t)h,
                              IPC_CREAT | 0777);
     if (g_x11.shm.shmid < 0) goto fail;
 
@@ -192,7 +192,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
             .window = g_x11.window,
             .message_type = wm_state,
             .format = 32,
-            .data.l = {1, fullscreen_atom, 0, 0, 0}
+            .data.l = {1L, (long)fullscreen_atom, 0L, 0L, 0L}
         }};
         XSendEvent(g_x11.display, RootWindow(g_x11.display, DefaultScreen(g_x11.display)),
                   False, SubstructureRedirectMask | SubstructureNotifyMask, &e);
@@ -265,7 +265,7 @@ pxl_backend_end_frame(void) {
     assert(g_x11.display && g_x11.img && g_x11.img->data);
 
     Bool success = XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
-                                g_x11.img, 0, 0, 0, 0, g_x11.width, g_x11.height,
+                                g_x11.img, 0, 0, 0, 0, (unsigned int)g_x11.width, (unsigned int)g_x11.height,
                                 False);
     XSync(g_x11.display, False);
     
@@ -420,10 +420,10 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
                 /* FIFO: if buffer is full, shift left to make room for new characters */
                 if (g_x11.text_buffer_len + len > (int)sizeof(g_x11.text_buffer)) {
                     int excess = (g_x11.text_buffer_len + len) - (int)sizeof(g_x11.text_buffer);
-                    memmove(g_x11.text_buffer, g_x11.text_buffer + excess, g_x11.text_buffer_len - excess);
+                    memmove(g_x11.text_buffer, g_x11.text_buffer + excess, (size_t)(g_x11.text_buffer_len - excess));
                     g_x11.text_buffer_len -= excess;
                 }
-                memcpy(g_x11.text_buffer + g_x11.text_buffer_len, buf, len);
+                memcpy(g_x11.text_buffer + g_x11.text_buffer_len, buf, (size_t)len);
                 g_x11.text_buffer_len += len;
             }
             break;
@@ -520,12 +520,12 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     /* Early return if nothing to copy (kept for clarity and to avoid useless operations) */
     if (copy_len <= 0) return 0;
 
-    memcpy(out_text, g_x11.text_buffer, copy_len);
+    memcpy(out_text, g_x11.text_buffer, (size_t)copy_len);
     out_text[copy_len] = '\0';
 
     /* Consume copied bytes (no null-termination in internal buffer) */
     g_x11.text_buffer_len -= copy_len;
-    memmove(g_x11.text_buffer, g_x11.text_buffer + copy_len, g_x11.text_buffer_len);
+    memmove(g_x11.text_buffer, g_x11.text_buffer + copy_len, (size_t)g_x11.text_buffer_len);
 
     return copy_len;
 }

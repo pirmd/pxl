@@ -146,12 +146,12 @@ generate_header(FILE *out, const pxl_font_header_data_t *d, bool subfont_only) {
 		d->name, d->num_chars, d->glyph_h, d->stride);
 
 	for (int c = 0; c < d->num_chars; c++) {
-		uint32_t rune = d->rune_start + c;
+		uint32_t rune = d->rune_start + (uint32_t)c;
 		fprintf(out, "    /* U+%04X */\n    {\n", rune);
 		for (int y = 0; y < d->glyph_h; y++) {
 			fprintf(out, "        {");
 			for (size_t b = 0; b < d->stride; b++) {
-				size_t offset = c * d->glyph_h * d->stride + y * d->stride + b;
+				size_t offset = (size_t)c * (size_t)d->glyph_h * (size_t)d->stride + (size_t)y * (size_t)d->stride + b;
 				fprintf(out, "0x%02X%s", d->bitmask[offset],
 					(b < d->stride - 1) ? ", " : "");
 			}
@@ -257,7 +257,7 @@ parse_bdf(const char *path, bdf_glyph_t **glyphs_out, int *num_glyphs_out,
 		} else if (strncmp(line, "ENCODING", 8) == 0) {
 			if (num >= cap) {
 				cap *= 2;
-				bdf_glyph_t *ng = realloc(glyphs, cap * sizeof(bdf_glyph_t));
+				bdf_glyph_t *ng = realloc(glyphs, (size_t)cap * sizeof(bdf_glyph_t));
 				if (!ng) {
 				   	for (int i = 0; i < num; i++) {
 					   	free_glyph(&glyphs[i]);
@@ -287,7 +287,7 @@ parse_bdf(const char *path, bdf_glyph_t **glyphs_out, int *num_glyphs_out,
 			in_char = 0;
 		} else if (in_char && cur && cur->w > 0) {
 			if (cur->num_bitmap_lines >= cur->h) continue;
-			char **nl = realloc(cur->bitmap_lines, (cur->num_bitmap_lines + 1) * sizeof(char *));
+			char **nl = realloc(cur->bitmap_lines, (size_t)(cur->num_bitmap_lines + 1) * sizeof(char *));
 			if (!nl) {
 			   	for (int i = 0; i < num; i++) {
 				   	free_glyph(&glyphs[i]);
@@ -309,7 +309,7 @@ parse_bdf(const char *path, bdf_glyph_t **glyphs_out, int *num_glyphs_out,
 static void
 hex_line_to_lsb(const char *hex, int w, uint8_t *out, size_t stride) {
 	memset(out, 0, stride);
-	uint32_t val = strtoul(hex, NULL, 16);
+	uint32_t val = (uint32_t)strtoul(hex, NULL, 16);
 	int bits = (int)strlen(hex) * 4;
 	for (int x = 0; x < w; x++) {
 		int shift = bits - 1 - x;
@@ -419,17 +419,17 @@ main(int argc, char **argv) {
 	for (int i = 0; i < num_glyphs; i++) if (glyphs[i].w > max_w) max_w = glyphs[i].w;
 	d.glyph_w = (max_w == 0) ? 8 : max_w;
 	d.glyph_h = bbox_h;
-	d.stride = PXL_CALC_STRIDE(d.glyph_w);
+	d.stride = (size_t)PXL_CALC_STRIDE(d.glyph_w);
 
-	d.glyph_widths = calloc(d.num_chars, sizeof(uint8_t));
-	d.glyph_advances = calloc(d.num_chars, sizeof(uint8_t));
-	d.glyph_offsets_x = calloc(d.num_chars, sizeof(int8_t));
-	d.glyph_offsets_y = calloc(d.num_chars, sizeof(int8_t));
-	d.bitmask = calloc((size_t)d.num_chars * d.glyph_h * d.stride, 1);
+	d.glyph_widths = calloc((size_t)d.num_chars, sizeof(uint8_t));
+	d.glyph_advances = calloc((size_t)d.num_chars, sizeof(uint8_t));
+	d.glyph_offsets_x = calloc((size_t)d.num_chars, sizeof(int8_t));
+	d.glyph_offsets_y = calloc((size_t)d.num_chars, sizeof(int8_t));
+	d.bitmask = calloc((size_t)d.num_chars * (size_t)d.glyph_h * d.stride, 1);
 
 	/* 3. Fill data. Missing glyphs stay perfectly 0-filled */
 	for (int c = 0; c < d.num_chars; c++) {
-		uint32_t rune = d.rune_start + c;
+		uint32_t rune = d.rune_start + (uint32_t)c;
 		bdf_glyph_t *g = NULL;
 		
 		for (int i = 0; i < num_glyphs; i++) {
@@ -445,7 +445,7 @@ main(int argc, char **argv) {
 			if (g->w > 0 && g->num_bitmap_lines > 0) {
 				int y_start = ascent - g->h - g->yoff;
 				for (int y = 0; y < d.glyph_h; y++) {
-					uint8_t *row = d.bitmask + c * d.glyph_h * d.stride + y * d.stride;
+					uint8_t *row = d.bitmask + (size_t)c * (size_t)d.glyph_h * d.stride + (size_t)y * d.stride;
 					if (y >= y_start && y < y_start + g->h) {
 						int by = y - y_start;
 						if (by < g->num_bitmap_lines) hex_line_to_lsb(g->bitmap_lines[by], g->w, row, d.stride);

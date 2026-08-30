@@ -15,7 +15,7 @@ demo_draw_bitmask_scaled(pxl_canvas_t *cnv, int scale,
 	uint32_t color = cnv->color;
 	for (int gy = 0; gy < bm_r.h; gy++) {
 		for (int gx = 0; gx < bm_r.w; gx++) {
-			int byte_idx = (bm_r.y + gy) * bm->stride + (bm_r.x + gx) / 8;
+			size_t byte_idx = (size_t)(bm_r.y + gy) * (size_t)bm->stride + (size_t)(bm_r.x + gx) / 8u;
 			uint8_t byte = bm->data[byte_idx];
 			int bit = (bm_r.x + gx) % 8;
 			if (byte & (1 << bit)) {

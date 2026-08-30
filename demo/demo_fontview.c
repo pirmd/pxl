@@ -179,11 +179,11 @@ font_view_glyph(const font_view_t *fv, int idx, glyph_t *out_glyph) {
 
 	for (int i = 0; i < fv->font_family_size; i++) {
 		const pxl_font_t *font = family_fonts[i];
-		int font_count = font->rune_end - font->rune_start + 1;
+		int font_count = (int)(font->rune_end - font->rune_start + 1u);
 
 		if (idx_in_font < font_count) {
 			out_glyph->bitmask   = &font->bitmask;
-			out_glyph->codepoint = font->rune_start + idx_in_font;
+			out_glyph->codepoint = (uint32_t)font->rune_start + (uint32_t)idx_in_font;
 			out_glyph->width     = font->bitmask.width;
 			out_glyph->height    = font->glyph_height;
 
@@ -231,16 +231,16 @@ font_view_next_glyph(font_view_t *fv, int idx_inc) {
 
 static void
 font_view_next_font(font_view_t *fv) {
-	fv->family_idx = (fv->family_idx + 1) % NUM_FONT_FAMILIES;
+	fv->family_idx = (int)((((size_t)fv->family_idx + 1u) % NUM_FONT_FAMILIES));
 
 	fv->font_family      = font_families[fv->family_idx];
-	fv->font_family_size = font_family_sizes[fv->family_idx];
+	fv->font_family_size = (int)font_family_sizes[fv->family_idx];
 	fv->font_family_name = font_family_names[fv->family_idx];
 
 	fv->font_family_glyph_count = 0;
 	for (int i = 0; i < fv->font_family_size; i++) {
 		const pxl_font_t *font = fv->font_family[i];
-		int font_count = font->rune_end - font->rune_start + 1;
+		int font_count = (int)(font->rune_end - font->rune_start + 1u);
 		fv->font_family_glyph_count += font_count;
 	}
 
@@ -267,7 +267,7 @@ font_view_mem_size(const font_view_t *fv) {
 		uint32_t glyph_count = font->rune_end - font->rune_start + 1;
 		
 		/* Bitmask data */
-		total_size += (size_t)glyph_count * font->glyph_height * font->bitmask.stride;
+		total_size += (size_t)glyph_count * (size_t)font->glyph_height * (size_t)font->bitmask.stride;
 		
 		/* Metadata arrays (each is glyph_count elements) */
 		if (font->glyph_widths) total_size += glyph_count * sizeof(uint8_t);
@@ -327,7 +327,7 @@ render_font_view(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_draw_rect(cnv, selected_x, selected_y, GRID_VIEW_CELL_W, GRID_VIEW_CELL_H);
 
 	pxl_writer_t w;
-	pxl_writer_init(&w, fv->font_family, fv->font_family_size);
+	pxl_writer_init(&w, fv->font_family, (size_t)fv->font_family_size);
 	pxl_canvas_set_color(cnv, GRID_VIEW_FG);
 
 	for (int i = fv->start_idx; i < fv->end_idx; i++) {
@@ -428,7 +428,7 @@ render_text_preview(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 	const char *text = lorem_texts[fv->family_idx];
 	pxl_writer_t w;
-	pxl_writer_init(&w, fv->font_family, fv->font_family_size);
+	pxl_writer_init(&w, fv->font_family, (size_t)fv->font_family_size);
 	pxl_canvas_set_color(cnv, TEXT_PREVIEW_FG);
 
 	pxl_writer_set_cursor(&w, TEXT_PREVIEW_X + 5, TEXT_PREVIEW_Y + 5);

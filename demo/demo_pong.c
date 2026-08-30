@@ -32,6 +32,8 @@
 
 #define W 800
 #define H 600
+#define Wf 800.0f
+#define Hf 600.0f
 #define FPS 60.0f
 
 /* UI */
@@ -63,14 +65,14 @@ typedef struct {
 typedef struct {
 	struct {
 		float x, y;
-		int w, h;
+		float w, h;
 		float speed;
 		float vy;
 	} paddle_left, paddle_right;
 
 	struct {
 		float x, y;
-		int radius;
+		float radius;
 		float vx, vy;
 		float speed;
 	} ball;
@@ -92,22 +94,22 @@ static void
 init_pong(pong_t *p) {
 	assert(p != NULL);
 	/* Paddles */
-	p->paddle_left.x = 20;
-	p->paddle_left.y = H/2 - 50;
-	p->paddle_left.w = 15;
-	p->paddle_left.h = 100;
+	p->paddle_left.x = 20.0f;
+	p->paddle_left.y = (float)(H/2 - 50);
+	p->paddle_left.w = 15.0f;
+	p->paddle_left.h = 100.0f;
 	p->paddle_left.speed = 400.0f;
 	p->paddle_left.vy = 0.0f;
 
-	p->paddle_right.x = W - 20 - 15;
-	p->paddle_right.y = H/2 - 50;
-	p->paddle_right.w = 15;
-	p->paddle_right.h = 100;
+	p->paddle_right.x = (float)(W - 20 - 15);
+	p->paddle_right.y = (float)(H/2 - 50);
+	p->paddle_right.w = 15.0f;
+	p->paddle_right.h = 100.0f;
 	p->paddle_right.speed = 400.0f;
 	p->paddle_right.vy = 0.0f;
 
 	/* Ball */
-	p->ball.radius = 8;
+	p->ball.radius = 8.0f;
 	p->ball.speed = 300.0f;
 	reset_ball(p);
 
@@ -152,22 +154,22 @@ update_pong(const pong_t *current, float dt, pong_input_t input, pong_t *next) {
 	next->paddle_right.y += next->paddle_right.vy * dt;
 
 	/* Clamp paddles to screen */
-	if (next->paddle_left.y < 0) next->paddle_left.y = 0;
-	if (next->paddle_left.y + next->paddle_left.h > H) next->paddle_left.y = H - next->paddle_left.h;
-	if (next->paddle_right.y < 0) next->paddle_right.y = 0;
-	if (next->paddle_right.y + next->paddle_right.h > H) next->paddle_right.y = H - next->paddle_right.h;
+	if (next->paddle_left.y < 0.0f) next->paddle_left.y = 0.0f;
+	if (next->paddle_left.y + next->paddle_left.h > Hf) next->paddle_left.y = Hf - next->paddle_left.h;
+	if (next->paddle_right.y < 0.0f) next->paddle_right.y = 0.0f;
+	if (next->paddle_right.y + next->paddle_right.h > Hf) next->paddle_right.y = Hf - next->paddle_right.h;
 
 	/* Update ball */
 	next->ball.x += next->ball.vx * dt;
 	next->ball.y += next->ball.vy * dt;
 
 	/* Ball collision with top and bottom */
-	if (next->ball.y - next->ball.radius < 0) {
+	if (next->ball.y - next->ball.radius < 0.0f) {
 		next->ball.y = next->ball.radius;
 		next->ball.vy = -next->ball.vy;
 	}
-	if (next->ball.y + next->ball.radius > H) {
-		next->ball.y = H - next->ball.radius;
+	if (next->ball.y + next->ball.radius > Hf) {
+		next->ball.y = Hf - next->ball.radius;
 		next->ball.vy = -next->ball.vy;
 	}
 
@@ -195,11 +197,11 @@ update_pong(const pong_t *current, float dt, pong_input_t input, pong_t *next) {
 	}
 
 	/* Ball out of bounds (score) */
-	if (next->ball.x - next->ball.radius < 0) {
+	if (next->ball.x - next->ball.radius < 0.0f) {
 		next->score_right++;
 		reset_ball(next);
 	}
-	if (next->ball.x + next->ball.radius > W) {
+	if (next->ball.x + next->ball.radius > Wf) {
 		next->score_left++;
 		reset_ball(next);
 	}
@@ -325,12 +327,12 @@ render_game(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 
 	/* Draw paddles */
 	pxl_fill_rect(cnv, (int)p->paddle_left.x, (int)p->paddle_left.y,
-		p->paddle_left.w, p->paddle_left.h);
+		(int)p->paddle_left.w, (int)p->paddle_left.h);
 	pxl_fill_rect(cnv, (int)p->paddle_right.x, (int)p->paddle_right.y,
-		p->paddle_right.w, p->paddle_right.h);
+		(int)p->paddle_right.w, (int)p->paddle_right.h);
 
 	/* Draw ball */
-	pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, p->ball.radius);
+	pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, (int)p->ball.radius);
 }
 
 static void
@@ -479,7 +481,7 @@ main(void) {
 
 		while (pxl_app_advance_physics(&app)) {
 			pong_prev = pong;
-			update_pong(&pong_prev, app.physics_ts.dt, pong_input, &pong);
+			update_pong(&pong_prev, (float)app.physics_ts.dt, pong_input, &pong);
 		}
 
 		pxl_buf_t pb;

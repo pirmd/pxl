@@ -91,11 +91,11 @@ pxl_canvas_clear(pxl_canvas_t *cnv) {
 		assert(pb->height <= INT_MAX / pb->stride / (int)sizeof(pxl_t));
 
 		if (cnv->color == 0) {
-			memset(pb->data, 0x00, pb->height * pb->stride * sizeof(pxl_t));
+			memset(pb->data, 0x00, (size_t)pb->height * (size_t)pb->stride * sizeof(pxl_t));
 			return;
 		}
 		if (cnv->color == 0xFFFFFFFFU) {
-			memset(pb->data, 0xFF, pb->height * pb->stride * sizeof(pxl_t));
+			memset(pb->data, 0xFF, (size_t)pb->height * (size_t)pb->stride * sizeof(pxl_t));
 			return;
 		}
 	}

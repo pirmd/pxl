@@ -103,24 +103,24 @@ init_atlas(pxl_buf_t *atlas) {
     atlas->width = ATLAS_WIDTH;
     atlas->height = ATLAS_HEIGHT;
     atlas->stride = pxl_calc_stride(ATLAS_WIDTH);
-    atlas->data = malloc(atlas->stride * atlas->height * sizeof(pxl_t));
+    atlas->data = malloc((size_t)atlas->stride * (size_t)atlas->height * sizeof(pxl_t));
 
     for (int row = 0; row < ATLAS_ROWS; row++) {
         for (int col = 0; col < ATLAS_COLS; col++) {
             int tile_idx = row * ATLAS_COLS + col;
-            particle_type_t type = tile_idx / 4;
+            particle_type_t type = (particle_type_t)(tile_idx / 4);
             int frame = tile_idx % 4;
 
             uint32_t color;
             switch (type % PARTICLE_COUNT) {
                 case PARTICLE_FIRE:
-                    color = RED | ((frame * 60) << 16);
+                    color = RED | (((unsigned int)frame * 60u) << 16);
                     break;
                 case PARTICLE_SMOKE:
-                    color = GRAY + (frame * 0x0F0F0F);
+                    color = GRAY + (unsigned int)frame * 0x0F0F0Fu;
                     break;
                 case PARTICLE_SPARK:
-                    color = YELLOW | (frame * 0x111111);
+                    color = YELLOW | (unsigned int)frame * 0x111111u;
                     break;
                 default:
                     color = WHITE;
@@ -358,7 +358,7 @@ update_fountain(const fountain_t *current, float dt, fountain_input_t input, fou
 		}
 	}
 
-	next->emit_accumulator += dt * next->emit_rate;
+	next->emit_accumulator += dt * (float)next->emit_rate;
 	if (next->emit_accumulator >= 1.0f) {
 		next->emit_accumulator -= 1.0f;
 		spawn_particles(next, next->source_x, next->source_y, next->emit_type, 5);
@@ -625,7 +625,7 @@ main(void) {
 
 		while (pxl_app_advance_physics(&app)) {
 			fountain_prev = fountain;
-			update_fountain(&fountain_prev, app.physics_ts.dt, fountain_input, &fountain);
+			update_fountain(&fountain_prev, (float)app.physics_ts.dt, fountain_input, &fountain);
 		}
 
 		pxl_buf_t pb;

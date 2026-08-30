@@ -129,7 +129,7 @@ update_gas(const gas_t *current, float dt, int add_particles, gas_t *next) {
 
 	/* Apply particle count changes */
 	if (add_particles != 0) {
-		size_t new_count = next->count + add_particles;
+		size_t new_count = (size_t)next->count + (size_t)add_particles;
 		if (new_count > MAX_PARTICLES) new_count = MAX_PARTICLES;
 		
 		/* Initialize new particles */
@@ -419,7 +419,7 @@ main(void) {
 
 		while (pxl_app_advance_physics(&app)) {
 			gas_prev = gas;
-			update_gas(&gas_prev, app.physics_ts.dt, add_particles, &gas);
+			update_gas(&gas_prev, (float)app.physics_ts.dt, add_particles, &gas);
 		}
 
 		pxl_buf_t pb;

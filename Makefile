@@ -16,6 +16,7 @@ CFLAGS_LINT  = -Wall -Wextra
 CFLAGS_LINT += -Wpedantic -Wshadow -Wvla
 CFLAGS_LINT += -Wwrite-strings -Wold-style-definition
 CFLAGS_LINT += -Wno-unused-function
+CFLAGS_LINT += -Wconversion
 
 all: $(LIB)
 
