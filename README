@@ -12,18 +12,17 @@ Features:
   - Keyboard/mouse input
 
 Build:
-  make          # lib
-  make lint     # run lint
-  make test     # run tests
-  make demo     # demos
-  make clean    # cleaning
+  make          # Build libpxl.a (default backend: x11)
+  make BACKEND=sdl  # Build with SDL2 backend
+  make lint     # Static analysis with strict warnings (-Werror)
+  make test     # Run unit tests (default backend)
+  make demo     # Build demos
+  make clean    # Remove build artifacts
 
-  Configuration possible using config.mk.
-  'Release mode' (remove "asserts") via PXL_BUILD_MODE=release.
-  Backend selection via PXL_BACKEND=sdl or PXL_BACKEND=x11 (default).
-
-  Main configuration is defined in Makefile.inc. Override in config.mk or via
-  environment variables.
+  Build configuration:
+    Main configuration is defined in Makefile.inc.
+    Copy 'config.mk.example' to 'config.mk' to override backend, CFLAGS, or library paths.
+    Use 'sh test-all.sh' to test all backends (x11, sdl) and tools.
 
 Quick start:
     /* Minimal PXL application */
@@ -99,7 +98,7 @@ Tools:
 
 Testing:
   Framework: test.h (minimalist assert-based testing)
-  Run tests: make test or sh test.sh to go through all available backends.
+  Run tests: make test or sh test-all.sh to go through all available backends.
 
 License:
   MIT. See LICENSE.

@@ -10,9 +10,6 @@ PXL_DIR=..
 CC     ?= cc
 CFLAGS ?= -O0 -g -std=c99 -Wall -Wextra
 
-X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
-SDL_LIBS   ?= -L/usr/local/lib -lSDL2
-
 include $(PXL_DIR)/Makefile.inc
 
 CFLAGS  += $(PXL_CFLAGS)
@@ -29,9 +26,10 @@ test: $(TST)
 
 .for t in $(TST)
 $(t): $(t).c test.h $(PXL_DIR)/libpxl.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(t).c
+	$(CC) $(CFLAGS) $(t).c -o $@ $(LDFLAGS)
 .endfor
 
+${TST}: $(PXL_HDR)
 
 clean:
 	@rm -f $(TST)

@@ -1,0 +1,20 @@
+# pxl user config - copy this file to config.mk and edit as needed.
+#
+#   cp config.mk.example config.mk
+
+# Backend selection: x11 (default) or sdl
+#PXL_BACKEND = sdl
+
+# Release build: optimizations + assertions disabled.
+# NOTE: these flags REPLACE the default CFLAGS (defined in Makefile).
+# PXL_CFLAGS (backend-specific includes) are always appended afterwards.
+#CFLAGS = -O2 -DNDEBUG -std=c99 -Wall -Wextra
+
+#CC = clang
+
+# Backend library locations, if not found automatically or in the
+# default search path (see Makefile.inc for the pkg-config probe):
+#X11_CFLAGS = -I/usr/X11R6/include
+#X11_LIBS   = -L/usr/X11R6/lib -lX11 -lXext
+#SDL_CFLAGS = -I/usr/local/include/SDL2
+#SDL_LIBS   = -L/usr/local/lib -lSDL2

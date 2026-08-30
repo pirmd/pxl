@@ -8,25 +8,28 @@ PXL_DIR=..
 CC     ?= cc
 CFLAGS ?= -O0 -g -std=c99 -Wall -Wextra
 
-X11_LIBS   ?= -L/usr/X11R6/lib -lX11 -lXext
-SDL_LIBS   ?= -L/usr/local/lib -lSDL2
-
 include $(PXL_DIR)/Makefile.inc
 
 CFLAGS  += $(PXL_CFLAGS)
 CFLAGS  += -I.
 
 LDFLAGS += $(PXL_LDLIBS)
+# -lm required for demo_fountain.c (uses cosf/sinf from math.h)
 LDFLAGS += -lm
 
 all: $(DEMO)
 
 .for d in $(DEMO)
-$(d): $(d).c demo_helpers.c $(PXL_DIR)/libpxl.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(d).c demo_helpers.c
+$(d): $(d).c demo_helpers.o $(PXL_DIR)/libpxl.a
+	$(CC) $(CFLAGS) $(d).c demo_helpers.o -o $@ $(LDFLAGS)
 .endfor
 
+demo_helpers.o: demo_helpers.c demo_helpers.h $(PXL_HDR)
+	$(CC) $(CFLAGS) -c -o $@ demo_helpers.c
+
+${DEMO}: demo_helpers.h $(PXL_HDR)
+
 clean:
-	rm -f $(DEMO) demo_helpers.o
+	rm -f $(DEMO) *.o
 
 .PHONY: all clean
