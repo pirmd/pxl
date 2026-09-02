@@ -1,7 +1,7 @@
 # pxl - Unit tests
 
 TST  = test_buf test_input test_backend test_canvas test_geom test_shape test_blit test_text_basic
-TST += test_text test_tileset test_stepper test_app
+TST += test_text test_tileset test_stepper test_app test_camera
 
 PXL_DIR=..
 

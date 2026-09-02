@@ -58,7 +58,7 @@
 #define PAGE_W   ((PAPER_W - 2 * PAPER_MARGIN) / (CHAR_W + 1))
 #define PAGE_H   ((PAPER_H - 2 * PAPER_MARGIN) / (CHAR_H + LEADING))
 
-#define PRINT_DURATION  0.5   /* Duration of printing in s */
+#define PRINT_DURATION  0.2   /* Duration of printing in s */
 
 /*
  *  Typewriter state
@@ -163,7 +163,7 @@ render_typewriter(pxl_canvas_t *cnv, typewriter_t *tw) {
 	pxl_canvas_set_color(cnv, PAPER_COLOR);
 	pxl_fill_rect(cnv, MARGIN_X, MARGIN_Y, PAPER_W, PAPER_H);
 
-	pxl_canvas_set_offset(cnv, MARGIN_X + PAPER_MARGIN, MARGIN_Y + PAPER_MARGIN);
+	pxl_canvas_set_camera(cnv, MARGIN_X + PAPER_MARGIN, MARGIN_Y + PAPER_MARGIN);
 	pxl_canvas_set_scissor(cnv, MARGIN_X, MARGIN_Y, PAPER_W, PAPER_H);
 
     pxl_writer_t w;

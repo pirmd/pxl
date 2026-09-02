@@ -304,7 +304,6 @@ render_title(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_rect_t title_bounds = pxl_str_bounds(title_text);
 
 	pxl_canvas_set_color(cnv, TITLE_FG);
-	/* Position relative to the title canvas (0,0 is top-left of subview) */
 	int title_x = (TITLE_W - title_bounds.w) / 2;
 	int title_y = (TITLE_H - title_bounds.h) / 2;
 	pxl_draw_str(cnv, title_x, title_y, title_text);
@@ -314,8 +313,10 @@ static void
 render_font_view(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_canvas_set_color(cnv, GRID_VIEW_SELECT_FG);
 	/* Draw selection rectangle around current glyph (relative to start_idx) */
-	int selected_x = ((fv->glyph_idx - fv->start_idx) % fv->cols) * GRID_VIEW_CELL_W;
-	int selected_y = ((fv->glyph_idx - fv->start_idx) / fv->cols) * GRID_VIEW_CELL_H;
+	int selected_col = (fv->glyph_idx - fv->start_idx) % fv->cols;
+	int selected_row = (fv->glyph_idx - fv->start_idx) / fv->cols;
+	int selected_x = selected_col * GRID_VIEW_CELL_W;
+	int selected_y = selected_row * GRID_VIEW_CELL_H;
 	pxl_draw_rect(cnv, selected_x, selected_y, GRID_VIEW_CELL_W, GRID_VIEW_CELL_H);
 
 	pxl_writer_t w;
@@ -326,9 +327,11 @@ render_font_view(pxl_canvas_t *cnv, const font_view_t *fv) {
 		glyph_t glyph;
 		if (font_view_glyph(fv, i, &glyph) != 0) continue; /* no glyph found, should not happen */
 
-		/* Position relative to start_idx (0 = first glyph in current page) */
-		int x = ((i - fv->start_idx) % fv->cols) * GRID_VIEW_CELL_W + (GRID_VIEW_CELL_W - glyph.width) / 2;
-		int y = ((i - fv->start_idx) / fv->cols) * GRID_VIEW_CELL_H + (GRID_VIEW_CELL_H - glyph.height) / 2;
+		/* Position relative to start_idx, accounting for grid wrapping */
+		int col = (i - fv->start_idx) % fv->cols;
+		int row = (i - fv->start_idx) / fv->cols;
+		int x = col * GRID_VIEW_CELL_W + (GRID_VIEW_CELL_W - glyph.width) / 2;
+		int y = row * GRID_VIEW_CELL_H + (GRID_VIEW_CELL_H - glyph.height) / 2;
 
 		pxl_writer_set_cursor(&w, x, y);
 		pxl_draw_rune(cnv, &w, glyph.codepoint);
@@ -344,7 +347,6 @@ render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
 		return;
 	}
 
-	/* Calculate position relative to the glyph zoom canvas (0,0 is top-left of subview) */
 	int zoom_x = (GLYPH_ZOOM_W - glyph.width * GLYPH_ZOOM_FACTOR) / 2;
 	int zoom_y = (GLYPH_ZOOM_H - glyph.height * GLYPH_ZOOM_FACTOR) / 2;
 
@@ -369,7 +371,6 @@ render_glyph_characteristics(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_canvas_set_color(cnv, GLYPH_FG);
 
 	pxl_rect_t text_bounds = pxl_str_bounds(text);
-	/* Position relative to the glyph canvas (0,0 is top-left of subview) */
 	int text_x = (GLYPH_W - text_bounds.w) / 16;
 	int text_y = (GLYPH_H - text_bounds.h) / 2;
 	pxl_draw_str(cnv, text_x, text_y, text);
@@ -406,7 +407,6 @@ render_footer(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 	pxl_rect_t footer_bounds = pxl_str_bounds(footer_text);
 
-	/* Position relative to the footer canvas (0,0 is top-left of subview) */
 	int footer_x = (FOOTER_W - footer_bounds.w) / 2;
 	int footer_y = (FOOTER_H - footer_bounds.h) / 2;
 
@@ -424,7 +424,6 @@ render_text_preview(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_writer_init(&w, fv->font_family, (size_t)fv->font_family_size);
 	pxl_canvas_set_color(cnv, TEXT_PREVIEW_FG);
 
-	/* Position relative to the text preview canvas (0,0 is top-left of subview) */
 	pxl_writer_set_cursor(&w, 5, 5);
 	pxl_draw_text(cnv, &w, text);
 }

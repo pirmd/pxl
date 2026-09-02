@@ -14,7 +14,7 @@
 
 /* Drawing */
 #include "canvas.h"
-#include "geom.h"
+#include "camera.h"
 #include "shape.h"
 #include "blit.h"
 #include "text_basic.h"

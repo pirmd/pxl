@@ -36,4 +36,5 @@ PXL_LDLIBS += $(SDL_LIBS)
 PXL_HDR = $(PXL_DIR)/err.h $(PXL_DIR)/buf.h $(PXL_DIR)/input.h $(PXL_DIR)/backend.h \
           $(PXL_DIR)/canvas.h $(PXL_DIR)/bitmask.h $(PXL_DIR)/geom.h $(PXL_DIR)/shape.h \
           $(PXL_DIR)/blit.h $(PXL_DIR)/text_basic.h $(PXL_DIR)/text.h $(PXL_DIR)/tileset.h \
-          $(PXL_DIR)/stepper.h $(PXL_DIR)/color.h $(PXL_DIR)/app.h $(PXL_DIR)/pxl.h
+          $(PXL_DIR)/stepper.h $(PXL_DIR)/color.h $(PXL_DIR)/app.h $(PXL_DIR)/pxl.h \
+          $(PXL_DIR)/camera.h
