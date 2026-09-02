@@ -322,6 +322,24 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
                 pxl_input_release(in, PXL_WM_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                 pxl_input_press(in, PXL_WM_FOCUS_LOST);
+            } else if (event->window.event == SDL_WINDOWEVENT_RESIZED) {
+                g_sdl.width = event->window.data1;
+                g_sdl.height = event->window.data2;
+                in->window_width = g_sdl.width;
+                in->window_height = g_sdl.height;
+                pxl_input_press(in, PXL_WM_RESIZE);
+                
+                /* Recreate texture with new size */
+                SDL_DestroyTexture(g_sdl.texture);
+                g_sdl.texture = SDL_CreateTexture(
+                    g_sdl.renderer,
+                    SDL_PIXELFORMAT_ARGB8888,
+                    SDL_TEXTUREACCESS_STREAMING,
+                    g_sdl.width, g_sdl.height
+                );
+                if (!g_sdl.texture) {
+                    /* Fallback: continue with old texture (will fail in begin_frame) */
+                }
             }
             break;
 

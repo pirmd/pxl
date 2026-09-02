@@ -30,6 +30,8 @@ static struct {
     XShmSegmentInfo shm;
     XImage         *img;
     int             width, height;
+    int             depth;
+    Visual         *visual;
     Atom            wm_delete;
     /* Input method / input context: required for Xutf8LookupString to
      * produce correct UTF-8 text (dead keys, compose sequences, non-Latin1
@@ -88,9 +90,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
         return PXL_E_BACKEND_INIT;
     }
 
-    Visual *visual = NULL;
-    int depth = 0;
-    if (!select_argb_visual(g_x11.display, &visual, &depth)) goto fail;
+    if (!select_argb_visual(g_x11.display, &g_x11.visual, &g_x11.depth)) goto fail;
 
     int scr = DefaultScreen(g_x11.display);
     Window root = RootWindow(g_x11.display, scr);
@@ -143,7 +143,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     XMapWindow(g_x11.display, g_x11.window);
     XSync(g_x11.display, False);
 
-    g_x11.img = XShmCreateImage(g_x11.display, visual, (unsigned int)depth, ZPixmap, NULL,
+    g_x11.img = XShmCreateImage(g_x11.display, g_x11.visual, (unsigned int)g_x11.depth, ZPixmap, NULL,
                                 &g_x11.shm, (unsigned int)w, (unsigned int)h);
     if (!g_x11.img) goto fail;
 
@@ -172,6 +172,9 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 
     g_x11.width = w;
     g_x11.height = h;
+    
+    /* Initialize window_width/height in input (will be updated on resize) */
+    /* Note: Not set here as input is managed by poll_events/wait_events */
 
     /* Unmap if hidden flag is set */
     if (flags & PXL_BACKEND_HIDDEN) {
@@ -476,6 +479,71 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         case FocusOut:
             pxl_input_press(in, PXL_WM_FOCUS_LOST);
             if (g_x11.xic) XUnsetICFocus(g_x11.xic);
+            break;
+
+        case ConfigureNotify:
+            /* Window resize event */
+            if (event->xconfigure.width != g_x11.width ||
+                event->xconfigure.height != g_x11.height) {
+                g_x11.width = event->xconfigure.width;
+                g_x11.height = event->xconfigure.height;
+                in->window_width = g_x11.width;
+                in->window_height = g_x11.height;
+                pxl_input_press(in, PXL_WM_RESIZE);
+
+                /* Recreate XImage and XShm with new size */
+                if (g_x11.img) {
+                    XShmDetach(g_x11.display, &g_x11.shm);
+                    if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
+                        shmdt(g_x11.shm.shmaddr);
+                    }
+                    shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
+                    XDestroyImage(g_x11.img);
+                    g_x11.img = NULL;
+                }
+
+                g_x11.img = XShmCreateImage(g_x11.display, g_x11.visual, (unsigned int)g_x11.depth, ZPixmap, NULL,
+                                            &g_x11.shm, (unsigned int)g_x11.width, (unsigned int)g_x11.height);
+                if (!g_x11.img) break;
+
+                if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) {
+                    XDestroyImage(g_x11.img);
+                    g_x11.img = NULL;
+                    break;
+                }
+
+                if (g_x11.height > 0 && g_x11.img->bytes_per_line > INT_MAX / g_x11.height) {
+                    XDestroyImage(g_x11.img);
+                    g_x11.img = NULL;
+                    break;
+                }
+
+                g_x11.shm.shmid = shmget(IPC_PRIVATE,
+                                       (size_t)g_x11.img->bytes_per_line * (size_t)g_x11.height,
+                                       IPC_CREAT | 0777);
+                if (g_x11.shm.shmid < 0) {
+                    XDestroyImage(g_x11.img);
+                    g_x11.img = NULL;
+                    break;
+                }
+
+                g_x11.shm.shmaddr = g_x11.img->data = shmat(g_x11.shm.shmid, 0, 0);
+                if (g_x11.shm.shmaddr == (char *)-1) {
+                    shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
+                    XDestroyImage(g_x11.img);
+                    g_x11.img = NULL;
+                    break;
+                }
+
+                g_x11.shm.readOnly = False;
+                if (!XShmAttach(g_x11.display, &g_x11.shm)) {
+                    shmdt(g_x11.shm.shmaddr);
+                    shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
+                    XDestroyImage(g_x11.img);
+                    g_x11.img = NULL;
+                    break;
+                }
+            }
             break;
     }
 }

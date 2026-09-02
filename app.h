@@ -89,6 +89,12 @@ pxl_app_advance(pxl_app_t *app) {
 
 	pxl_backend_poll_events(&app->curr);
 
+	/* Update app width/height if window was resized */
+	if (pxl_input_state(&app->curr, PXL_WM_RESIZE)) {
+		app->width = app->curr.window_width;
+		app->height = app->curr.window_height;
+	}
+
 	return !pxl_app_should_close(app);
 }
 
@@ -104,6 +110,12 @@ pxl_app_advance_wait(pxl_app_t *app) {
 	app->curr.mouse_wheel_y = 0;
 
 	pxl_backend_wait_events(&app->curr);
+
+	/* Update app width/height if window was resized */
+	if (pxl_input_state(&app->curr, PXL_WM_RESIZE)) {
+		app->width = app->curr.window_width;
+		app->height = app->curr.window_height;
+	}
 
 	return !pxl_app_should_close(app);
 }

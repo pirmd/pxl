@@ -87,6 +87,7 @@ typedef enum {
 	PXL_WM_FOCUS_LOST,
 	PXL_WM_MOUSE_FOCUS_LOST,
 	PXL_WM_QUIT,
+	PXL_WM_RESIZE,
 
     PXL_IN_COUNT
 } pxl_input_code_t;
@@ -100,6 +101,7 @@ typedef struct {
 	uint64_t state[(PXL_IN_COUNT + 63) / 64];    /* Current key/mouse button state */
 	int mouse_x, mouse_y;                        /* Current mouse position         */
 	int mouse_wheel_x, mouse_wheel_y;            /* Wheel delta since last reset   */
+	int window_width, window_height;            /* Current window size (0 if not initialized) */
 } pxl_input_t;
 
 /* Check key/mouse button state. Returns 1 if pressed/down, 0 if released/up. */
