@@ -2,6 +2,7 @@
 #define PXL_INPUT_H
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 /*
@@ -102,8 +103,8 @@ typedef struct {
 	int mouse_wheel_x, mouse_wheel_y;            /* Wheel delta since last reset   */
 } pxl_input_t;
 
-/* Check key/mouse button state. Returns 1 if pressed/down, 0 if released/up. */
-static inline int
+/* Check key/mouse button state. Returns true if pressed/down, false if released/up. */
+static inline bool
 pxl_input_state(const pxl_input_t *in, pxl_input_code_t c) {
 	assert(in);
 	assert(c >= 0 && c < PXL_IN_COUNT);
