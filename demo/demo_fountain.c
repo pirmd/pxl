@@ -389,7 +389,7 @@ render_particle_count(pxl_canvas_t *cnv, const fountain_t *fountain, const pxl_f
 	uint32_t fg = 0xFFFFFFFF;
 	pxl_canvas_set_color(cnv, fg);
 	
-	/* Draw at top-left */
+	/* Draw at top-left (relative to viewport) */
 	int x = 10;
 	int y = 10 + bounds.h;
 	 demo_draw_text_scaled(cnv, font, count_str, 1, x, y);
@@ -466,8 +466,8 @@ render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 
 	int border = bounds.h / 6;
 	int pad = bounds.h / 2;
-	int x = W/2 - bounds.w / 2;
-	int y = H/2 - bounds.h / 2;
+	int x = cnv->scissor.x + cnv->scissor.w / 2 - bounds.w / 2;
+	int y = cnv->scissor.y + cnv->scissor.h / 2 - bounds.h / 2;
 
 	uint32_t fg = WHITE;
 	uint32_t bg = BLACK;
@@ -521,8 +521,10 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 
 	int border = scale * 4;
 	int pad = scale * 6;
-	int x = (W - max_width) / 2 - pad - border;
-	int y = (H - total_height) / 2 - pad - border;
+	int w = pxl_canvas_view_width(cnv);
+	int h = pxl_canvas_view_height(cnv);
+	int x = (w - max_width) / 2 - pad - border;
+	int y = (h - total_height) / 2 - pad - border;
 
 	uint32_t fg = WHITE;
 	uint32_t bg = BLACK;
@@ -635,8 +637,8 @@ main(void) {
 			pxl_canvas_init(&cnv, &pb);
 
 			/* Main canvas (full screen) */
-			pxl_canvas_t cnv_main = cnv;
-			pxl_canvas_set_scissor(&cnv_main, 0, 0, W, H);
+			pxl_canvas_t cnv_main;
+			pxl_canvas_init_view(&cnv_main, &pb, 0, 0, W, H);
 
 			/* Interpolate and render */
 			fountain_t fountain_interpolated;
@@ -654,7 +656,8 @@ main(void) {
 				uint32_t fg = 0xFFFFFFFF;
 				pxl_canvas_set_color(&cnv_main, fg);
 				demo_draw_text_scaled(&cnv_main, ui.font, fps_str, 1,
-					W - fps_bounds.w - 10, H - fps_bounds.h - 10);
+					pxl_canvas_view_width(&cnv_main) - fps_bounds.w - 10,
+					pxl_canvas_view_height(&cnv_main) - fps_bounds.h - 10);
 			}
 
 			/* Draw pause overlay */

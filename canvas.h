@@ -75,7 +75,46 @@ pxl_canvas_reset_offset(pxl_canvas_t *cnv) {
 	cnv->offset_y = 0;
 }
 
-/* Drawing ----------------------------------------------------------------- */
+/* Views ------------------------------------------------------------------- */
+
+/* Initialize a canvas with a specific viewport (offset + scissor).
+ * Equivalent to pxl_canvas_init() followed by pxl_canvas_set_offset() and pxl_canvas_set_scissor().
+ */
+static inline void
+pxl_canvas_init_view(pxl_canvas_t *cnv, pxl_buf_t *pb, int x, int y, int w, int h) {
+	pxl_canvas_init(cnv, pb);
+	pxl_canvas_set_offset(cnv, x, y);
+	pxl_canvas_set_scissor(cnv, x, y, w, h);
+}
+
+/* Derive a subview from an existing canvas.
+ * Copies the source canvas state, then applies a relative offset and sets a new scissor.
+ * The subview's offset is relative to the source canvas's offset.
+ */
+static inline void
+pxl_canvas_set_subview(pxl_canvas_t *dst, const pxl_canvas_t *src, int x, int y, int w, int h) {
+	*dst = *src;
+	pxl_canvas_set_offset(dst, dst->offset_x + x, dst->offset_y + y);
+	pxl_canvas_set_scissor(dst, x, y, w, h);
+}
+
+/* Viewport helpers ------------------------------------------------------- */
+
+/* Get the width of the canvas's scissor (viewport width) */
+static inline int
+pxl_canvas_view_width(const pxl_canvas_t *cnv) {
+	assert(cnv);
+	return cnv->scissor.w;
+}
+
+/* Get the height of the canvas's scissor (viewport height) */
+static inline int
+pxl_canvas_view_height(const pxl_canvas_t *cnv) {
+	assert(cnv);
+	return cnv->scissor.h;
+}
+
+/* Drawing ---------------------------------------------------------------- */
 static inline void
 pxl_canvas_clear(pxl_canvas_t *cnv) {
 	assert(cnv && cnv->pb);
