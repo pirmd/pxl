@@ -292,8 +292,8 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	assert(cnv != NULL && p != NULL && ui != NULL);
 	const pxl_font_t *font = ui->font;
 	int scale = SCORE_ZOOM;
-	const int viewport_w = cnv->scissor.w;
-	const int viewport_h = cnv->scissor.h;
+	const int w = pxl_canvas_view_width(cnv);
+	const int h = pxl_canvas_view_height(cnv);
 
 	pxl_canvas_set_color(cnv, FG_COLOR);
 
@@ -302,36 +302,37 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	snprintf(score_str, sizeof(score_str), "%d", p->score_left);
 	pxl_rect_t bounds = demo_text_bounds_scaled(font, score_str, scale);
 	demo_draw_text_scaled(cnv, font, score_str, scale,
-			viewport_w / 4 - bounds.w / 2,
-			viewport_h / 2 - bounds.h / 2);
+			w / 4 - bounds.w / 2,
+			h / 2 - bounds.h / 2);
 
 	/* Right score */
 	snprintf(score_str, sizeof(score_str), "%d", p->score_right);
 	bounds = demo_text_bounds_scaled(font, score_str, scale);
 	demo_draw_text_scaled(cnv, font, score_str, scale,
-			3 * viewport_w / 4 - bounds.w / 2,
-			viewport_h / 2 - bounds.h / 2);
+			3 * w / 4 - bounds.w / 2,
+			h / 2 - bounds.h / 2);
 }
 
 static void
 render_game(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	assert(cnv != NULL && p != NULL && ui != NULL);
 
-	const int viewport_h = cnv->scissor.h;
+	const int w = pxl_canvas_view_width(cnv);
+	const int h = pxl_canvas_view_height(cnv);
 
 	/* Draw center line */
 	pxl_canvas_set_color(cnv, FG_COLOR);
-	for (int y = 0; y < viewport_h; y += 30) {
-		pxl_fill_rect(cnv, cnv->scissor.w / 2 - 2, y, 4, 20);
+	for (int y = 0; y < h; y += 30) {
+		pxl_fill_rect(cnv, w / 2 - 2, y, 4, 20);
 	}
 
-	/* Draw paddles */
+	/* Draw paddles (coordinates are already relative to viewport) */
 	pxl_fill_rect(cnv, (int)p->paddle_left.x, (int)p->paddle_left.y,
 		(int)p->paddle_left.w, (int)p->paddle_left.h);
 	pxl_fill_rect(cnv, (int)p->paddle_right.x, (int)p->paddle_right.y,
 		(int)p->paddle_right.w, (int)p->paddle_right.h);
 
-	/* Draw ball */
+	/* Draw ball (coordinates are already relative to viewport) */
 	pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, (int)p->ball.radius);
 }
 
@@ -346,8 +347,8 @@ render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 
 	int border = bounds.h / 6;
 	int pad = bounds.h / 2;
-	int x = W/2 - bounds.w / 2;
-	int y = H/2 - bounds.h / 2;
+	int x = cnv->scissor.x + cnv->scissor.w / 2 - bounds.w / 2;
+	int y = cnv->scissor.y + cnv->scissor.h / 2 - bounds.h / 2;
 
 	uint32_t fg = FG_COLOR;
 	uint32_t bg = BG_COLOR;
@@ -399,8 +400,10 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 
 	int border = scale * 4;
 	int pad = scale * 6;
-	int x = (W - max_width) / 2 - pad - border;
-	int y = (H - total_height) / 2 - pad - border;
+	int w = pxl_canvas_view_width(cnv);
+	int h = pxl_canvas_view_height(cnv);
+	int x = (w - max_width) / 2 - pad - border;
+	int y = (h - total_height) / 2 - pad - border;
 
 	uint32_t fg = FG_COLOR;
 	uint32_t bg = BG_COLOR;
@@ -491,11 +494,11 @@ main(void) {
 			pxl_canvas_t cnv;
 			pxl_canvas_init(&cnv, &pb);
 
-			pxl_canvas_t cnv_score = cnv;
-			pxl_canvas_set_scissor(&cnv_score, 0, 0, W, 50);
+			pxl_canvas_t cnv_score;
+			pxl_canvas_init_view(&cnv_score, &pb, 0, 0, W, 50);
 
-			pxl_canvas_t cnv_game = cnv;
-			pxl_canvas_set_scissor(&cnv_game, 0, 0, W, H);
+			pxl_canvas_t cnv_game;
+			pxl_canvas_init_view(&cnv_game, &pb, 0, 0, W, H);
 
 			/* Clear */
 			pxl_canvas_set_color(&cnv, BG_COLOR);
@@ -520,7 +523,8 @@ main(void) {
 				pxl_rect_t fps_bounds = demo_text_bounds_scaled(ui.font, fps_str, 1);
 				pxl_canvas_set_color(&cnv_game, FG_COLOR);
 				demo_draw_text_scaled(&cnv_game, ui.font, fps_str, 1,
-					W - fps_bounds.w - 10, H - fps_bounds.h - 10);
+					pxl_canvas_view_width(&cnv_game) - fps_bounds.w - 10,
+					pxl_canvas_view_height(&cnv_game) - fps_bounds.h - 10);
 			}
 
 			/* Draw pause overlay */
