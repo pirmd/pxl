@@ -1,0 +1,163 @@
+name: Cross-Platform CI
+
+on:
+  push:
+    branches: [ main, devel, build ]
+  pull_request:
+    branches: [ main, devel, build ]
+
+jobs:
+  # ============================================================================
+  # macOS (X11 + SDL2)
+  # ============================================================================
+  macos:
+    name: macOS (Clang + SDL2/X11 via XQuartz)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (SDL2, XQuartz for X11)
+        run: |
+          brew update
+          brew install sdl2
+          # XQuartz is pre-installed on macOS runners, but we need to configure it
+          export DISPLAY=:0
+
+      - name: Lint
+        run: make lint
+
+      - name: Build (default backend: x11)
+        run: |
+          export DISPLAY=:0
+          make clean
+          make
+
+      - name: Run tests
+        run: |
+          export DISPLAY=:0
+          make test
+
+      - name: Test SDL2 backend
+        run: |
+          export DISPLAY=:0
+          make clean
+          make BACKEND=sdl
+          make test
+
+
+  # ============================================================================
+  # OpenBSD (via VM)
+  # ============================================================================
+  openbsd:
+    name: OpenBSD (x86_64)
+    runs-on: macos-12  # Required for nested virtualization
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run in OpenBSD VM
+        uses: vmactions/openbsd-vm@v1
+        with:
+          arch: x86_64
+          version: "7.5"
+          sync: rsync
+          prepare: |
+            pkg_add -z git gmake gcc
+            # Install SDL2 and X11 dependencies
+            pkg_add -z sdl2 libX11 libXext libXrender libxcb
+          run: |
+            cd $GITHUB_WORKSPACE
+            # Build with X11 backend (default)
+            make clean
+            make
+            make test
+
+
+  # ============================================================================
+  # NetBSD (via VM)
+  # ============================================================================
+  netbsd:
+    name: NetBSD (x86_64)
+    runs-on: macos-12  # Required for nested virtualization
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run in NetBSD VM
+        uses: vmactions/netbsd-vm@v1
+        with:
+          arch: x86_64
+          version: "10.0"
+          sync: rsync
+          prepare: |
+            pkgin -y install git gmake gcc
+            # Install SDL2 and X11 dependencies
+            pkgin -y install sdl2 libX11 libXext libXrender
+          run: |
+            cd $GITHUB_WORKSPACE
+            # Build with X11 backend (default)
+            make clean
+            make
+            make test
+
+
+  # ============================================================================
+  # Raspberry Pi (Cross-compilation ARM64)
+  # ============================================================================
+  raspberry-pi:
+    name: Raspberry Pi (ARM64 Cross-Compile)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cross-compilation toolchain
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          # Install SDL2 for ARM64
+          sudo apt-get install -y libsdl2-dev:arm64
+
+      - name: Cross-compile for ARM64
+        env:
+          CC: aarch64-linux-gnu-gcc
+          CFLAGS: -I/usr/include/SDL2
+          LDFLAGS: -L/usr/lib/aarch64-linux-gnu
+        run: |
+          make clean
+          make BACKEND=sdl
+          file libpxl.a  # Verify it's ARM64
+
+      - name: Upload ARM64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pxl-arm64
+          path: libpxl.a
+          if-no-files-found: error
+
+
+  # ============================================================================
+  # Windows (MinGW)
+  # ============================================================================
+  windows:
+    name: Windows (MinGW + SDL2)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install MinGW and SDL2
+        run: |
+          choco install mingw -y
+          choco install sdl2 -y
+          # Add MinGW to PATH
+          echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
+
+      - name: Build with MinGW
+        env:
+          CC: gcc
+        run: |
+          make clean
+          make BACKEND=sdl
+          make test
