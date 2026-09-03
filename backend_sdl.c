@@ -12,8 +12,8 @@ static struct {
     SDL_Window   *window;
     SDL_Renderer *renderer;
     SDL_Texture  *texture;
-    int width;
-    int height;
+    int logical_w, logical_h;   /* Rendering resolution (what app sees) */
+    int physical_w, physical_h; /* Window/display resolution (what backend shows) */
     /* Text input buffer for typed characters (UTF-8) */
     char text_buffer[128];
     int text_buffer_len;
@@ -33,8 +33,8 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 		return PXL_E_BACKEND_INIT;
 	}
 
-	/* Build window flags */
-	uint32_t window_flags = 0;
+	/* Build window flags - always resizable to allow physical size changes */
+	uint32_t window_flags = SDL_WINDOW_RESIZABLE;
 	if (flags & PXL_BACKEND_FULLSCREEN) {
 		window_flags |= SDL_WINDOW_FULLSCREEN;
 	}
@@ -49,6 +49,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 		y = SDL_WINDOWPOS_CENTERED;
 	}
 
+	/* Window and texture are initially created at logical size (w x h) */
 	g_sdl.window = SDL_CreateWindow(
 		title,
 		x, y,
@@ -69,6 +70,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	);
 	if (!g_sdl.renderer) goto fail;
 
+	/* Texture is always at LOGICAL size (what app renders to) */
 	g_sdl.texture = SDL_CreateTexture(
 		g_sdl.renderer,
 		SDL_PIXELFORMAT_ARGB8888,  /* ARGB8888 to match PXL color native format */
@@ -77,8 +79,11 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	);
 	if (!g_sdl.texture) goto fail;
 
-	g_sdl.width = w;
-	g_sdl.height = h;
+	/* Initialize sizes: logical = texture size, physical = window size (same at start) */
+	g_sdl.logical_w = w;
+	g_sdl.logical_h = h;
+	g_sdl.physical_w = w;
+	g_sdl.physical_h = h;
 
 	/* Enable text input for character retrieval */
 	SDL_StartTextInput();
@@ -113,8 +118,9 @@ pxl_backend_begin_frame(pxl_buf_t *out_pb) {
 
     assert(pitch % (int)sizeof(pxl_t) == 0);
 
-    out_pb->width = g_sdl.width;
-    out_pb->height = g_sdl.height;
+    /* Always return LOGICAL size to the application */
+    out_pb->width = g_sdl.logical_w;
+    out_pb->height = g_sdl.logical_h;
     out_pb->stride = pitch / (int)sizeof(pxl_t);
     out_pb->data = (pxl_t *)pixels;
 
@@ -125,13 +131,36 @@ pxl_err_t
 pxl_backend_end_frame(void) {
     SDL_UnlockTexture(g_sdl.texture);
     SDL_RenderClear(g_sdl.renderer);
-    SDL_RenderCopy(g_sdl.renderer, g_sdl.texture, NULL, NULL);
+    
+    /* Render texture at LOGICAL size to PHYSICAL size with scaling */
+    SDL_Rect dest_rect = {0, 0, g_sdl.physical_w, g_sdl.physical_h};
+    SDL_RenderCopy(g_sdl.renderer, g_sdl.texture, NULL, &dest_rect);
     
     if (SDL_RenderPresent(g_sdl.renderer) != 0) {
         pxl_log(SDL_GetError());
         return PXL_E_BACKEND_FRAME;
     }
     return PXL_SUCCESS;
+}
+
+void
+pxl_backend_set_physical_size(int physical_w, int physical_h) {
+    if (physical_w <= 0 || physical_h <= 0) {
+        return;  /* Ignore invalid sizes */
+    }
+    
+    /* Update physical size */
+    g_sdl.physical_w = physical_w;
+    g_sdl.physical_h = physical_h;
+    
+    /* Resize window */
+    SDL_SetWindowSize(g_sdl.window, physical_w, physical_h);
+}
+
+void
+pxl_backend_get_physical_size(int *out_w, int *out_h) {
+    if (out_w) *out_w = g_sdl.physical_w;
+    if (out_h) *out_h = g_sdl.physical_h;
 }
 
 double
@@ -322,6 +351,10 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
                 pxl_input_release(in, PXL_WM_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                 pxl_input_press(in, PXL_WM_FOCUS_LOST);
+            } else if (event->window.event == SDL_WINDOWEVENT_RESIZED) {
+                /* Update physical size on window resize */
+                g_sdl.physical_w = event->window.data1;
+                g_sdl.physical_h = event->window.data2;
             }
             break;
 

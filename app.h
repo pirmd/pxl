@@ -31,7 +31,8 @@
 typedef struct {
 	/* User configurable attributes */
 	const char* title;
-	int width, height;
+	int width, height;          /* Logical size (rendering resolution) */
+	int physical_w, physical_h; /* Physical size (window/display). 0 = use width/height */
 	pxl_backend_flags_t backend_flags;
 
 	double physics_dt;              /* Fixed timestep in seconds. 0 = disable physics stepper */
@@ -50,6 +51,11 @@ pxl_app_init(pxl_app_t *app) {
 	
 	if (pxl_backend_init(app->title, app->width, app->height, app->backend_flags) != PXL_SUCCESS) {
 		return PXL_E_BACKEND_INIT;
+	}
+	
+	/* Set physical size if specified (0 means use logical size) */
+	if (app->physical_w > 0 && app->physical_h > 0) {
+		pxl_backend_set_physical_size(app->physical_w, app->physical_h);
 	}
 	
 	app->curr = (pxl_input_t){0};

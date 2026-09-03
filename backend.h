@@ -35,9 +35,24 @@ typedef enum {
 	PXL_BACKEND_CENTERED   = (1 << 3),  /* Center window on screen */
 } pxl_backend_flags_t;
 
-/* Initialize the backend */
+/* Initialize the backend with a logical size (rendering resolution).
+ * The physical size (window/display size) defaults to the same as logical size.
+ * Use pxl_backend_set_physical_size() to change the window/display size after init.
+ */
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags);
+
+/* Set the physical window/display size.
+ * This allows for scaling between logical (rendering) and physical (display) sizes.
+ * For example: logical 800x600 -> physical 1600x1200 for HiDPI.
+ * Call this after pxl_backend_init() to enable scaling.
+ */
+void
+pxl_backend_set_physical_size(int physical_w, int physical_h);
+
+/* Get the current physical window/display size. */
+void
+pxl_backend_get_physical_size(int *out_w, int *out_h);
 
 /* Cleanup the backend */
 void

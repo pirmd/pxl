@@ -29,7 +29,8 @@ static struct {
     GC              gc;
     XShmSegmentInfo shm;
     XImage         *img;
-    int             width, height;
+    int             logical_w, logical_h;   /* Rendering resolution (what app sees) */
+    int             physical_w, physical_h; /* Window/display resolution (what backend shows) */
     Atom            wm_delete;
     /* Input method / input context: required for Xutf8LookupString to
      * produce correct UTF-8 text (dead keys, compose sequences, non-Latin1
@@ -170,8 +171,8 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     g_x11.gc = XCreateGC(g_x11.display, g_x11.window, 0, NULL);
     if (!g_x11.gc) goto fail;
 
-    g_x11.width = w;
-    g_x11.height = h;
+    g_x11.logical_w = w;
+    g_x11.logical_h = h;
 
     /* Unmap if hidden flag is set */
     if (flags & PXL_BACKEND_HIDDEN) {
@@ -199,6 +200,11 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     }
 
     XFlush(g_x11.display);
+    
+    /* Initialize physical size to match logical size */
+    g_x11.physical_w = w;
+    g_x11.physical_h = h;
+
 
     return PXL_SUCCESS;
 
@@ -252,8 +258,9 @@ pxl_backend_begin_frame(pxl_buf_t *out_pb) {
 	assert(g_x11.display && g_x11.img && g_x11.img->data);
     assert(g_x11.img->bytes_per_line % (int)sizeof(pxl_t) == 0);
 
-    out_pb->width  = g_x11.width;
-    out_pb->height = g_x11.height;
+    /* Always return LOGICAL size to the application */
+    out_pb->width  = g_x11.logical_w;
+    out_pb->height = g_x11.logical_h;
     out_pb->stride = g_x11.img->bytes_per_line / (int)sizeof(pxl_t);
     out_pb->data   = (pxl_t *)g_x11.img->data;
 
@@ -265,7 +272,7 @@ pxl_backend_end_frame(void) {
     assert(g_x11.display && g_x11.img && g_x11.img->data);
 
     Bool success = XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
-                                g_x11.img, 0, 0, 0, 0, (unsigned int)g_x11.width, (unsigned int)g_x11.height,
+                                g_x11.img, 0, 0, 0, 0, (unsigned int)g_x11.logical_w, (unsigned int)g_x11.logical_h,
                                 False);
     XSync(g_x11.display, False);
     
@@ -528,4 +535,25 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     memmove(g_x11.text_buffer, g_x11.text_buffer + copy_len, (size_t)g_x11.text_buffer_len);
 
     return copy_len;
+}
+
+void
+pxl_backend_set_physical_size(int physical_w, int physical_h) {
+    if (physical_w <= 0 || physical_h <= 0) {
+        return;  /* Ignore invalid sizes */
+    }
+    
+    /* Update physical size */
+    g_x11.physical_w = physical_w;
+    g_x11.physical_h = physical_h;
+    
+    /* Resize window */
+    XResizeWindow(g_x11.display, g_x11.window, (unsigned int)physical_w, (unsigned int)physical_h);
+    XSync(g_x11.display, False);
+}
+
+void
+pxl_backend_get_physical_size(int *out_w, int *out_h) {
+    if (out_w) *out_w = g_x11.physical_w;
+    if (out_h) *out_h = g_x11.physical_h;
 }
