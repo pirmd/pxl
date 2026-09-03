@@ -30,6 +30,7 @@
 #include <stdio.h>
 
 #include "pxl.h"
+#include "text.h"
 #include "demo_helpers.h"
 #include "font_9x15.h"
 
@@ -309,8 +310,10 @@ main(void) {
 				pxl_rect_t fps_bounds = demo_text_bounds_scaled(&font_9x15_latin, fps_str, 1);
 				uint32_t fg = 0xFFFFFFFF;
 				pxl_canvas_set_color(&cnv, fg);
-				demo_draw_text_scaled(&cnv, &font_9x15_latin, fps_str, 1,
-					W - fps_bounds.w - 10, H - fps_bounds.h - 10);
+				/* Use pxl_align_x/pxl_align_y for right alignment */
+				int fps_x = pxl_align_x(0, W, fps_bounds.w, PXL_ALIGN_RIGHT) - 10;
+				int fps_y = pxl_align_y(0, H, fps_bounds.h, PXL_ALIGN_RIGHT) - 10;
+				demo_draw_text_scaled(&cnv, &font_9x15_latin, fps_str, 1, fps_x, fps_y);
 			}
 
 			(void)pxl_backend_end_frame();
