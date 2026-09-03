@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, devel, build ]
+  pull_request:
+    branches: [ main, devel, build ]
+
+jobs:
+  build-and-test:
+    name: Build and Test (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (SDL2, X11)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libsdl2-dev libx11-dev libxext-dev libxrender-dev libxcb1-dev libx11-xcb-dev libxcb-render0-dev libxcb-shm0-dev
+
+      - name: Lint
+        run: make lint
+
+      - name: Build
+        run: make
+
+      - name: Run tests
+        run: make test
+
+  test-all-backends:
+    name: Test All Backends
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (SDL2, X11)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libsdl2-dev libx11-dev libxext-dev libxrender-dev libxcb1-dev libx11-xcb-dev libxcb-render0-dev libxcb-shm0-dev
+
+      - name: Test all backends
+        run: sh test-all.sh
+
+  build-demo:
+    name: Build Demos
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (SDL2, X11)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libsdl2-dev libx11-dev libxext-dev libxrender-dev libxcb1-dev libx11-xcb-dev libxcb-render0-dev libxcb-shm0-dev
+
+      - name: Build demos
+        run: make demo
