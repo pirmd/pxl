@@ -681,6 +681,130 @@ test_pxl_text_bounds_cascade(void) {
 	ASSERT(bounds.h == g_font_a.glyph_height);
 }
 
+/* Tests for alignment helpers */
+
+static void
+test_pxl_align_x_left(void) {
+	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_LEFT);
+	ASSERT(x == 100);
+}
+
+static void
+test_pxl_align_x_center(void) {
+	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_CENTER);
+	ASSERT(x == 100 + (800 - 200) / 2);
+	ASSERT(x == 400);
+}
+
+static void
+test_pxl_align_x_right(void) {
+	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_RIGHT);
+	ASSERT(x == 100 + 800 - 200);
+	ASSERT(x == 700);
+}
+
+static void
+test_pxl_align_y_top(void) {
+	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_LEFT);
+	ASSERT(y == 50);
+}
+
+static void
+test_pxl_align_y_center(void) {
+	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_CENTER);
+	ASSERT(y == 50 + (200 - 100) / 2);
+	ASSERT(y == 100);
+}
+
+static void
+test_pxl_align_y_bottom(void) {
+	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_RIGHT);
+	ASSERT(y == 50 + 200 - 100);
+	ASSERT(y == 150);
+}
+
+/* Tests for truncated text helpers */
+
+static void
+test_pxl_text_bounds_n_basic(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "ABC", 10);
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h > 0);
+}
+
+static void
+test_pxl_text_bounds_n_empty(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "ABC", 0);
+	ASSERT(bounds.w == 0);
+	ASSERT(bounds.h == 0);
+}
+
+static void
+test_pxl_text_bounds_n_partial(void) {
+	setup_fixture();
+	pxl_rect_t full_bounds = pxl_text_bounds(&g_w, "ABC");
+	pxl_rect_t partial_bounds = pxl_text_bounds_n(&g_w, "ABC", 2);
+	ASSERT(partial_bounds.w <= full_bounds.w);
+	ASSERT(partial_bounds.h == full_bounds.h);
+}
+
+static void
+test_pxl_text_bounds_n_with_newline(void) {
+	setup_fixture();
+	const char *text = "A\nBC";
+	const char *first_line = text;
+	const char *newline = strchr(text, '\n');
+	size_t first_line_bytes = newline - first_line;
+
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, first_line_bytes);
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == g_w.fonts[0]->glyph_height);
+}
+
+static void
+test_pxl_draw_text_n_basic(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "ABC";
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text_n(&g_cnv, &g_w, text, 10);
+
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, 10);
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+static void
+test_pxl_draw_text_n_empty(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text_n(&g_cnv, &g_w, "ABC", 0);
+
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_pxl_draw_text_n_partial(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "ABC";
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text_n(&g_cnv, &g_w, text, 2);
+
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, 2);
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
 /* Main */
 
 int
@@ -731,6 +855,23 @@ main(void) {
 	test_pxl_draw_rune_cascade_missing_rune();
 	test_pxl_draw_rune_cascade_lowercase();
 	test_pxl_text_bounds_cascade();
+
+	/* Tests for alignment helpers */
+	test_pxl_align_x_left();
+	test_pxl_align_x_center();
+	test_pxl_align_x_right();
+	test_pxl_align_y_top();
+	test_pxl_align_y_center();
+	test_pxl_align_y_bottom();
+
+	/* Tests for truncated text helpers */
+	test_pxl_text_bounds_n_basic();
+	test_pxl_text_bounds_n_empty();
+	test_pxl_text_bounds_n_partial();
+	test_pxl_text_bounds_n_with_newline();
+	test_pxl_draw_text_n_basic();
+	test_pxl_draw_text_n_empty();
+	test_pxl_draw_text_n_partial();
 
 	return 0;
 }

@@ -265,3 +265,121 @@ pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune) {
 
 	return (pxl_rect_t){0, 0, glyph_w, glyph_h};
 }
+
+/* --- Alignment helpers --- */
+
+int
+pxl_align_x(int x0, int container_w, int text_w, pxl_align_t align) {
+	switch (align) {
+		case PXL_ALIGN_LEFT:
+			return x0;
+		case PXL_ALIGN_CENTER:
+			return x0 + (container_w - text_w) / 2;
+		case PXL_ALIGN_RIGHT:
+			return x0 + container_w - text_w;
+		default:
+			assert(0 && "Invalid align value");
+			return x0;
+	}
+}
+
+int
+pxl_align_y(int y0, int container_h, int text_h, pxl_align_t align) {
+	switch (align) {
+		case PXL_ALIGN_LEFT:
+			return y0;
+		case PXL_ALIGN_CENTER:
+			return y0 + (container_h - text_h) / 2;
+		case PXL_ALIGN_RIGHT:
+			return y0 + container_h - text_h;
+		default:
+			assert(0 && "Invalid align value");
+			return y0;
+	}
+}
+
+/* --- Truncated text helpers --- */
+
+pxl_rect_t
+pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes) {
+	assert(w && w->font_count > 0);
+	assert(txt);
+
+	const int tracking = w->tracking;
+	const int leading = w->leading ? w->leading : w->fonts[0]->leading;
+	const int glyph_height = w->fonts[0]->glyph_height;
+
+	pxl_rect_t b = {0};
+	int width = 0;
+	int newline_count = 0;
+	size_t bytes_consumed = 0;
+
+	uint32_t codepoint;
+	while (*txt && bytes_consumed < max_bytes) {
+		int byte_len = pxl_utf8_decode(txt, &codepoint);
+		if (bytes_consumed + byte_len > max_bytes) {
+			break; /* Stop before partial rune */
+		}
+		txt += byte_len;
+		bytes_consumed += byte_len;
+
+		uint32_t rune = codepoint;
+
+		switch (rune) {
+			case '\n':
+				if (width > b.w) b.w = width;
+				width = 0;
+				newline_count++;
+				continue;
+
+			case '\r':
+				if (width > b.w) b.w = width;
+				width = 0;
+				continue;
+
+			case '\t':
+				width += tracking * w->tab_width;
+				continue;
+		}
+
+		const pxl_font_t *font;
+		int idx;
+		if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+			width += w->fonts[0]->bitmask.width + tracking;
+			continue;
+		}
+
+		int glyph_w, advance;
+		pxl_font_glyph_metrics(font, idx, &glyph_w, NULL, &advance, NULL, NULL);
+
+		width += advance + tracking;
+	}
+
+	if (width > b.w) b.w = width;
+
+	/* Calculate height */
+	int total_lines = (newline_count == 0 && width == 0) ? 0 : newline_count + 1;
+	b.h = total_lines * glyph_height + newline_count * leading;
+
+	return b;
+}
+
+void
+pxl_draw_text_n(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, size_t max_bytes) {
+	assert(cnv && w && w->font_count > 0);
+	assert(txt);
+
+	size_t bytes_consumed = 0;
+	uint32_t codepoint;
+
+	while (*txt && bytes_consumed < max_bytes) {
+		int byte_len = pxl_utf8_decode(txt, &codepoint);
+		if (bytes_consumed + byte_len > max_bytes) {
+			break; /* Stop before partial rune */
+		}
+		txt += byte_len;
+		bytes_consumed += byte_len;
+
+		pxl_draw_rune(cnv, w, codepoint);
+	}
+}

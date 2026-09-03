@@ -65,16 +65,28 @@ pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
 	w->line_start_x = x;
 }
 
-/* Writing */
-void
-pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune);
-
-void
-pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
-
 /* UTF-8 utilities */
 int
 pxl_utf8_decode(const char *text, uint32_t *out_codepoint);
+
+/* Alignment */
+typedef enum {
+	PXL_ALIGN_LEFT,    /* Align to left edge */
+	PXL_ALIGN_CENTER,  /* Align to center */
+	PXL_ALIGN_RIGHT,   /* Align to right edge */
+} pxl_align_t;
+
+/* Calculate aligned x position for text of width `text_w` within a container.
+ * `x0` is the container's left edge, `container_w` is its width.
+ */
+int
+pxl_align_x(int x0, int container_w, int text_w, pxl_align_t align);
+
+/* Calculate aligned y position for text of height `text_h` within a container.
+ * `y0` is the container's top edge, `container_h` is its height.
+ */
+int
+pxl_align_y(int y0, int container_h, int text_h, pxl_align_t align);
 
 /* Measurement */
 pxl_rect_t
@@ -82,5 +94,32 @@ pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune); /* Returns bounds for a s
 
 pxl_rect_t
 pxl_text_bounds(const pxl_writer_t *w, const char *txt); /* Returns bounds for a text string */
+
+/* Returns bounds for a text string truncated to `max_bytes` bytes.
+ * Note: The caller must ensure `max_bytes` does not split a UTF-8 rune.
+ *       In practice, use newline positions (\n) as split points to guarantee this.
+ */
+pxl_rect_t
+pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes);
+
+/* Drawing */
+void
+pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune);
+
+void
+pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
+
+/* Drawing */
+void
+pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune);
+
+void
+pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
+
+/* Draw text truncated to `max_bytes` bytes.
+ * Note: The caller must ensure `max_bytes` does not split a UTF-8 rune.
+ */
+void
+pxl_draw_text_n(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, size_t max_bytes);
 
 #endif /* PXL_TEXT_H */
