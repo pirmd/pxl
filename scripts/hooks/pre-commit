@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+echo "🔍 Running pre-commit checks for PXL..."
+
+# 1. Linting strict (PXL utilise -Werror)
+echo "  → Linting..."
+if ! make lint > /dev/null 2>&1; then
+    echo "❌ FAIL: Linting errors found. Run 'make lint' to see details."
+    exit 1
+fi
+
+# 2. Build (vérifie la compilation)
+echo "  → Building..."
+if ! make clean > /dev/null 2>&1 || ! make > /dev/null 2>&1; then
+    echo "❌ FAIL: Build failed. Fix compilation errors first."
+    exit 1
+fi
+
+# 3. Tests unitaires
+echo "  → Running tests..."
+if ! make test > /dev/null 2>&1; then
+    echo "❌ FAIL: Tests failed. Run 'make test' to debug."
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"
+exit 0

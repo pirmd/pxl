@@ -1,0 +1,11 @@
+#!/bin/sh
+
+echo "🔍 Running pre-push checks (all backends)..."
+
+if ! sh test-all.sh > /dev/null 2>&1; then
+    echo "❌ FAIL: Some backends failed tests. Run 'sh test-all.sh' to debug."
+    exit 1
+fi
+
+echo "✅ All backends tested successfully!"
+exit 0

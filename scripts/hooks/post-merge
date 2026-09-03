@@ -1,0 +1,5 @@
+#!/bin/sh
+
+echo "🧹 Cleaning build artifacts after merge..."
+make clean > /dev/null 2>&1
+echo "✅ Cleanup done."
