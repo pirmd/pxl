@@ -577,7 +577,7 @@ handle_input(pxl_app_t *app, ui_t *ui, particle_type_t current_type, fountain_in
 	ui->show_help = pxl_app_is_pressed(app, PXL_KEYB_H);
 
 	/* Update physics pause state */
-	app->physics_ts.paused = ui->show_pause || ui->show_help;
+	app->paused = ui->show_pause || ui->show_help;
 
 	/* Handle fountain-specific input if not paused */
 	if (!ui->show_pause && !ui->show_help) {
@@ -642,7 +642,7 @@ main(void) {
 
 			/* Interpolate and render */
 			fountain_t fountain_interpolated;
-			interpolate_fountain(&fountain_prev, &fountain, app.physics_ts.lerp_factor, &fountain_interpolated);
+			interpolate_fountain(&fountain_prev, &fountain, app.physics_ts.alpha, &fountain_interpolated);
 			render(&cnv_main, &fountain_interpolated);
 
 			/* Render particle count at top-left */

@@ -332,10 +332,10 @@ handle_input(pxl_app_t *app, ui_t *ui, int *add_particles) {
 	
 	/* Speed controls - Page Up/Down (time scale affects physics speed only) */
 	if (pxl_app_was_pressed(app, PXL_KEYB_PAGE_UP)) {
-		app->physics_ts.time_scale = fminf(app->physics_ts.time_scale * 1.25f, 8.0f);
+		app->time_scale = fminf(app->time_scale * 1.25f, 8.0f);
 	}
 	if (pxl_app_was_pressed(app, PXL_KEYB_PAGE_DOWN)) {
-		app->physics_ts.time_scale = fmaxf(app->physics_ts.time_scale / 1.25f, 0.125f);
+		app->time_scale = fmaxf(app->time_scale / 1.25f, 0.125f);
 	}
 	
 	/* Focus-based pause: auto-pause on focus loss */
@@ -359,7 +359,7 @@ handle_input(pxl_app_t *app, ui_t *ui, int *add_particles) {
 	ui->show_help = pxl_app_is_pressed(app, PXL_KEYB_H);
 	
 	/* Update physics pause state (stops simulation when paused) */
-	app->physics_ts.paused = ui->show_pause || ui->show_help;
+	app->paused = ui->show_pause || ui->show_help;
 }
 
 int
@@ -404,7 +404,7 @@ main(void) {
 	 * pxl_app_advance()      - Advances frame timer, processes OS events
 	 * pxl_app_advance_physics()- Runs physics at fixed rate (FPS Hz)
 	 * app.physics_ts.dt      - Fixed delta time (1/FPS seconds)
-	 * app.physics_ts.lerp_factor - Blend factor for interpolation [0,1)
+	 * app.physics_ts.alpha - Blend factor for interpolation [0,1)
 	 *
 	 * This ensures deterministic physics regardless of frame rate.
 	 */
@@ -433,12 +433,12 @@ main(void) {
 			pxl_canvas_clear(&cnv);
 
 			/* Smooth rendering via interpolation:
-			 * Blends gas_prev and gas using lerp_factor.
-			 * At 60 FPS with 60 physics steps: lerp_factor = 0 (no blend).
-			 * At 120 FPS with 60 physics steps: lerp_factor = 0.5 (midpoint).
+			 * Blends gas_prev and gas using alpha.
+			 * At 60 FPS with 60 physics steps: alpha = 0 (no blend).
+			 * At 120 FPS with 60 physics steps: alpha = 0.5 (midpoint).
 			 * This decouples rendering from physics for smooth visuals. */
 			gas_t gas_interpolated;
-			interpolate_gas(&gas_prev, &gas, app.physics_ts.lerp_factor, &gas_interpolated);
+			interpolate_gas(&gas_prev, &gas, app.physics_ts.alpha, &gas_interpolated);
 
 			/* Draw simulation */
 			render_gas(&cnv, &gas_interpolated, &ui);

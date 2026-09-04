@@ -53,6 +53,8 @@ typedef struct {
 	game_mode_t mode;
 	bool show_pause;
 	bool show_help;
+
+	pxl_timer_t score_timer_left, score_timer_right;
 } ui_t;
 
 /* Pong game */
@@ -79,6 +81,8 @@ typedef struct {
 
 	int score_left;
 	int score_right;
+	bool left_scored;
+	bool right_scored;
 } pong_t;
 
 static void
@@ -116,6 +120,8 @@ init_pong(pong_t *p) {
 	/* Scores */
 	p->score_left = 0;
 	p->score_right = 0;
+	p->left_scored = false;
+	p->right_scored = false;
 }
 
 static void
@@ -138,6 +144,8 @@ interpolate_pong(const pong_t *prev, const pong_t *cur, float alpha, pong_t *out
 
 	out->score_left = cur->score_left;
 	out->score_right = cur->score_right;
+	out->left_scored = cur->left_scored;
+	out->right_scored = cur->right_scored;
 }
 
 static void
@@ -196,13 +204,19 @@ update_pong(const pong_t *current, float dt, pong_input_t input, pong_t *next) {
 		next->ball.vy = hit_pos * next->ball.speed * 0.8f;
 	}
 
+	next->left_scored = false;
+	next->right_scored = false;
+
 	/* Ball out of bounds (score) */
 	if (next->ball.x - next->ball.radius < 0.0f) {
 		next->score_right++;
+		next->right_scored = true;
+		next->left_scored = false;
 		reset_ball(next);
-	}
-	if (next->ball.x + next->ball.radius > Wf) {
+	} else if (next->ball.x + next->ball.radius > Wf) {
 		next->score_left++;
+		next->left_scored = true;
+		next->right_scored = false;
 		reset_ball(next);
 	}
 }
@@ -283,7 +297,7 @@ handle_input(pxl_app_t *app, ui_t *ui) {
 	/* Help screen toggle */
 	ui->show_help = pxl_app_is_pressed(app, PXL_KEYB_H);
 
-	app->physics_ts.paused = ui->show_pause || ui->show_help;
+	app->paused = ui->show_pause || ui->show_help;
 }
 
 /* Render */
@@ -291,23 +305,44 @@ static void
 render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	assert(cnv != NULL && p != NULL && ui != NULL);
 	const pxl_font_t *font = ui->font;
-	int scale = SCORE_ZOOM;
 	const int w = pxl_canvas_view_width(cnv);
 	const int h = pxl_canvas_view_height(cnv);
 
-	pxl_canvas_set_color(cnv, FG_COLOR);
-
 	/* Left score */
+	int scale = SCORE_ZOOM;
+	uint32_t color = FG_COLOR;
+
+	if (!pxl_timer_finished(&ui->score_timer_left)) {
+		float progress = pxl_timer_progress(&ui->score_timer_left);
+		float ease_out = progress * progress;  /* Ease-out: starts fast, slows down */
+		float pulse = 1.0f + 0.5f * (1.0f - ease_out);  /* Pulse from 1.5x to 1.0x */
+		scale = (int)((float)scale * pulse);
+		color = 0xFF00FF00;
+	}
+
 	char score_str[8];
 	snprintf(score_str, sizeof(score_str), "%d", p->score_left);
 	pxl_rect_t bounds = demo_text_bounds_scaled(font, score_str, scale);
+	pxl_canvas_set_color(cnv, color);
 	demo_draw_text_scaled(cnv, font, score_str, scale,
 			w / 4 - bounds.w / 2,
 			h / 2 - bounds.h / 2);
 
 	/* Right score */
+	scale = SCORE_ZOOM;
+	color = FG_COLOR;
+
+	if (!pxl_timer_finished(&ui->score_timer_right)) {
+		float progress = pxl_timer_progress(&ui->score_timer_right);
+		float ease_out = progress * progress;  /* Ease-out: starts fast, slows down */
+		float pulse = 1.0f + 1.0f * (1.0f - ease_out);  /* Pulse from 2.0x to 1.0x */
+		scale = (int)((float)scale * pulse);
+		color = 0xFF00FF00;
+	}
+
 	snprintf(score_str, sizeof(score_str), "%d", p->score_right);
 	bounds = demo_text_bounds_scaled(font, score_str, scale);
+	pxl_canvas_set_color(cnv, color);
 	demo_draw_text_scaled(cnv, font, score_str, scale,
 			3 * w / 4 - bounds.w / 2,
 			h / 2 - bounds.h / 2);
@@ -449,7 +484,9 @@ main(void) {
 
 	ui_t ui = {
 		.font = &font_9x15_latin,
-		.mode = GAME_1P
+		.mode = GAME_1P,
+		.score_timer_left = (pxl_timer_t){0},
+		.score_timer_right = (pxl_timer_t){0}
 	};
 
 	/* Two states:
@@ -468,7 +505,7 @@ main(void) {
 	 * pxl_app_advance()      - Advances frame timer, processes OS events
 	 * pxl_app_advance_physics()- Runs physics at fixed rate (FPS Hz)
 	 * app.physics_ts.dt      - Fixed delta time (1/FPS seconds)
-	 * app.physics_ts.lerp_factor - Blend factor for interpolation [0,1)
+	 * app.physics_ts.alpha - Blend factor for interpolation [0,1)
 	 *
 	 * This ensures deterministic physics regardless of frame rate.
 	 */
@@ -486,6 +523,20 @@ main(void) {
 			pong_prev = pong;
 			update_pong(&pong_prev, (float)app.physics_ts.dt, pong_input, &pong);
 		}
+
+		/* Handle score animations */
+		if (pong.left_scored) {
+			pxl_timer_start(&ui.score_timer_left, 0.4);
+			pong.left_scored = false;
+		}
+		if (pong.right_scored) {
+			pxl_timer_start(&ui.score_timer_right, 0.4);
+			pong.right_scored = false;
+		}
+
+		/* Advance score timers */
+		pxl_timer_advance(&ui.score_timer_left, app.frame_dt);
+		pxl_timer_advance(&ui.score_timer_right, app.frame_dt);
 
 		pxl_buf_t pb;
 		if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
@@ -505,12 +556,12 @@ main(void) {
 			pxl_canvas_clear(&cnv);
 
 			/* Smooth rendering via interpolation:
-			 * Blends pong_prev and pong using lerp_factor.
-			 * At 60 FPS with 60 physics steps: lerp_factor = 0 (no blend).
-			 * At 120 FPS with 60 physics steps: lerp_factor = 0.5 (midpoint).
+			 * Blends pong_prev and pong using alpha.
+			 * At 60 FPS with 60 physics steps: alpha = 0 (no blend).
+			 * At 120 FPS with 60 physics steps: alpha = 0.5 (midpoint).
 			 */
 			pong_t pong_interpolated;
-			interpolate_pong(&pong_prev, &pong, app.physics_ts.lerp_factor, &pong_interpolated);
+			interpolate_pong(&pong_prev, &pong, app.physics_ts.alpha, &pong_interpolated);
 
 			/* Draw score and game areas */
 			render_score(&cnv_score, &pong_interpolated, &ui);
