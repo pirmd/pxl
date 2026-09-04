@@ -540,7 +540,7 @@ main(void) {
 			(void)pxl_backend_end_frame();
 		}
 		
-		 demo_update_fps(pxl_backend_get_time(), &fps);
+		 demo_update_fps(app.frame_dt, &fps);
 	}
 
 	pxl_app_deinit(&app);

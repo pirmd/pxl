@@ -28,6 +28,7 @@
 /* Input and time */
 #include "input.h"
 #include "stepper.h"
+#include "timer.h"
 
 /* Backend (platform-specific) */
 #include "backend.h"

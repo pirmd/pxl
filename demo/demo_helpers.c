@@ -125,18 +125,15 @@ demo_draw_text_scaled(pxl_canvas_t *cnv, const pxl_font_t *font,
  * ========================================================================= */
 
 void
-demo_update_fps(double now, int *current_fps) {
+demo_update_fps(double frame_dt, int *current_fps) {
 	assert(current_fps != NULL);
-	static double t0 = 0;
-	static int n = 0;
-	if (t0 == 0) {
-		t0 = now;
-		return;
-	}
-	n++;
-	if (now - t0 >= 1.0) {
-		*current_fps = (int)((float)n / (float)(now - t0));
-		n = 0;
-		t0 = now;
+	static double accumulator = 0;
+	static int frame_count = 0;
+	accumulator += frame_dt;
+	frame_count++;
+	if (accumulator >= 1.0) {
+		*current_fps = (int)((float)frame_count / accumulator);
+		frame_count = 0;
+		accumulator = 0;
 	}
 }

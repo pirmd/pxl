@@ -85,6 +85,6 @@ demo_draw_text_scaled(pxl_canvas_t *cnv, const pxl_font_t *font,
 
 /* Update FPS counter */
 void
-demo_update_fps(double now, int *current_fps);
+demo_update_fps(double frame_dt, int *current_fps);
 
 #endif /* PXL_DEMO_HELPERS_H */
