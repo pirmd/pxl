@@ -505,9 +505,22 @@ main(void) {
 	 * pxl_app_advance()      - Advances frame timer, processes OS events
 	 * pxl_app_advance_physics()- Runs physics at fixed rate (FPS Hz)
 	 * app.physics_ts.dt      - Fixed delta time (1/FPS seconds)
-	 * app.physics_ts.alpha - Blend factor for interpolation [0,1)
+	 * app.physics_ts.alpha   - Blend factor for interpolation [0,1)
+	 * app.frame_dt          - Raw frame delta time (use for FPS capping)
 	 *
 	 * This ensures deterministic physics regardless of frame rate.
+	 *
+	 * To cap the frame rate (e.g., to 60 FPS for CPU efficiency):
+	 *   double target_fps = 60.0;
+	 *   double min_frame_time = 1.0 / target_fps;
+	 *   if (app.frame_dt < min_frame_time) {
+	 *       double sleep_ms = (min_frame_time - app.frame_dt) * 1000.0;
+	 *       #ifdef _WIN32
+	 *           Sleep((DWORD)sleep_ms);
+	 *       #else
+	 *           usleep((useconds_t)(sleep_ms * 1000.0));  // usleep takes microseconds
+	 *       #endif
+	 *   }
 	 */
 	while (pxl_app_advance(&app)) {
 		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
