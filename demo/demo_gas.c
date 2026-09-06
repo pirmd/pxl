@@ -237,8 +237,8 @@ render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 	
 	int border = bounds.h / 6;
 	int pad = bounds.h / 2;
-	int x = W/2 - bounds.w / 2;
-	int y = H/2 - bounds.h / 2;
+	int x = pxl_align_x(0, W, bounds.w, PXL_ALIGN_CENTER);
+	int y = pxl_align_y(0, H, bounds.h, PXL_ALIGN_CENTER);
 	
 	uint32_t fg = 0xFFFFFFFF;
 	uint32_t bg = 0xFF000000;
@@ -287,8 +287,10 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	
 	int border = scale * 4;
 	int pad = scale * 6;
-	int x = (W - max_width) / 2 - pad - border;
-	int y = (H - total_height) / 2 - pad - border;
+	int box_w = max_width + 2 * pad + 2 * border;
+	int box_h = total_height + 2 * pad + 2 * border;
+	int x = pxl_align_x(0, W, box_w, PXL_ALIGN_CENTER);
+	int y = pxl_align_y(0, H, box_h, PXL_ALIGN_CENTER);
 	
 	uint32_t fg = 0xFFFFFFFF;
 	uint32_t bg = 0xFF000000;
@@ -308,9 +310,10 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	/* Draw help lines */
 	pxl_canvas_set_color(cnv, fg);
 	int current_y = y + border + pad;
+	int text_area_x = x + border + pad;
 	for (int i = 0; i < line_count; i++) {
 		pxl_rect_t bounds = demo_text_bounds_scaled(ui->font, help_lines[i], scale);
-		int line_x = x + border + pad + (max_width - bounds.w) / 2;
+		int line_x = pxl_align_x(text_area_x, max_width, bounds.w, PXL_ALIGN_CENTER);
 		demo_draw_text_scaled(cnv, ui->font, help_lines[i], scale, line_x, current_y);
 		current_y += bounds.h;
 	}
@@ -450,8 +453,10 @@ main(void) {
 			pxl_rect_t fps_bounds = demo_text_bounds_scaled(ui.font, fps_str, 1);
 			uint32_t fg = 0xFFFFFFFF;
 			pxl_canvas_set_color(&cnv, fg);
-			demo_draw_text_scaled(&cnv, ui.font, fps_str, 1,
-				W - fps_bounds.w - 10, H - fps_bounds.h - 10);
+			/* Align to right/bottom with 10px margin */
+			int fps_x = pxl_align_x(0, W - 10, fps_bounds.w, PXL_ALIGN_RIGHT);
+			int fps_y = pxl_align_y(0, H - 10, fps_bounds.h, PXL_ALIGN_BOTTOM);
+			demo_draw_text_scaled(&cnv, ui.font, fps_str, 1, fps_x, fps_y);
 
 			/* Draw pause overlay */
 			if (ui.show_pause) {

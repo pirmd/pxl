@@ -304,8 +304,8 @@ render_title(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_rect_t title_bounds = pxl_str_bounds(title_text);
 
 	pxl_canvas_set_color(cnv, TITLE_FG);
-	int title_x = (TITLE_W - title_bounds.w) / 2;
-	int title_y = (TITLE_H - title_bounds.h) / 2;
+	int title_x = pxl_align_x(0, TITLE_W, title_bounds.w, PXL_ALIGN_CENTER);
+	int title_y = pxl_align_y(0, TITLE_H, title_bounds.h, PXL_ALIGN_CENTER);
 	pxl_draw_str(cnv, title_x, title_y, title_text);
 }
 
@@ -330,8 +330,10 @@ render_font_view(pxl_canvas_t *cnv, const font_view_t *fv) {
 		/* Position relative to start_idx, accounting for grid wrapping */
 		int col = (i - fv->start_idx) % fv->cols;
 		int row = (i - fv->start_idx) / fv->cols;
-		int x = col * GRID_VIEW_CELL_W + (GRID_VIEW_CELL_W - glyph.width) / 2;
-		int y = row * GRID_VIEW_CELL_H + (GRID_VIEW_CELL_H - glyph.height) / 2;
+		int cell_x = col * GRID_VIEW_CELL_W;
+		int cell_y = row * GRID_VIEW_CELL_H;
+		int x = cell_x + pxl_align_x(0, GRID_VIEW_CELL_W, glyph.width, PXL_ALIGN_CENTER);
+		int y = cell_y + pxl_align_y(0, GRID_VIEW_CELL_H, glyph.height, PXL_ALIGN_CENTER);
 
 		pxl_writer_set_cursor(&w, x, y);
 		pxl_draw_rune(cnv, &w, glyph.codepoint);
@@ -347,8 +349,8 @@ render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
 		return;
 	}
 
-	int zoom_x = (GLYPH_ZOOM_W - glyph.width * GLYPH_ZOOM_FACTOR) / 2;
-	int zoom_y = (GLYPH_ZOOM_H - glyph.height * GLYPH_ZOOM_FACTOR) / 2;
+	int zoom_x = pxl_align_x(0, GLYPH_ZOOM_W, glyph.width * GLYPH_ZOOM_FACTOR, PXL_ALIGN_CENTER);
+	int zoom_y = pxl_align_y(0, GLYPH_ZOOM_H, glyph.height * GLYPH_ZOOM_FACTOR, PXL_ALIGN_CENTER);
 
 	pxl_canvas_set_color(cnv, GLYPH_ZOOM_FG);
 	 demo_draw_bitmask_scaled(cnv, GLYPH_ZOOM_FACTOR, glyph.bitmask, glyph.bitmask_r, zoom_x, zoom_y);
@@ -372,7 +374,7 @@ render_glyph_characteristics(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 	pxl_rect_t text_bounds = pxl_str_bounds(text);
 	int text_x = (GLYPH_W - text_bounds.w) / 16;
-	int text_y = (GLYPH_H - text_bounds.h) / 2;
+	int text_y = pxl_align_y(0, GLYPH_H, text_bounds.h, PXL_ALIGN_CENTER);
 	pxl_draw_str(cnv, text_x, text_y, text);
 }
 
@@ -407,8 +409,8 @@ render_footer(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 	pxl_rect_t footer_bounds = pxl_str_bounds(footer_text);
 
-	int footer_x = (FOOTER_W - footer_bounds.w) / 2;
-	int footer_y = (FOOTER_H - footer_bounds.h) / 2;
+	int footer_x = pxl_align_x(0, FOOTER_W, footer_bounds.w, PXL_ALIGN_CENTER);
+	int footer_y = pxl_align_y(0, FOOTER_H, footer_bounds.h, PXL_ALIGN_CENTER);
 
 	pxl_canvas_set_color(cnv, FOOTER_FG);
 	pxl_draw_str(cnv, footer_x, footer_y, footer_text);
@@ -533,8 +535,10 @@ main(void) {
 				pxl_rect_t fps_bounds = demo_text_bounds_scaled(&font_9x15_latin, fps_str, 1);
 				uint32_t fg = 0xFFFFFFFF;
 				pxl_canvas_set_color(&cnv, fg);
-				 demo_draw_text_scaled(&cnv, &font_9x15_latin, fps_str, 1,
-					W - fps_bounds.w - 10, H - fps_bounds.h - 10);
+				/* Align to right/bottom with 10px margin */
+				int fps_x = pxl_align_x(0, W - 10, fps_bounds.w, PXL_ALIGN_RIGHT);
+				int fps_y = pxl_align_y(0, H - 10, fps_bounds.h, PXL_ALIGN_BOTTOM);
+				 demo_draw_text_scaled(&cnv, &font_9x15_latin, fps_str, 1, fps_x, fps_y);
 			}
 
 			(void)pxl_backend_end_frame();

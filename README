@@ -87,7 +87,7 @@ Architecture:
   Framework:
     app.h          - Optional app layer: frame management, input, poll/wait event modes
     stepper.h      - Time-stepped physics loop helper (fixed timestep, interpolation)
-    text.h/text.c  - Text rendering with mono or proportional LSB bitmask font
+    text.h/text.c  - Text rendering with mono or proportional LSB bitmask font and alignment helpers
     tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
 
   pxl.h - umbrella header that includes all public headers. For finer

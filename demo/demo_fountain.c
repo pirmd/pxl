@@ -466,8 +466,8 @@ render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 
 	int border = bounds.h / 6;
 	int pad = bounds.h / 2;
-	int x = cnv->scissor.x + cnv->scissor.w / 2 - bounds.w / 2;
-	int y = cnv->scissor.y + cnv->scissor.h / 2 - bounds.h / 2;
+	int x = pxl_align_x(cnv->scissor.x, cnv->scissor.w, bounds.w, PXL_ALIGN_CENTER);
+	int y = pxl_align_y(cnv->scissor.y, cnv->scissor.h, bounds.h, PXL_ALIGN_CENTER);
 
 	uint32_t fg = WHITE;
 	uint32_t bg = BLACK;
@@ -523,8 +523,10 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	int pad = scale * 6;
 	int w = pxl_canvas_view_width(cnv);
 	int h = pxl_canvas_view_height(cnv);
-	int x = (w - max_width) / 2 - pad - border;
-	int y = (h - total_height) / 2 - pad - border;
+	int box_w = max_width + 2 * pad + 2 * border;
+	int box_h = total_height + 2 * pad + 2 * border;
+	int x = pxl_align_x(0, w, box_w, PXL_ALIGN_CENTER);
+	int y = pxl_align_y(0, h, box_h, PXL_ALIGN_CENTER);
 
 	uint32_t fg = WHITE;
 	uint32_t bg = BLACK;
@@ -544,9 +546,10 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	/* Draw help lines */
 	pxl_canvas_set_color(cnv, fg);
 	int current_y = y + border + pad;
+	int text_area_x = x + border + pad;
 	for (int i = 0; i < line_count; i++) {
 		pxl_rect_t bounds = demo_text_bounds_scaled(ui->font, help_lines[i], scale);
-		int line_x = x + border + pad + (max_width - bounds.w) / 2;
+		int line_x = pxl_align_x(text_area_x, max_width, bounds.w, PXL_ALIGN_CENTER);
 		 demo_draw_text_scaled(cnv, ui->font, help_lines[i], scale, line_x, current_y);
 		current_y += bounds.h;
 	}
@@ -655,9 +658,12 @@ main(void) {
 				pxl_rect_t fps_bounds = demo_text_bounds_scaled(ui.font, fps_str, 1);
 				uint32_t fg = 0xFFFFFFFF;
 				pxl_canvas_set_color(&cnv_main, fg);
-				demo_draw_text_scaled(&cnv_main, ui.font, fps_str, 1,
-					pxl_canvas_view_width(&cnv_main) - fps_bounds.w - 10,
-					pxl_canvas_view_height(&cnv_main) - fps_bounds.h - 10);
+				int w = pxl_canvas_view_width(&cnv_main);
+				int h = pxl_canvas_view_height(&cnv_main);
+				/* Align to right/bottom with 10px margin */
+				int fps_x = pxl_align_x(0, w - 10, fps_bounds.w, PXL_ALIGN_RIGHT);
+				int fps_y = pxl_align_y(0, h - 10, fps_bounds.h, PXL_ALIGN_BOTTOM);
+				demo_draw_text_scaled(&cnv_main, ui.font, fps_str, 1, fps_x, fps_y);
 			}
 
 			/* Draw pause overlay */

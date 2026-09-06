@@ -443,6 +443,107 @@ test_pxl_draw_text_with_tab(void) {
 	ASSERT(has_pixels_in_rect(expected));
 }
 
+/* Tests for multi-line consistency */
+
+static void
+test_pxl_text_bounds_carriage_return_only(void) {
+	setup_fixture();
+	/* \r alone should NOT create a new line (height = 1 line) */
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\rB");
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == g_w.fonts[0]->glyph_height); /* Single line */
+}
+
+static void
+test_pxl_text_bounds_crlf(void) {
+	setup_fixture();
+	/* \r\n should be treated as a single line break (2 lines total) */
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\r\nB");
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == 2 * g_w.fonts[0]->glyph_height + g_test_font.leading);
+}
+
+static void
+test_pxl_text_bounds_double_newline(void) {
+	setup_fixture();
+	/* \n\n should create an empty line (3 lines total: A, empty, B) */
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\n\nB");
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == 3 * g_w.fonts[0]->glyph_height + 2 * g_test_font.leading);
+}
+
+static void
+test_pxl_draw_text_with_carriage_return(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "A\rB";
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text(&g_cnv, &g_w, text);
+
+	/* After \r, y should be unchanged (no line break), B overwrites A at start of line */
+	ASSERT(g_w.y == y);
+}
+
+/* Test the example from pxl_next_textline() documentation */
+static void
+test_pxl_next_textline_example(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "A\nB\r\nC";
+	pxl_writer_t w_local;
+	const pxl_font_t *fonts[] = {&g_test_font};
+	pxl_writer_init(&w_local, fonts, 1);
+	pxl_writer_set_cursor(&w_local, 0, 0);
+
+	const char *p = text;
+	while (*p) {
+		pxl_draw_textline(&g_cnv, &w_local, p);
+		pxl_writer_set_cursor(&w_local, 0, w_local.y);
+		p = pxl_next_textline(p);
+	}
+
+	/* Verify that something was drawn */
+	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 10, 10}));
+}
+
+static void
+test_pxl_text_draw_consistency(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	/* Test that pxl_text_bounds and pxl_draw_text agree on line count
+	 * pxl_text_bounds: height = total_lines * glyph_height + newline_count * leading
+	 * pxl_draw_text: y increases by leading for each \n
+	 * For "A\nB\r\nC": 3 lines (A, B, C), 2 newlines (\n and \n after \r)
+	 */
+	const char *text = "A\nB\r\nC";
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
+
+	/* Draw the text */
+	int start_y = 5;
+	pxl_writer_set_cursor(&g_w, 0, start_y);
+	pxl_draw_text(&g_cnv, &g_w, text);
+
+	/* Verify: bounds.h = total_lines * glyph_height + newline_count * leading
+	 *         drawn_height = newline_count * leading
+	 *         So: bounds.h = (drawn_height / leading + 1) * glyph_height + drawn_height
+	 * But simpler: just verify that the number of newlines matches
+	 */
+	int glyph_height = g_w.fonts[0]->glyph_height;
+	int leading = g_test_font.leading;
+	int newline_count = 2; /* "A\nB\r\nC" has 2 newlines */
+	int total_lines = newline_count + 1; /* 3 lines */
+	int expected_height = total_lines * glyph_height + newline_count * leading;
+	ASSERT(bounds.h == expected_height);
+
+	/* Verify drawn y position: each \n advances by leading */
+	int drawn_height = g_w.y - start_y;
+	ASSERT(drawn_height == newline_count * leading);
+}
+
 static void
 test_pxl_draw_text_with_scissor(void) {
 	setup_fixture();
@@ -681,6 +782,303 @@ test_pxl_text_bounds_cascade(void) {
 	ASSERT(bounds.h == g_font_a.glyph_height);
 }
 
+/* Tests for alignment helpers */
+
+static void
+test_pxl_align_x_left(void) {
+	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_LEFT);
+	ASSERT(x == 100);
+}
+
+static void
+test_pxl_align_x_center(void) {
+	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_CENTER);
+	ASSERT(x == 100 + (800 - 200) / 2);
+	ASSERT(x == 400);
+}
+
+static void
+test_pxl_align_x_right(void) {
+	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_RIGHT);
+	ASSERT(x == 100 + 800 - 200);
+	ASSERT(x == 700);
+}
+
+static void
+test_pxl_align_y_top(void) {
+	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_TOP);
+	ASSERT(y == 50);
+}
+
+static void
+test_pxl_align_y_center(void) {
+	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_CENTER);
+	ASSERT(y == 50 + (200 - 100) / 2);
+	ASSERT(y == 100);
+}
+
+static void
+test_pxl_align_y_bottom(void) {
+	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_BOTTOM);
+	ASSERT(y == 50 + 200 - 100);
+	ASSERT(y == 150);
+}
+
+/* Edge cases for alignment */
+
+static void
+test_pxl_align_x_overflow(void) {
+	/* text_w > container_w: should still return valid position (overflow is caller's responsibility) */
+	int x = pxl_align_x(100, 200, 400, PXL_ALIGN_LEFT);
+	ASSERT(x == 100);
+
+	x = pxl_align_x(100, 200, 400, PXL_ALIGN_CENTER);
+	ASSERT(x == 100 + (200 - 400) / 2);
+	ASSERT(x == 0); /* 100 + (-100) = 0 */
+
+	x = pxl_align_x(100, 200, 400, PXL_ALIGN_RIGHT);
+	ASSERT(x == 100 + 200 - 400);
+	ASSERT(x == -100); /* 300 - 400 = -100 */
+}
+
+static void
+test_pxl_align_x_zero_text(void) {
+	int x = pxl_align_x(100, 800, 0, PXL_ALIGN_CENTER);
+	ASSERT(x == 100 + (800 - 0) / 2);
+	ASSERT(x == 500);
+}
+
+static void
+test_pxl_align_x_zero_container(void) {
+	/* Zero container: LEFT stays at x0, CENTER/RIGHT will position based on text_w */
+	int x = pxl_align_x(100, 0, 200, PXL_ALIGN_LEFT);
+	ASSERT(x == 100);
+
+	x = pxl_align_x(100, 0, 200, PXL_ALIGN_CENTER);
+	ASSERT(x == 100 + (0 - 200) / 2);
+	ASSERT(x == 0); /* 100 - 100 = 0 */
+
+	x = pxl_align_x(100, 0, 200, PXL_ALIGN_RIGHT);
+	ASSERT(x == 100 + 0 - 200);
+	ASSERT(x == -100);
+}
+
+/* Tests for truncated text helpers */
+
+static void
+test_pxl_text_bounds_n_basic(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "ABC", 10);
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h > 0);
+}
+
+static void
+test_pxl_text_bounds_n_empty(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "ABC", 0);
+	ASSERT(bounds.w == 0);
+	ASSERT(bounds.h == 0);
+}
+
+static void
+test_pxl_text_bounds_n_partial(void) {
+	setup_fixture();
+	pxl_rect_t full_bounds = pxl_text_bounds(&g_w, "ABC");
+	pxl_rect_t partial_bounds = pxl_text_bounds_n(&g_w, "ABC", 2);
+	ASSERT(partial_bounds.w <= full_bounds.w);
+	ASSERT(partial_bounds.h == full_bounds.h);
+}
+
+static void
+test_pxl_text_bounds_n_with_newline(void) {
+	setup_fixture();
+	const char *text = "A\nBC";
+	const char *first_line = text;
+	const char *newline = strchr(text, '\n');
+	size_t first_line_bytes = (size_t)(newline - first_line);
+
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, first_line_bytes);
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == g_w.fonts[0]->glyph_height);
+}
+
+static void
+test_pxl_draw_text_n_basic(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "ABC";
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text_n(&g_cnv, &g_w, text, 10);
+
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, 10);
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+static void
+test_pxl_draw_text_n_empty(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text_n(&g_cnv, &g_w, "ABC", 0);
+
+	ASSERT(buf_is_empty());
+}
+
+static void
+test_pxl_draw_text_n_partial(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "ABC";
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text_n(&g_cnv, &g_w, text, 2);
+
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, 2);
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+/* Additional edge case tests for truncated text helpers */
+
+static void
+test_pxl_text_bounds_n_with_tab(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "A\tB", 10);
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h > 0);
+}
+
+static void
+test_pxl_text_bounds_n_with_carriage_return(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "A\rB", 10);
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h > 0);
+}
+
+static void
+test_pxl_text_bounds_n_multiline(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "A\nB\nC", 10);
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h > g_w.fonts[0]->glyph_height); /* Multiple lines */
+}
+
+static void
+test_pxl_draw_text_n_with_newline(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_text_n(&g_cnv, &g_w, "A\nB", 3); /* Only first line + newline */
+
+	/* Should have drawn 'A' and newline moved cursor down */
+	ASSERT(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
+}
+
+/* Tests for line-based helpers */
+
+static void
+test_pxl_textline_bounds_basic(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "ABC");
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == g_w.fonts[0]->glyph_height);
+}
+
+static void
+test_pxl_textline_bounds_with_newline(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "AB\nCD");
+	ASSERT(bounds.w > 0);
+	ASSERT(bounds.h == g_test_font.glyph_height);
+	/* Use pxl_next_textline to get offset */
+	const char *text = "AB\nCD";
+	const char *next = pxl_next_textline(text);
+	ASSERT(next == text + 3); /* "AB\n" = 3 bytes */
+}
+
+static void
+test_pxl_textline_bounds_empty(void) {
+	setup_fixture();
+	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "");
+	ASSERT(bounds.w == 0);
+	ASSERT(bounds.h == 0);
+}
+
+static void
+test_pxl_draw_textline_basic(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	pxl_draw_textline(&g_cnv, &g_w, "ABC");
+
+	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "ABC");
+	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
+	ASSERT(has_pixels_in_rect(expected));
+}
+
+/* Tests for pxl_next_textline */
+
+static void
+test_pxl_next_textline_empty(void) {
+	const char *txt = "";
+	const char *next = pxl_next_textline(txt);
+	ASSERT(next == txt); /* Returns txt when empty */
+	ASSERT(*next == '\0');
+}
+
+static void
+test_pxl_next_textline_no_break(void) {
+	const char *txt = "ABC";
+	const char *next = pxl_next_textline(txt);
+	/* Never returns NULL: returns pointer to '\0' at end of string */
+	ASSERT(next == txt + 3);
+	ASSERT(*next == '\0');
+}
+
+static void
+test_pxl_next_textline_with_newline(void) {
+	const char *text = "AB\nCD";
+	const char *next = pxl_next_textline(text);
+	ASSERT(next == text + 3); /* Points to 'C' after '\n' */
+	ASSERT(*next == 'C');
+}
+
+static void
+test_pxl_next_textline_with_carriage_return(void) {
+	const char *text = "AB\rCD";
+	const char *next = pxl_next_textline(text);
+	ASSERT(next == text + 3); /* Points to 'C' after '\r' */
+	ASSERT(*next == 'C');
+}
+
+static void
+test_pxl_next_textline_with_crlf(void) {
+	const char *text = "AB\r\nCD";
+	const char *next = pxl_next_textline(text);
+	ASSERT(next == text + 4); /* Points to 'C' after '\r\n' */
+	ASSERT(*next == 'C');
+}
+
+static void
+test_pxl_next_textline_at_end(void) {
+	const char *text = "ABC\n";
+	const char *next = pxl_next_textline(text);
+	ASSERT(next == text + 4); /* Points to '\0' after '\n' */
+	ASSERT(*next == '\0');
+}
+
 /* Main */
 
 int
@@ -715,6 +1113,8 @@ main(void) {
 	test_pxl_draw_text_empty();
 	test_pxl_draw_text_with_newline();
 	test_pxl_draw_text_with_tab();
+	test_pxl_draw_text_with_carriage_return();
+	test_pxl_text_draw_consistency();
 	test_pxl_draw_text_with_scissor();
 	test_pxl_draw_text_with_offset();
 	test_pxl_draw_text_proportional();
@@ -723,6 +1123,9 @@ main(void) {
 	test_pxl_text_bounds_empty();
 	test_pxl_text_bounds_height();
 	test_pxl_text_bounds_with_tab();
+	test_pxl_text_bounds_carriage_return_only();
+	test_pxl_text_bounds_crlf();
+	test_pxl_text_bounds_double_newline();
 	test_pxl_text_bounds_zero_tracking();
 	test_pxl_text_bounds_zero_leading();
 
@@ -731,6 +1134,49 @@ main(void) {
 	test_pxl_draw_rune_cascade_missing_rune();
 	test_pxl_draw_rune_cascade_lowercase();
 	test_pxl_text_bounds_cascade();
+
+	/* Tests for alignment helpers */
+	test_pxl_align_x_left();
+	test_pxl_align_x_center();
+	test_pxl_align_x_right();
+	test_pxl_align_y_top();
+	test_pxl_align_y_center();
+	test_pxl_align_y_bottom();
+
+	/* Edge cases for alignment */
+	test_pxl_align_x_overflow();
+	test_pxl_align_x_zero_text();
+	test_pxl_align_x_zero_container();
+
+	/* Tests for truncated text helpers */
+	test_pxl_text_bounds_n_basic();
+	test_pxl_text_bounds_n_empty();
+	test_pxl_text_bounds_n_partial();
+	test_pxl_text_bounds_n_with_newline();
+	test_pxl_draw_text_n_basic();
+	test_pxl_draw_text_n_empty();
+	test_pxl_draw_text_n_partial();
+
+	/* Additional edge case tests for truncated text helpers */
+	test_pxl_text_bounds_n_with_tab();
+	test_pxl_text_bounds_n_with_carriage_return();
+	test_pxl_text_bounds_n_multiline();
+	test_pxl_draw_text_n_with_newline();
+
+	/* Tests for line-based helpers */
+	test_pxl_textline_bounds_basic();
+	test_pxl_textline_bounds_with_newline();
+	test_pxl_textline_bounds_empty();
+	test_pxl_draw_textline_basic();
+
+	/* Tests for pxl_next_textline */
+	test_pxl_next_textline_example();
+	test_pxl_next_textline_empty();
+	test_pxl_next_textline_no_break();
+	test_pxl_next_textline_with_newline();
+	test_pxl_next_textline_with_carriage_return();
+	test_pxl_next_textline_with_crlf();
+	test_pxl_next_textline_at_end();
 
 	return 0;
 }
