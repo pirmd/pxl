@@ -54,6 +54,7 @@ Demos:
   - demo_pong.c        - Complete game: physics, input, rendering, interpolation
   - demo_fonview.c     - Bitmask font viewer
 
+
 Architecture:
   Core:
     backend.h      - Backend interface. All backends use ARGB8888 pixel format

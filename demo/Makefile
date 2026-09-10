@@ -20,16 +20,13 @@ LDFLAGS += -lm
 all: $(DEMO)
 
 .for d in $(DEMO)
-$(d): $(d).c demo_helpers.o $(PXL_DIR)/libpxl.a
-	$(CC) $(CFLAGS) $(d).c demo_helpers.o -o $@ $(LDFLAGS)
+$(d): $(d).c $(PXL_DIR)/libpxl.a
+	$(CC) $(CFLAGS) $(d).c -o $@ $(LDFLAGS)
 .endfor
-
-demo_helpers.o: demo_helpers.c demo_helpers.h $(PXL_HDR)
-	$(CC) $(CFLAGS) -c -o $@ demo_helpers.c
 
 ${DEMO}: demo_helpers.h $(PXL_HDR)
 
 clean:
-	rm -f $(DEMO) *.o
+	rm -f $(DEMO)
 
 .PHONY: all clean

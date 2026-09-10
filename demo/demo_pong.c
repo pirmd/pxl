@@ -27,7 +27,7 @@
 #include <math.h>
 
 #include "pxl.h"              /* Core PXL library (includes all public headers) */
-#include "demo_helpers.h"     /* Demo-specific: demo_rng(), demo_draw_text_scaled(), demo_text_bounds_scaled() */
+#include "demo_helpers.h"     /* Demo-specific: demo_rng(), demo_update_fps() */
 #include "font_9x15.h"        /* Auto-generated font header (see tool/bdf2pxl) */
 
 #define W 800
@@ -304,9 +304,12 @@ handle_input(pxl_app_t *app, ui_t *ui) {
 static void
 render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	assert(cnv != NULL && p != NULL && ui != NULL);
-	const pxl_font_t *font = ui->font;
 	const int w = pxl_canvas_view_width(cnv);
 	const int h = pxl_canvas_view_height(cnv);
+
+	pxl_writer_t w_writer;
+	const pxl_font_t *fonts[] = {ui->font};
+	pxl_writer_init(&w_writer, fonts, 1);
 
 	/* Left score */
 	int scale = SCORE_ZOOM;
@@ -322,11 +325,12 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 
 	char score_str[8];
 	snprintf(score_str, sizeof(score_str), "%d", p->score_left);
-	pxl_rect_t bounds = demo_text_bounds_scaled(font, score_str, scale);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, score_str, scale, PXL_FLIP_NONE);
 	pxl_canvas_set_color(cnv, color);
 	int left_x = pxl_align_x(0, w / 2, bounds.w, PXL_ALIGN_CENTER);
 	int center_y = pxl_align_y(0, h, bounds.h, PXL_ALIGN_CENTER);
-	demo_draw_text_scaled(cnv, font, score_str, scale, left_x, center_y);
+	pxl_writer_set_cursor(&w_writer, left_x, center_y);
+	pxl_draw_text_transformed(cnv, &w_writer, score_str, scale, PXL_FLIP_NONE);
 
 	/* Right score */
 	scale = SCORE_ZOOM;
@@ -341,10 +345,11 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	}
 
 	snprintf(score_str, sizeof(score_str), "%d", p->score_right);
-	bounds = demo_text_bounds_scaled(font, score_str, scale);
+	bounds = pxl_text_bounds_transformed(&w_writer, score_str, scale, PXL_FLIP_NONE);
 	pxl_canvas_set_color(cnv, color);
 	int right_x = pxl_align_x(w / 2, w / 2, bounds.w, PXL_ALIGN_CENTER);
-	demo_draw_text_scaled(cnv, font, score_str, scale, right_x, center_y);
+	pxl_writer_set_cursor(&w_writer, right_x, center_y);
+	pxl_draw_text_transformed(cnv, &w_writer, score_str, scale, PXL_FLIP_NONE);
 }
 
 static void
@@ -374,16 +379,20 @@ render_game(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 static void
 render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 	assert(cnv != NULL && ui != NULL);
-	const pxl_font_t *font = ui->font;
 	int scale = PAUSE_ZOOM;
 
-	const char pause_str[] = "PAUSE";
-	pxl_rect_t bounds = demo_text_bounds_scaled(font, pause_str, scale);
+	pxl_writer_t w_writer;
+	const pxl_font_t *fonts[] = {ui->font};
+	pxl_writer_init(&w_writer, fonts, 1);
 
-	int border = bounds.h / 6;
-	int pad = bounds.h / 2;
+	const char pause_str[] = "PAUSE";
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, pause_str, scale, PXL_FLIP_NONE);
+
+	int border = scale;
+	int pad = scale * 2;
+	int box_h = bounds.h + 2 * pad + 2 * border;
 	int x = pxl_align_x(cnv->scissor.x, cnv->scissor.w, bounds.w, PXL_ALIGN_CENTER);
-	int y = pxl_align_y(cnv->scissor.y, cnv->scissor.h, bounds.h, PXL_ALIGN_CENTER);
+	int y = pxl_align_y(cnv->scissor.y, cnv->scissor.h, box_h, PXL_ALIGN_CENTER);
 
 	uint32_t fg = FG_COLOR;
 	uint32_t bg = BG_COLOR;
@@ -402,14 +411,18 @@ render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 
 	/* Draw "PAUSE" */
 	pxl_canvas_set_color(cnv, fg);
-	demo_draw_text_scaled(cnv, font, pause_str, scale, x, y);
+	pxl_writer_set_cursor(&w_writer, x, y);
+	pxl_draw_text_transformed(cnv, &w_writer, pause_str, scale, PXL_FLIP_NONE);
 }
 
 static void
 render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	assert(cnv != NULL && ui != NULL);
-	const pxl_font_t *font = ui->font;
 	int scale = 2;
+
+	pxl_writer_t w_writer;
+	const pxl_font_t *fonts[] = {ui->font};
+	pxl_writer_init(&w_writer, fonts, 1);
 
 	const char *help_lines[] = {
 		"CONTROLS:",
@@ -427,10 +440,14 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	/* Calculate total bounds */
 	int max_width = 0;
 	int total_height = 0;
+	int line_leading = w_writer.leading ? w_writer.leading : w_writer.fonts[0]->leading;
 	for (int i = 0; i < line_count; i++) {
-		pxl_rect_t bounds = demo_text_bounds_scaled(font, help_lines[i], scale);
+		pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, help_lines[i], scale, PXL_FLIP_NONE);
 		if (bounds.w > max_width) max_width = bounds.w;
 		total_height += bounds.h;
+		if (i < line_count - 1) {
+			total_height += line_leading * scale;
+		}
 	}
 
 	int border = scale * 4;
@@ -462,10 +479,14 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	int current_y = y + border + pad;
 	int text_area_x = x + border + pad;
 	for (int i = 0; i < line_count; i++) {
-		pxl_rect_t bounds = demo_text_bounds_scaled(font, help_lines[i], scale);
+		pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, help_lines[i], scale, PXL_FLIP_NONE);
 		int line_x = pxl_align_x(text_area_x, max_width, bounds.w, PXL_ALIGN_CENTER);
-		demo_draw_text_scaled(cnv, font, help_lines[i], scale, line_x, current_y);
+		pxl_writer_set_cursor(&w_writer, line_x, current_y);
+		pxl_draw_text_transformed(cnv, &w_writer, help_lines[i], scale, PXL_FLIP_NONE);
 		current_y += bounds.h;
+		if (i < line_count - 1) {
+			current_y += line_leading * scale;
+		}
 	}
 }
 
@@ -587,14 +608,19 @@ main(void) {
 			if (fps > 0) {
 				char fps_str[16];
 				snprintf(fps_str, sizeof(fps_str), "FPS: %d", fps);
-				pxl_rect_t fps_bounds = demo_text_bounds_scaled(ui.font, fps_str, 1);
+
+				pxl_writer_t fps_writer;
+				const pxl_font_t *fps_fonts[] = {ui.font};
+				pxl_writer_init(&fps_writer, fps_fonts, 1);
+				pxl_rect_t fps_bounds = pxl_text_bounds_transformed(&fps_writer, fps_str, 1, PXL_FLIP_NONE);
 				pxl_canvas_set_color(&cnv_game, FG_COLOR);
 				int w = pxl_canvas_view_width(&cnv_game);
 				int h = pxl_canvas_view_height(&cnv_game);
 				/* Align to right/bottom with 10px margin */
 				int fps_x = pxl_align_x(0, w - 10, fps_bounds.w, PXL_ALIGN_RIGHT);
 				int fps_y = pxl_align_y(0, h - 10, fps_bounds.h, PXL_ALIGN_BOTTOM);
-				demo_draw_text_scaled(&cnv_game, ui.font, fps_str, 1, fps_x, fps_y);
+				pxl_writer_set_cursor(&fps_writer, fps_x, fps_y);
+				pxl_draw_text_transformed(&cnv_game, &fps_writer, fps_str, 1, PXL_FLIP_NONE);
 			}
 
 			/* Draw pause overlay */

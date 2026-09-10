@@ -155,4 +155,15 @@ pxl_next_textline(const char *txt) {
 	return txt; /* Points to '\0' at end of string */
 }
 
+/* Text bounds and drawing with scaling and flipping.
+ * scale must be >= 1. flip is applied to destination coordinates.
+ *
+ * Example:
+ *   // Get bounds and draw scaled text
+ *   pxl_rect_t bounds = pxl_text_bounds_transformed(&writer, "Hello", 2, PXL_FLIP_NONE);
+ *   pxl_draw_text_transformed(&cnv, &writer, "Hello", 2, PXL_FLIP_NONE);
+ */
+pxl_rect_t pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);
+void pxl_draw_text_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);
+
 #endif /* PXL_TEXT_H */

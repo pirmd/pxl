@@ -6,6 +6,20 @@
 #include "blit.h"
 #include "geom.h"
 
+/* Test fixture for transformed functions */
+#define TRANSFORM_W 20
+#define TRANSFORM_H 20
+#define TRANSFORM_STRIDE 20
+
+static pxl_t g_transform_buf_data[TRANSFORM_STRIDE * TRANSFORM_H];
+static pxl_buf_t g_transform_buf = {
+	.data = g_transform_buf_data,
+	.width = TRANSFORM_W,
+	.height = TRANSFORM_H,
+	.stride = TRANSFORM_STRIDE
+};
+static pxl_canvas_t g_transform_cnv;
+
 /* Fixture ----------------------------------------------------------------- */
 
 #define FIXTURE_W 101
@@ -118,6 +132,12 @@ src_buf_fill(pxl_buf_t *pb, pxl_t color) {
 			row[x] = color;
 		}
 	}
+}
+
+static inline void
+fixture_transform_reset(void) {
+	memset(g_transform_buf_data, 0x00, sizeof(g_transform_buf_data));
+	pxl_canvas_init(&g_transform_cnv, &g_transform_buf);
 }
 
 /* Static bitmasks for bitmask tests */
@@ -375,6 +395,236 @@ test_pxl_draw_bitmask_with_offset(void) {
 	}
 }
 
+/* Tests for transformed bitmask drawing */
+
+static void
+test_pxl_draw_bitmask_transformed_scale2(void) {
+	fixture_transform_reset();
+
+	pxl_t color = COLOR_GREEN;
+	pxl_canvas_set_color(&g_transform_cnv, color);
+
+	/* Create a 4x4 bitmask with all bits set */
+	uint8_t bm_data[2] = { 0xFF, 0xFF };
+	pxl_bitmask_t bm = { .data = bm_data, .width = 4, .height = 2, .stride = 1 };
+
+	pxl_rect_t bm_r = {0, 0, 4, 2};
+	int x = 5, y = 5;
+	pxl_draw_bitmask_transformed(&g_transform_cnv, &bm, bm_r, x, y, 2, PXL_FLIP_NONE);
+
+	/* Check that a 8x4 rectangle is drawn */
+	for (int dy = 0; dy < 4; dy++) {
+		for (int dx = 0; dx < 8; dx++) {
+			int px = x + dx;
+			int py = y + dy;
+			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
+			ASSERT(got == color);
+		}
+	}
+}
+
+static void
+test_pxl_draw_bitmask_transformed_flip_h(void) {
+	fixture_transform_reset();
+
+	pxl_t color = COLOR_RED;
+	pxl_canvas_set_color(&g_transform_cnv, color);
+
+	/* Create a bitmask with only bit 0 set (leftmost pixel) */
+	uint8_t bm_data[1] = { 0x01 };
+	pxl_bitmask_t bm = { .data = bm_data, .width = 4, .height = 1, .stride = 1 };
+
+	pxl_rect_t bm_r = {0, 0, 4, 1};
+	int x = 5, y = 5;
+	pxl_draw_bitmask_transformed(&g_transform_cnv, &bm, bm_r, x, y, 1, PXL_FLIP_H);
+
+	/* With flip H, bit 0 (leftmost source) appears at rightmost destination */
+	pxl_t got = *pxl_buf_ptr(&g_transform_buf, 5 + 3, 5);
+	ASSERT(got == color); /* Rightmost pixel should be on (source bit 0) */
+	got = *pxl_buf_ptr(&g_transform_buf, 5, 5);
+	ASSERT(got == 0); /* Leftmost pixel should be off */
+}
+
+static void
+test_pxl_draw_bitmask_transformed_flip_v(void) {
+	fixture_transform_reset();
+
+	pxl_t color = COLOR_BLUE;
+	pxl_canvas_set_color(&g_transform_cnv, color);
+
+	/* Create a 1x2 bitmask with top bit set and bottom bit clear */
+	uint8_t bm_data[2] = { 0x01, 0x00 }; /* First row has bit 0 set, second row has bit 0 clear */
+	pxl_bitmask_t bm = { .data = bm_data, .width = 1, .height = 2, .stride = 1 };
+
+	pxl_rect_t bm_r = {0, 0, 1, 2};
+	int x = 5, y = 5;
+	pxl_draw_bitmask_transformed(&g_transform_cnv, &bm, bm_r, x, y, 1, PXL_FLIP_V);
+
+	/* With flip V, the top source bit appears at bottom destination */
+	pxl_t got = *pxl_buf_ptr(&g_transform_buf, 5, 5 + 1);
+	ASSERT(got == color); /* Bottom pixel should be on (source top bit) */
+	got = *pxl_buf_ptr(&g_transform_buf, 5, 5);
+	ASSERT(got == 0); /* Top pixel should be off (source bottom bit was off) */
+}
+
+static void
+test_pxl_blit_transformed_scale2(void) {
+	fixture_transform_reset();
+
+	/* Fill source buffer with a pattern */
+	pxl_t color = COLOR_YELLOW;
+	src_buf_fill(&g_src_pb_8x8, color);
+
+	pxl_rect_t pb_r = {0, 0, 4, 4};
+	int x = 5, y = 5;
+	pxl_blit_transformed(&g_transform_cnv, &g_src_pb_8x8, pb_r, x, y, 2, PXL_FLIP_NONE);
+
+	/* Check that a 8x8 rectangle is drawn */
+	for (int dy = 0; dy < 8; dy++) {
+		for (int dx = 0; dx < 8; dx++) {
+			int px = x + dx;
+			int py = y + dy;
+			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
+			ASSERT(got == color);
+		}
+	}
+}
+
+static void
+test_pxl_blit_transformed_flip_h(void) {
+	fixture_transform_reset();
+
+	/* Fill source buffer with a pattern */
+	for (int y = 0; y < 8; y++) {
+		pxl_t *row = pxl_buf_ptr(&g_src_pb_8x8, 0, y);
+		for (int x = 0; x < 8; x++) {
+			row[x] = (pxl_t)(x * 100);
+		}
+	}
+
+	pxl_rect_t pb_r = {0, 0, 8, 8};
+	int x = 2, y = 2;
+	pxl_blit_transformed(&g_transform_cnv, &g_src_pb_8x8, pb_r, x, y, 1, PXL_FLIP_H);
+
+	/* With flip H, source[src_x] is drawn at dst_x + (width-1-src_x)
+	 * so at destination position (x + (7-src_x)), we have source[src_x] */
+	for (int src_y = 0; src_y < 8; src_y++) {
+		for (int src_x = 0; src_x < 8; src_x++) {
+			int px = x + (7 - src_x); /* flipped destination position */
+			int py = y + src_y;
+			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
+			pxl_t expected = (pxl_t)(src_x * 100); /* source[src_x] */
+			ASSERT(got == expected);
+		}
+	}
+}
+
+static void
+test_pxl_blit_transformed_flip_v(void) {
+	fixture_transform_reset();
+
+	/* Fill source buffer with a pattern */
+	for (int y = 0; y < 8; y++) {
+		pxl_t *row = pxl_buf_ptr(&g_src_pb_8x8, 0, y);
+		for (int x = 0; x < 8; x++) {
+			row[x] = (pxl_t)(y * 100);
+		}
+	}
+
+	pxl_rect_t pb_r = {0, 0, 8, 8};
+	int x = 2, y = 2;
+	pxl_blit_transformed(&g_transform_cnv, &g_src_pb_8x8, pb_r, x, y, 1, PXL_FLIP_V);
+
+	/* With flip V, source[src_y] is drawn at dst_y + (height-1-src_y) */
+	for (int src_y = 0; src_y < 8; src_y++) {
+		for (int src_x = 0; src_x < 8; src_x++) {
+			int px = x + src_x;
+			int py = y + (7 - src_y); /* flipped destination position */
+			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
+			pxl_t expected = (pxl_t)(src_y * 100); /* source[src_y] */
+			ASSERT(got == expected);
+		}
+	}
+}
+
+static void
+test_pxl_blit_transformed_scale_and_flip(void) {
+	fixture_transform_reset();
+
+	/* Fill source buffer with a pattern */
+	for (int y = 0; y < 4; y++) {
+		pxl_t *row = pxl_buf_ptr(&g_src_pb_8x8, 0, y);
+		for (int x = 0; x < 4; x++) {
+			row[x] = (pxl_t)(y * 10 + x);
+		}
+	}
+
+	pxl_rect_t pb_r = {0, 0, 4, 4};
+	int x = 5, y = 5;
+	pxl_blit_transformed(&g_transform_cnv, &g_src_pb_8x8, pb_r, x, y, 2, PXL_FLIP_H);
+
+	/* Check that pixels are scaled by 2 and flipped horizontally
+	 * source[sx,sy] is drawn at x + (3-sx)*2, y + sy*2 */
+	for (int sy = 0; sy < 4; sy++) {
+		for (int sx = 0; sx < 4; sx++) {
+			pxl_t expected = (pxl_t)(sy * 10 + sx); /* source[sx,sy] */
+			/* Each source pixel becomes a 2x2 block at flipped position */
+			for (int dy = 0; dy < 2; dy++) {
+				for (int dx = 0; dx < 2; dx++) {
+					int px = x + (3 - sx) * 2 + dx; /* Flipped destination position */
+					int py = y + sy * 2 + dy;
+					pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
+					ASSERT(got == expected);
+				}
+			}
+		}
+	}
+}
+
+/* Example tests from documentation */
+
+static void
+test_example_pxl_draw_bitmask_transformed(void) {
+	/* Example: Draw a bitmask with 2x scaling */
+	pxl_buf_t pb = { .data = g_transform_buf_data, .width = TRANSFORM_W, .height = TRANSFORM_H, .stride = TRANSFORM_STRIDE };
+	pxl_canvas_t cnv;
+	pxl_canvas_init(&cnv, &pb);
+	memset(g_transform_buf_data, 0x00, sizeof(g_transform_buf_data));
+
+	uint8_t bm_data[1] = { 0xFF };
+	pxl_bitmask_t bm = { .data = bm_data, .width = 8, .height = 1, .stride = 1 };
+
+	pxl_canvas_set_color(&cnv, 0xFFFFFFFF);
+	pxl_draw_bitmask_transformed(&cnv, &bm, (pxl_rect_t){0, 0, 8, 1}, 0, 0, 2, PXL_FLIP_NONE);
+
+	/* Verify: 16x2 rectangle should be drawn */
+	ASSERT(*pxl_buf_ptr(&pb, 0, 0) == 0xFFFFFFFF);
+	ASSERT(*pxl_buf_ptr(&pb, 15, 1) == 0xFFFFFFFF);
+}
+
+static void
+test_example_pxl_blit_transformed(void) {
+	/* Example: Blit with 2x scaling */
+	pxl_buf_t pb = { .data = g_transform_buf_data, .width = TRANSFORM_W, .height = TRANSFORM_H, .stride = TRANSFORM_STRIDE };
+	pxl_canvas_t cnv;
+	pxl_canvas_init(&cnv, &pb);
+	memset(g_transform_buf_data, 0x00, sizeof(g_transform_buf_data));
+
+	pxl_t src_data[4 * 4];
+	pxl_buf_t src = { .data = src_data, .width = 4, .height = 4, .stride = 4 };
+	for (int y = 0; y < 4; y++) {
+		for (int x = 0; x < 4; x++) {
+			src_data[y * 4 + x] = 0xFF000000U | (uint32_t)(x * 64 + y * 16);
+		}
+	}
+
+	pxl_blit_transformed(&cnv, &src, (pxl_rect_t){0, 0, 4, 4}, 0, 0, 2, PXL_FLIP_NONE);
+
+	/* Verify: 8x8 rectangle should be drawn with scaled pixels */
+	ASSERT(*pxl_buf_ptr(&pb, 0, 0) == 0xFF000000);
+	ASSERT(*pxl_buf_ptr(&pb, 7, 7) == (0xFF000000 | (3 * 64 + 3 * 16)));
+}
+
 /* Main ----------------------------------------------------------------------- */
 int
 main(void) {
@@ -390,6 +640,21 @@ main(void) {
 	test_pxl_draw_bitmask_all_bits_set();
 	test_pxl_draw_bitmask_clipped();
 	test_pxl_draw_bitmask_with_offset();
+
+	/* Transformed bitmask draw tests */
+	test_pxl_draw_bitmask_transformed_scale2();
+	test_pxl_draw_bitmask_transformed_flip_h();
+	test_pxl_draw_bitmask_transformed_flip_v();
+
+	/* Transformed blit tests */
+	test_pxl_blit_transformed_scale2();
+	test_pxl_blit_transformed_flip_h();
+	test_pxl_blit_transformed_flip_v();
+	test_pxl_blit_transformed_scale_and_flip();
+
+	/* Example tests */
+	test_example_pxl_draw_bitmask_transformed();
+	test_example_pxl_blit_transformed();
 
 	return 0;
 }

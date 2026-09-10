@@ -8,6 +8,14 @@
 typedef struct { int x, y, w, h; } pxl_rect_t;
 typedef struct { int x, w; } pxl_span_t;
 
+/* Flip flags for transformations (bitmask/buffer flip, drawing, etc.).
+ * Can be combined with |. Used by transform.h (pre-processing) and blit.h (rendering). */
+typedef enum {
+	PXL_FLIP_NONE = 0,    /* No flip */
+	PXL_FLIP_H    = 1 << 0, /* Flip horizontally */
+	PXL_FLIP_V    = 1 << 1, /* Flip vertically */
+} pxl_flip_t;
+
 static inline int pxl_min(int a, int b) { return (a < b) ? a : b; }
 static inline int pxl_max(int a, int b) { return (a < b) ? b : a; }
 

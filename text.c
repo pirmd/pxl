@@ -482,3 +482,161 @@ pxl_draw_textline(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt) {
 		pxl_draw_rune(cnv, w, codepoint);
 	}
 }
+
+/* =========================================================================
+ * Scaled text functions
+ * ========================================================================= */
+
+pxl_rect_t
+pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip) {
+	assert(w);
+	assert(scale >= 1);
+	assert(txt);
+
+	int total_w = 0;
+	int max_w = 0;
+	int max_h = 0;
+
+	const pxl_font_t *font = NULL;
+	int idx = 0;
+
+	/* Flip affects the final dimensions, but for bounds calculation,
+	 * we can ignore it as it only affects visual position, not size */
+	(void)flip; /* Unused for bounds calculation */
+
+	const int tracking = w->tracking;
+
+	while (*txt) {
+		uint32_t codepoint;
+		int bytes = pxl_utf8_decode(txt, &codepoint);
+		if (bytes <= 0) {
+			txt++;
+			continue;
+		}
+
+		if (codepoint == '\n' || codepoint == '\r') {
+			/* Newline: reset width, track max line width */
+			if (total_w > max_w) max_w = total_w;
+			total_w = 0;
+			if (codepoint == '\n') txt += 1;
+			else if (codepoint == '\r' && txt[1] == '\n') txt += 2;
+			else txt += 1;
+			continue;
+		}
+
+		if (codepoint == '\t') {
+			/* Tab: advance by tab_width spaces */
+			int tab_spaces = w->tab_width;
+			if (w->tab_width > 0) {
+				for (int i = 0; i < tab_spaces; i++) {
+					if (pxl_writer_find_glyph(w, ' ', &font, &idx)) {
+						int advance = (font->glyph_advances) ? font->glyph_advances[idx] :
+							(font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width);
+						total_w += advance * scale + tracking * scale;
+					}
+				}
+			}
+			txt++;
+			continue;
+		}
+
+		/* Find glyph for this codepoint */
+		if (pxl_writer_find_glyph(w, codepoint, &font, &idx)) {
+			int advance = (font->glyph_advances) ? font->glyph_advances[idx] :
+				(font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width);
+			int gh = font->glyph_height;
+			total_w += advance * scale + tracking * scale;
+			if (gh * scale > max_h) max_h = gh * scale;
+		}
+
+		txt += bytes;
+	}
+
+	/* Account for last line */
+	if (total_w > max_w) max_w = total_w;
+
+	return (pxl_rect_t){.w = max_w, .h = max_h};
+}
+
+void
+pxl_draw_text_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip) {
+	assert(cnv && cnv->pb);
+	assert(w);
+	assert(scale >= 1);
+	assert(txt);
+
+	const int tracking = w->tracking;
+
+	while (*txt) {
+		uint32_t codepoint;
+		int bytes = pxl_utf8_decode(txt, &codepoint);
+		if (bytes <= 0) {
+			txt++;
+			continue;
+		}
+
+		if (codepoint == '\n') {
+			w->x = w->line_start_x;
+			w->y += w->leading * scale;
+			txt += 1;
+			continue;
+		}
+
+		if (codepoint == '\r') {
+			w->x = w->line_start_x;
+			if (txt[1] == '\n') {
+				txt += 2;
+				w->y += w->leading * scale;
+			} else {
+				txt += 1;
+			}
+			continue;
+		}
+
+		if (codepoint == '\t') {
+			int tab_spaces = w->tab_width;
+			if (w->tab_width > 0) {
+				for (int i = 0; i < tab_spaces; i++) {
+					const pxl_font_t *font = NULL;
+					int idx = 0;
+					if (pxl_writer_find_glyph(w, ' ', &font, &idx)) {
+						int advance = (font->glyph_advances) ? font->glyph_advances[idx] :
+							(font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width);
+						pxl_draw_bitmask_transformed(cnv, &font->bitmask,
+							(pxl_rect_t){.x = 0, .y = idx * font->glyph_height,
+								.w = font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width,
+								.h = font->glyph_height},
+							w->x, w->y, scale, flip);
+						w->x += advance * scale + tracking * scale;
+					}
+				}
+			}
+			txt++;
+			continue;
+		}
+
+		/* Find glyph for this codepoint */
+		const pxl_font_t *font = NULL;
+		int idx = 0;
+		if (pxl_writer_find_glyph(w, codepoint, &font, &idx)) {
+			int advance = (font->glyph_advances) ? font->glyph_advances[idx] :
+				(font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width);
+			int gw = font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width;
+			int gh = font->glyph_height;
+
+			pxl_rect_t bm_r = {
+				.x = 0,
+				.y = idx * gh,
+				.w = gw,
+				.h = gh
+			};
+
+			pxl_draw_bitmask_transformed(cnv, &font->bitmask, bm_r,
+				w->x, w->y, scale, flip);
+
+			w->x += advance * scale + tracking * scale;
+		}
+
+		txt += bytes;
+	}
+}

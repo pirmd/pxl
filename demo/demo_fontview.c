@@ -353,7 +353,7 @@ render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
 	int zoom_y = pxl_align_y(0, GLYPH_ZOOM_H, glyph.height * GLYPH_ZOOM_FACTOR, PXL_ALIGN_CENTER);
 
 	pxl_canvas_set_color(cnv, GLYPH_ZOOM_FG);
-	 demo_draw_bitmask_scaled(cnv, GLYPH_ZOOM_FACTOR, glyph.bitmask, glyph.bitmask_r, zoom_x, zoom_y);
+	pxl_draw_bitmask_transformed(cnv, glyph.bitmask, glyph.bitmask_r, zoom_x, zoom_y, GLYPH_ZOOM_FACTOR, PXL_FLIP_NONE);
 }
 
 static void
@@ -532,13 +532,17 @@ main(void) {
 			if (fps > 0) {
 				char fps_str[16];
 				snprintf(fps_str, sizeof(fps_str), "FPS: %d", fps);
-				pxl_rect_t fps_bounds = demo_text_bounds_scaled(&font_9x15_latin, fps_str, 1);
+				const pxl_font_t *fonts[] = {&font_9x15_latin};
+				pxl_writer_t writer;
+				pxl_writer_init(&writer, fonts, 1);
+				pxl_rect_t fps_bounds = pxl_text_bounds_transformed(&writer, fps_str, 1, PXL_FLIP_NONE);
 				uint32_t fg = 0xFFFFFFFF;
 				pxl_canvas_set_color(&cnv, fg);
 				/* Align to right/bottom with 10px margin */
 				int fps_x = pxl_align_x(0, W - 10, fps_bounds.w, PXL_ALIGN_RIGHT);
 				int fps_y = pxl_align_y(0, H - 10, fps_bounds.h, PXL_ALIGN_BOTTOM);
-				 demo_draw_text_scaled(&cnv, &font_9x15_latin, fps_str, 1, fps_x, fps_y);
+				pxl_writer_set_cursor(&writer, fps_x, fps_y);
+				pxl_draw_text_transformed(&cnv, &writer, fps_str, 1, PXL_FLIP_NONE);
 			}
 
 			(void)pxl_backend_end_frame();
