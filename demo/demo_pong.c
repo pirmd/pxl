@@ -313,7 +313,7 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 
 	/* Left score */
 	int scale = SCORE_ZOOM;
-	uint32_t color = FG_COLOR;
+	pxl_t color = FG_COLOR;
 
 	if (!pxl_timer_finished(&ui->score_timer_left)) {
 		float progress = pxl_timer_progress(&ui->score_timer_left);
@@ -397,8 +397,8 @@ render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 	int x = aligned.x;
 	int y = aligned.y;
 
-	uint32_t fg = FG_COLOR;
-	uint32_t bg = BG_COLOR;
+	pxl_t fg = FG_COLOR;
+	pxl_t bg = BG_COLOR;
 
 	/* Outer rectangle (fg color) */
 	pxl_canvas_set_color(cnv, fg);
@@ -463,8 +463,8 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	int x = aligned.x;
 	int y = aligned.y;
 
-	uint32_t fg = FG_COLOR;
-	uint32_t bg = BG_COLOR;
+	pxl_t fg = FG_COLOR;
+	pxl_t bg = BG_COLOR;
 
 	/* Outer rectangle (fg color) */
 	pxl_canvas_set_color(cnv, fg);

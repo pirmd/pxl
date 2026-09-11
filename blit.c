@@ -169,7 +169,7 @@ pxl_draw_bitmask_transformed(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 		return;  /* Completely outside scissor */
 	}
 
-	uint32_t color = cnv->color;
+	pxl_t color = cnv->color;
 
 	/* Gather approach: iterate over destination pixels sequentially */
 	for (int dst_y = clipped.y; dst_y < clipped.y + clipped.h; dst_y++) {
