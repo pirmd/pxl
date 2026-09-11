@@ -541,7 +541,7 @@ main(void) {
 				pxl_writer_t writer;
 				pxl_writer_init(&writer, fonts, 1);
 				pxl_rect_t fps_bounds = pxl_text_bounds_transformed(&writer, fps_str, 1, PXL_FLIP_NONE);
-				pxl_t fg = 0xFFFFFFFF;
+				pxl_t fg = 0xFFFFFFFFU;
 				pxl_canvas_set_color(&cnv, fg);
 				/* Align to right/bottom with 10px margin */
 				pxl_rect_t aligned = pxl_rect_align(fps_bounds, (pxl_rect_t){0, 0, W - 10, H - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);

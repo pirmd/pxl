@@ -33,15 +33,13 @@ pxl_blit_rect(pxl_canvas_t *cnv, const pxl_buf_t *pb,
     int src_y = pb_r.y + (dst_rect.y - cnv_y);
 
     const pxl_t *pb_row = pxl_buf_ptr(pb, src_x, src_y);
-    int pb_stride = pb->stride;
     pxl_t *cnv_row = pxl_buf_ptr(cnv->pb, dst_rect.x, dst_rect.y);
-    int cnv_stride = cnv->pb->stride;
 
-    assert(dst_rect.w <= pb_stride);
+    assert(dst_rect.w <= pb->stride);
     for (int y = 0; y < dst_rect.h; ++y) {
         memcpy(cnv_row, pb_row, (size_t)dst_rect.w * sizeof(pxl_t));
-        pb_row += pb_stride;
-        cnv_row += cnv_stride;
+        pb_row += pb->stride;
+        cnv_row += cnv->pb->stride;
     }
 }
 
@@ -75,7 +73,7 @@ pxl_draw_bitmask(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 
 	for (int j = 0; j < dst_rect.h; ++j) {
 		pxl_t *dst = pxl_buf_ptr(cnv->pb, dst_rect.x, dst_rect.y + j);
-		const uint8_t *m_row = bm->data + ((size_t)(src_y + j) * bm->stride);
+		const uint8_t *m_row = bm->data + ((size_t)(src_y + j) * (size_t)bm->stride);
 
 		int i = 0;  /* Pixel position in current row */
 		size_t bit_offset = (size_t)src_x;  /* Bit offset for current row */

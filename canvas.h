@@ -32,7 +32,7 @@ pxl_canvas_init(pxl_canvas_t *cnv, pxl_buf_t *pb) {
 	cnv->offset_x = 0;
 	cnv->offset_y = 0;
 	cnv->scissor  = (pxl_rect_t){0, 0, pb->width, pb->height};
-	cnv->color    = 0xFFFFFFFF;
+	cnv->color    = 0xFFFFFFFFU;
 }
 
 /* State ------------------------------------------------------------------- */
@@ -139,13 +139,12 @@ pxl_canvas_clear(pxl_canvas_t *cnv) {
 	pxl_t pix = cnv->color;
 
 	pxl_t   *row = pxl_buf_ptr(pb, sc.x, sc.y);
-	int   stride = pb->stride;
 
 	for (int dy = 0; dy < sc.h; ++dy) {
 		for (int dx = 0; dx < sc.w; ++dx) {
 			row[dx] = pix;
 		}
-		row += stride;
+		row += pb->stride;
 	}
 }
 

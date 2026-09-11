@@ -320,7 +320,7 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 		float ease_out = progress * progress;  /* Ease-out: starts fast, slows down */
 		float pulse = 1.0f + 0.5f * (1.0f - ease_out);  /* Pulse from 1.5x to 1.0x */
 		scale = (int)((float)scale * pulse);
-		color = 0xFF00FF00;
+		color = 0xFF00FF00U;
 	}
 
 	char score_str[8];
@@ -341,7 +341,7 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 		float ease_out = progress * progress;  /* Ease-out: starts fast, slows down */
 		float pulse = 1.0f + 1.0f * (1.0f - ease_out);  /* Pulse from 2.0x to 1.0x */
 		scale = (int)((float)scale * pulse);
-		color = 0xFF00FF00;
+		color = 0xFF00FF00U;
 	}
 
 	snprintf(score_str, sizeof(score_str), "%d", p->score_right);
