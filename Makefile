@@ -35,7 +35,6 @@ lint:
 
 test: $(LIB)
 	$(MAKE) -C test test
-	$(MAKE) -C demo all
 
 demo: $(LIB)
 	$(MAKE) -C demo

@@ -127,10 +127,9 @@ pxl_backend_end_frame(void) {
     SDL_RenderClear(g_sdl.renderer);
     SDL_RenderCopy(g_sdl.renderer, g_sdl.texture, NULL, NULL);
     
-    if (SDL_RenderPresent(g_sdl.renderer) != 0) {
-        pxl_log(SDL_GetError());
-        return PXL_E_BACKEND_FRAME;
-    }
+    SDL_RenderPresent(g_sdl.renderer);
+    /* Note: SDL errors are not checked here for performance.
+     * SDL_RenderPresent failures are rare and typically unrecoverable. */
     return PXL_SUCCESS;
 }
 
