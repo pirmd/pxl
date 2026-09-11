@@ -18,7 +18,7 @@
  * Design:
  *   - time_scale: Global time scale (1.0 = normal, 0.5 = slow-mo, 2.0 = fast).
  *   - paused: Global pause flag.
- *   - effective_dt: Precomputed dt for the frame (clamped, scaled, paused-aware).
+ *   - frame_dt: Raw frame delta time (clamped, unaffected by time_scale/paused).
  *   - ALWAYS call pxl_app_advance() every frame, even when paused, to:
  *       1. Keep physics_ts.accumulator consistent (no jumps on unpause).
  *       2. Process input events.
@@ -36,8 +36,8 @@
  *       if (pxl_app_was_pressed(&app, PXL_KEY_P)) app.paused = !app.paused;
  *       if (pxl_app_was_pressed(&app, PXL_KEY_LEFT_SHIFT)) app.time_scale = 0.5f;
  *
- *       // Use app.effective_dt for custom timers:
- *       pxl_timer_advance(&my_timer, app.effective_dt);
+ *       // Use pxl_app_dt(&app) for time-aware updates:
+ *       pxl_timer_advance(&my_timer, pxl_app_dt(&app));
  *
  *       // Physics updates:
  *       while (pxl_app_advance_physics(&app)) update_physics();
@@ -67,8 +67,12 @@ typedef struct {
 	/* Time tracking */
 	double prev_time;             /* Time at previous frame (for dt calculation). */
 	double frame_dt;              /* Raw frame delta time (clamped, unaffected by time_scale/paused). */
-	double effective_dt;          /* Effective dt for current frame (clamped, scaled, paused-aware). */
 } pxl_app_t;
+
+/* Returns effective dt (paused-aware, time-scaled). Use for game logic. */
+static inline double pxl_app_dt(const pxl_app_t *app) {
+	return app->paused ? 0.0 : (app->frame_dt * (double)app->time_scale);
+}
 
 /* Initialize the app and backend. */
 static inline pxl_err_t
@@ -86,7 +90,6 @@ pxl_app_init(pxl_app_t *app) {
 	app->time_scale = 1.0f;
 	app->paused = false;
 	app->prev_time = pxl_backend_get_time();
-	app->effective_dt = 0.0;
 
 	/* Initialize physics stepper (dt = 0 means disabled) */
 	pxl_stepper_init(&app->physics_ts, app->physics_dt);
@@ -121,16 +124,14 @@ pxl_app_advance(pxl_app_t *app) {
 		frame_dt = PXL_APP_MAX_FRAME_TIME;
 	}
 
-	app->effective_dt = app->paused ? 0.0 : (frame_dt * (double)app->time_scale);
-
-	/* Always update stepper (even when paused) to avoid time jumps on unpause */
-	pxl_stepper_update(&app->physics_ts, app->effective_dt);
-
 	app->prev = app->curr;
 	app->curr.mouse_wheel_x = 0;
 	app->curr.mouse_wheel_y = 0;
 	app->frame_dt = frame_dt;
 	app->prev_time = now;
+
+	/* Always update stepper (even when paused) to avoid time jumps on unpause */
+	pxl_stepper_update(&app->physics_ts, pxl_app_dt(app));
 
 	pxl_backend_poll_events(&app->curr);
 
@@ -149,15 +150,13 @@ pxl_app_advance_wait(pxl_app_t *app) {
 		frame_dt = PXL_APP_MAX_FRAME_TIME;
 	}
 
-	app->effective_dt = app->paused ? 0.0 : (frame_dt * (double)app->time_scale);
-
-	pxl_stepper_update(&app->physics_ts, app->effective_dt);
-
 	app->prev = app->curr;
 	app->curr.mouse_wheel_x = 0;
 	app->curr.mouse_wheel_y = 0;
 	app->frame_dt = frame_dt;
 	app->prev_time = now;
+
+	pxl_stepper_update(&app->physics_ts, pxl_app_dt(app));
 
 	pxl_backend_wait_events(&app->curr);
 

@@ -19,7 +19,7 @@
  *   pxl_timer_start(&timer, 2.0);  // 2-second timer
  *
  *   // In frame loop:
- *   pxl_timer_advance(&timer, app.effective_dt);
+ *   pxl_timer_advance(&timer, pxl_app_dt(&app));
  *   if (pxl_timer_finished(&timer)) { play_explosion(); }
  *   float progress = pxl_timer_progress(&timer);
  */
