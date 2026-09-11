@@ -304,8 +304,9 @@ render_title(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_rect_t title_bounds = pxl_str_bounds(title_text);
 
 	pxl_canvas_set_color(cnv, TITLE_FG);
-	int title_x = pxl_align_x(0, TITLE_W, title_bounds.w, PXL_ALIGN_CENTER);
-	int title_y = pxl_align_y(0, TITLE_H, title_bounds.h, PXL_ALIGN_CENTER);
+	pxl_rect_t aligned = pxl_rect_align(title_bounds, (pxl_rect_t){0, 0, TITLE_W, TITLE_H}, PXL_H_CENTER | PXL_V_CENTER);
+	int title_x = aligned.x;
+	int title_y = aligned.y;
 	pxl_draw_str(cnv, title_x, title_y, title_text);
 }
 
@@ -332,8 +333,9 @@ render_font_view(pxl_canvas_t *cnv, const font_view_t *fv) {
 		int row = (i - fv->start_idx) / fv->cols;
 		int cell_x = col * GRID_VIEW_CELL_W;
 		int cell_y = row * GRID_VIEW_CELL_H;
-		int x = cell_x + pxl_align_x(0, GRID_VIEW_CELL_W, glyph.width, PXL_ALIGN_CENTER);
-		int y = cell_y + pxl_align_y(0, GRID_VIEW_CELL_H, glyph.height, PXL_ALIGN_CENTER);
+		pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, glyph.width, glyph.height}, (pxl_rect_t){cell_x, cell_y, GRID_VIEW_CELL_W, GRID_VIEW_CELL_H}, PXL_H_CENTER | PXL_V_CENTER);
+		int x = aligned.x;
+		int y = aligned.y;
 
 		pxl_writer_set_cursor(&w, x, y);
 		pxl_draw_rune(cnv, &w, glyph.codepoint);
@@ -349,8 +351,9 @@ render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
 		return;
 	}
 
-	int zoom_x = pxl_align_x(0, GLYPH_ZOOM_W, glyph.width * GLYPH_ZOOM_FACTOR, PXL_ALIGN_CENTER);
-	int zoom_y = pxl_align_y(0, GLYPH_ZOOM_H, glyph.height * GLYPH_ZOOM_FACTOR, PXL_ALIGN_CENTER);
+	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, glyph.width * GLYPH_ZOOM_FACTOR, glyph.height * GLYPH_ZOOM_FACTOR}, (pxl_rect_t){0, 0, GLYPH_ZOOM_W, GLYPH_ZOOM_H}, PXL_H_CENTER | PXL_V_CENTER);
+	int zoom_x = aligned.x;
+	int zoom_y = aligned.y;
 
 	pxl_canvas_set_color(cnv, GLYPH_ZOOM_FG);
 	pxl_draw_bitmask_transformed(cnv, glyph.bitmask, glyph.bitmask_r, zoom_x, zoom_y, GLYPH_ZOOM_FACTOR, PXL_FLIP_NONE);
@@ -374,7 +377,8 @@ render_glyph_characteristics(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 	pxl_rect_t text_bounds = pxl_str_bounds(text);
 	int text_x = (GLYPH_W - text_bounds.w) / 16;
-	int text_y = pxl_align_y(0, GLYPH_H, text_bounds.h, PXL_ALIGN_CENTER);
+	pxl_rect_t aligned = pxl_rect_align(text_bounds, (pxl_rect_t){0, 0, GLYPH_W, GLYPH_H}, PXL_H_LEFT | PXL_V_CENTER);
+	int text_y = aligned.y;
 	pxl_draw_str(cnv, text_x, text_y, text);
 }
 
@@ -409,8 +413,9 @@ render_footer(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 	pxl_rect_t footer_bounds = pxl_str_bounds(footer_text);
 
-	int footer_x = pxl_align_x(0, FOOTER_W, footer_bounds.w, PXL_ALIGN_CENTER);
-	int footer_y = pxl_align_y(0, FOOTER_H, footer_bounds.h, PXL_ALIGN_CENTER);
+	pxl_rect_t aligned = pxl_rect_align(footer_bounds, (pxl_rect_t){0, 0, FOOTER_W, FOOTER_H}, PXL_H_CENTER | PXL_V_CENTER);
+	int footer_x = aligned.x;
+	int footer_y = aligned.y;
 
 	pxl_canvas_set_color(cnv, FOOTER_FG);
 	pxl_draw_str(cnv, footer_x, footer_y, footer_text);
@@ -539,8 +544,9 @@ main(void) {
 				uint32_t fg = 0xFFFFFFFF;
 				pxl_canvas_set_color(&cnv, fg);
 				/* Align to right/bottom with 10px margin */
-				int fps_x = pxl_align_x(0, W - 10, fps_bounds.w, PXL_ALIGN_RIGHT);
-				int fps_y = pxl_align_y(0, H - 10, fps_bounds.h, PXL_ALIGN_BOTTOM);
+				pxl_rect_t aligned = pxl_rect_align(fps_bounds, (pxl_rect_t){0, 0, W - 10, H - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
+				int fps_x = aligned.x;
+				int fps_y = aligned.y;
 				pxl_writer_set_cursor(&writer, fps_x, fps_y);
 				pxl_draw_text_transformed(&cnv, &writer, fps_str, 1, PXL_FLIP_NONE);
 			}

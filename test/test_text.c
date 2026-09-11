@@ -782,87 +782,6 @@ test_pxl_text_bounds_cascade(void) {
 	ASSERT(bounds.h == g_font_a.glyph_height);
 }
 
-/* Tests for alignment helpers */
-
-static void
-test_pxl_align_x_left(void) {
-	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_LEFT);
-	ASSERT(x == 100);
-}
-
-static void
-test_pxl_align_x_center(void) {
-	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_CENTER);
-	ASSERT(x == 100 + (800 - 200) / 2);
-	ASSERT(x == 400);
-}
-
-static void
-test_pxl_align_x_right(void) {
-	int x = pxl_align_x(100, 800, 200, PXL_ALIGN_RIGHT);
-	ASSERT(x == 100 + 800 - 200);
-	ASSERT(x == 700);
-}
-
-static void
-test_pxl_align_y_top(void) {
-	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_TOP);
-	ASSERT(y == 50);
-}
-
-static void
-test_pxl_align_y_center(void) {
-	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_CENTER);
-	ASSERT(y == 50 + (200 - 100) / 2);
-	ASSERT(y == 100);
-}
-
-static void
-test_pxl_align_y_bottom(void) {
-	int y = pxl_align_y(50, 200, 100, PXL_ALIGN_BOTTOM);
-	ASSERT(y == 50 + 200 - 100);
-	ASSERT(y == 150);
-}
-
-/* Edge cases for alignment */
-
-static void
-test_pxl_align_x_overflow(void) {
-	/* text_w > container_w: should still return valid position (overflow is caller's responsibility) */
-	int x = pxl_align_x(100, 200, 400, PXL_ALIGN_LEFT);
-	ASSERT(x == 100);
-
-	x = pxl_align_x(100, 200, 400, PXL_ALIGN_CENTER);
-	ASSERT(x == 100 + (200 - 400) / 2);
-	ASSERT(x == 0); /* 100 + (-100) = 0 */
-
-	x = pxl_align_x(100, 200, 400, PXL_ALIGN_RIGHT);
-	ASSERT(x == 100 + 200 - 400);
-	ASSERT(x == -100); /* 300 - 400 = -100 */
-}
-
-static void
-test_pxl_align_x_zero_text(void) {
-	int x = pxl_align_x(100, 800, 0, PXL_ALIGN_CENTER);
-	ASSERT(x == 100 + (800 - 0) / 2);
-	ASSERT(x == 500);
-}
-
-static void
-test_pxl_align_x_zero_container(void) {
-	/* Zero container: LEFT stays at x0, CENTER/RIGHT will position based on text_w */
-	int x = pxl_align_x(100, 0, 200, PXL_ALIGN_LEFT);
-	ASSERT(x == 100);
-
-	x = pxl_align_x(100, 0, 200, PXL_ALIGN_CENTER);
-	ASSERT(x == 100 + (0 - 200) / 2);
-	ASSERT(x == 0); /* 100 - 100 = 0 */
-
-	x = pxl_align_x(100, 0, 200, PXL_ALIGN_RIGHT);
-	ASSERT(x == 100 + 0 - 200);
-	ASSERT(x == -100);
-}
-
 /* Tests for truncated text helpers */
 
 static void
@@ -1123,12 +1042,13 @@ static void
 test_pxl_text_bounds_transformed_multiline_max_width(void) {
 	/* Regression test: verify width returns max line width, not total/sum.
 	 * Line 1: 'A' = 6px, Line 2: 'ABC' = 18px.
-	 * Width must be 18 (max), not 24 (sum). Height must be 5 (max glyph height). */
+	 * Width must be 18 (max), not 24 (sum).
+	 * Height is total: 2 lines * glyph_height(5) + 1 newline * leading(6) = 16. */
 	setup_fixture();
 
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A\nABC", 1, PXL_FLIP_NONE);
 	ASSERT(bounds.w == 18);  /* Max line width */
-	ASSERT(bounds.h == 5);   /* Max glyph height */
+	ASSERT(bounds.h == 16);  /* Total height: 2*5 + 1*6 */
 }
 
 static void
@@ -1281,19 +1201,6 @@ main(void) {
 	test_pxl_draw_rune_cascade_missing_rune();
 	test_pxl_draw_rune_cascade_lowercase();
 	test_pxl_text_bounds_cascade();
-
-	/* Tests for alignment helpers */
-	test_pxl_align_x_left();
-	test_pxl_align_x_center();
-	test_pxl_align_x_right();
-	test_pxl_align_y_top();
-	test_pxl_align_y_center();
-	test_pxl_align_y_bottom();
-
-	/* Edge cases for alignment */
-	test_pxl_align_x_overflow();
-	test_pxl_align_x_zero_text();
-	test_pxl_align_x_zero_container();
 
 	/* Tests for truncated text helpers */
 	test_pxl_text_bounds_n_basic();

@@ -61,31 +61,6 @@ pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
 int
 pxl_utf8_decode(const char *text, uint32_t *out_codepoint);
 
-/* Alignment */
-typedef enum {
-	PXL_ALIGN_LEFT,    /* Align to left edge */
-	PXL_ALIGN_CENTER,  /* Align to center */
-	PXL_ALIGN_RIGHT,   /* Align to right edge */
-	/* Vertical alignment aliases */
-	PXL_ALIGN_TOP = PXL_ALIGN_LEFT,
-	PXL_ALIGN_MIDDLE = PXL_ALIGN_CENTER,
-	PXL_ALIGN_BOTTOM = PXL_ALIGN_RIGHT,
-} pxl_align_t;
-
-/* Calculate aligned x position for text of width `text_w` within a container.
- * `x0` is the container's left edge, `container_w` is its width.
- * Note: If text_w > container_w, text will overflow. Use canvas scissor to clip.
- */
-int
-pxl_align_x(int x0, int container_w, int text_w, pxl_align_t align);
-
-/* Calculate aligned y position for text of height `text_h` within a container.
- * `y0` is the container's top edge, `container_h` is its height.
- * Note: If text_h > container_h, text will overflow. Use canvas scissor to clip.
- */
-int
-pxl_align_y(int y0, int container_h, int text_h, pxl_align_t align);
-
 /* Measurement */
 pxl_rect_t
 pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune); /* Returns bounds for a single rune */
