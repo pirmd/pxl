@@ -29,6 +29,8 @@ static struct {
     GC              gc;
     XShmSegmentInfo shm;
     XImage         *img;
+    Visual         *visual;
+    int             depth;
     int             width, height;
     Atom            wm_delete;
     /* Input method / input context: required for Xutf8LookupString to
@@ -69,6 +71,61 @@ select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
     return false;
 }
 
+static bool create_pb_image(int w, int h);
+static void destroy_pb_image(void);
+
+static bool
+create_pb_image(int w, int h) {
+	assert(w > 0 && h > 0);
+
+	destroy_pb_image();
+
+	g_x11.img = XShmCreateImage(g_x11.display, g_x11.visual, (unsigned int)g_x11.depth, ZPixmap, NULL,
+	                           &g_x11.shm, (unsigned int)w, (unsigned int)h);
+	if (!g_x11.img) goto fail;
+
+	/* ensure we are pixel-aligned */
+	if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) goto fail;
+
+	/* Prevent integer overflow in shared memory size calculation */
+	if (h > 0 && g_x11.img->bytes_per_line > INT_MAX / h) goto fail;
+
+	g_x11.shm.shmid = shmget(IPC_PRIVATE,
+	                         (size_t)g_x11.img->bytes_per_line * (size_t)h,
+	                         IPC_CREAT | 0777);
+	if (g_x11.shm.shmid < 0) goto fail;
+
+	g_x11.shm.shmaddr = g_x11.img->data = shmat(g_x11.shm.shmid, 0, 0);
+	if (g_x11.shm.shmaddr == (char *)-1) goto fail;
+
+	g_x11.shm.readOnly = False;
+
+	if (!XShmAttach(g_x11.display, &g_x11.shm)) goto fail;
+
+	g_x11.width = w;
+	g_x11.height = h;
+	return true;
+
+fail:
+	destroy_pb_image();
+	return false;
+}
+
+static void
+destroy_pb_image(void) {
+	if (g_x11.img) {
+		XShmDetach(g_x11.display, &g_x11.shm);
+		if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
+			shmdt(g_x11.shm.shmaddr);
+		}
+		shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
+		XDestroyImage(g_x11.img);
+		g_x11.img = NULL;
+	}
+	g_x11.width = 0;
+	g_x11.height = 0;
+}
+
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     pxl_backend_deinit();
@@ -91,6 +148,8 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     Visual *visual = NULL;
     int depth = 0;
     if (!select_argb_visual(g_x11.display, &visual, &depth)) goto fail;
+    g_x11.visual = visual;
+    g_x11.depth = depth;
 
     int scr = DefaultScreen(g_x11.display);
     Window root = RootWindow(g_x11.display, scr);
@@ -143,35 +202,10 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     XMapWindow(g_x11.display, g_x11.window);
     XSync(g_x11.display, False);
 
-    g_x11.img = XShmCreateImage(g_x11.display, visual, (unsigned int)depth, ZPixmap, NULL,
-                                &g_x11.shm, (unsigned int)w, (unsigned int)h);
-    if (!g_x11.img) goto fail;
-
-	/* ensure we are pixel-aligned */
-    if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) goto fail;
-
-	/* Prevent integer overflow in shared memory size calculation */
-	if (h > 0 && g_x11.img->bytes_per_line > INT_MAX / h) {
-		goto fail;
-	}
-
-    g_x11.shm.shmid = shmget(IPC_PRIVATE,
-                             (size_t)g_x11.img->bytes_per_line * (size_t)h,
-                             IPC_CREAT | 0777);
-    if (g_x11.shm.shmid < 0) goto fail;
-
-    g_x11.shm.shmaddr = g_x11.img->data = shmat(g_x11.shm.shmid, 0, 0);
-    if (g_x11.shm.shmaddr == (char *)-1) goto fail;
-
-    g_x11.shm.readOnly = False;
-
-    if (!XShmAttach(g_x11.display, &g_x11.shm)) goto fail;
+    if (!create_pb_image(w, h)) goto fail;
 
     g_x11.gc = XCreateGC(g_x11.display, g_x11.window, 0, NULL);
     if (!g_x11.gc) goto fail;
-
-    g_x11.width = w;
-    g_x11.height = h;
 
     /* Unmap if hidden flag is set */
     if (flags & PXL_BACKEND_HIDDEN) {
@@ -211,15 +245,7 @@ void
 pxl_backend_deinit(void) {
     if (!g_x11.display) return;
 
-    if (g_x11.img) {
-        XShmDetach(g_x11.display, &g_x11.shm);
-        if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
-            shmdt(g_x11.shm.shmaddr);
-        }
-        shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
-        XDestroyImage(g_x11.img);
-        g_x11.img = NULL;
-    }
+    destroy_pb_image();
 
     if (g_x11.gc) {
         XFreeGC(g_x11.display, g_x11.gc);
@@ -499,11 +525,7 @@ pxl_backend_wait_events(pxl_input_t *in) {
     if (!XFilterEvent(&event, None)) {
         process_x11_event(&event, in);
     }
-    while (XPending(g_x11.display)) {
-        XNextEvent(g_x11.display, &event);
-        if (XFilterEvent(&event, None)) continue;
-        process_x11_event(&event, in);
-    }
+    pxl_backend_poll_events(in);     /* Drain remaining events */
 }
 
 int

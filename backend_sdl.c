@@ -5,6 +5,7 @@
 
 #include <SDL.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -18,6 +19,35 @@ static struct {
     char text_buffer[128];
     int text_buffer_len;
 } g_sdl;
+
+static bool create_pb_texture(int w, int h);
+static void destroy_pb_texture(void);
+
+static bool
+create_pb_texture(int w, int h) {
+	assert(w > 0 && h > 0);
+
+	destroy_pb_texture();
+
+	g_sdl.texture = SDL_CreateTexture(
+		g_sdl.renderer,
+		SDL_PIXELFORMAT_ARGB8888,  /* ARGB8888 to match PXL color native format */
+		SDL_TEXTUREACCESS_STREAMING,
+		w, h
+	);
+	if (!g_sdl.texture) return false;
+
+	g_sdl.width = w;
+	g_sdl.height = h;
+	return true;
+}
+
+static void
+destroy_pb_texture(void) {
+	if (g_sdl.texture) { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
+	g_sdl.width = 0;
+	g_sdl.height = 0;
+}
 
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
@@ -69,16 +99,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	);
 	if (!g_sdl.renderer) goto fail;
 
-	g_sdl.texture = SDL_CreateTexture(
-		g_sdl.renderer,
-		SDL_PIXELFORMAT_ARGB8888,  /* ARGB8888 to match PXL color native format */
-		SDL_TEXTUREACCESS_STREAMING,
-		w, h
-	);
-	if (!g_sdl.texture) goto fail;
-
-	g_sdl.width = w;
-	g_sdl.height = h;
+	if (!create_pb_texture(w, h)) goto fail;
 
 	/* Enable text input for character retrieval */
 	SDL_StartTextInput();
@@ -94,7 +115,7 @@ void
 pxl_backend_deinit(void) {
     SDL_StopTextInput();
     g_sdl.text_buffer_len = 0;  /* No null-termination needed */
-    if (g_sdl.texture)  { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
+    destroy_pb_texture();
     if (g_sdl.renderer) { SDL_DestroyRenderer(g_sdl.renderer); g_sdl.renderer = NULL; }
     if (g_sdl.window)   { SDL_DestroyWindow(g_sdl.window); g_sdl.window = NULL; }
     SDL_Quit();
@@ -354,9 +375,7 @@ pxl_backend_wait_events(pxl_input_t *in) {
     SDL_Event event;
     if (SDL_WaitEvent(&event)) {
         process_sdl_event(&event, in);
-        while (SDL_PollEvent(&event)) {
-            process_sdl_event(&event, in);
-        }
+        pxl_backend_poll_events(in);
     }
 }
 
