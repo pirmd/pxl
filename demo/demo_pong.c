@@ -237,9 +237,9 @@ static void
 p1_get_input(pxl_app_t *app, pong_input_t *input) {
 	assert(app != NULL && input != NULL);
 	input->paddle_left_dir = 0;
-	if (pxl_app_is_pressed(app, PXL_KEYB_K) || pxl_app_is_pressed(app, PXL_KEYB_UP))
+	if (pxl_app_is_active(app, PXL_KEYB_K) || pxl_app_is_active(app, PXL_KEYB_UP))
 		input->paddle_left_dir = -1;
-	if (pxl_app_is_pressed(app, PXL_KEYB_J) || pxl_app_is_pressed(app, PXL_KEYB_DOWN))
+	if (pxl_app_is_active(app, PXL_KEYB_J) || pxl_app_is_active(app, PXL_KEYB_DOWN))
 		input->paddle_left_dir = 1;
 }
 
@@ -247,8 +247,8 @@ static void
 p2_get_input(pxl_app_t *app, pong_input_t *input) {
 	assert(app != NULL && input != NULL);
 	input->paddle_right_dir = 0;
-	if (pxl_app_is_pressed(app, PXL_KEYB_Z)) input->paddle_right_dir = -1;
-	if (pxl_app_is_pressed(app, PXL_KEYB_S)) input->paddle_right_dir = 1;
+	if (pxl_app_is_active(app, PXL_KEYB_Z)) input->paddle_right_dir = -1;
+	if (pxl_app_is_active(app, PXL_KEYB_S)) input->paddle_right_dir = 1;
 }
 
 static void
@@ -273,29 +273,29 @@ handle_pong_input(pxl_app_t *app, const ui_t *ui, const pong_t *pong, pong_input
 static void
 handle_input(pxl_app_t *app, ui_t *ui) {
 	/* Cycle through game modes: 1 player <-> 2 players */
-	if (pxl_app_was_pressed(app, PXL_KEYB_T)) {
+	if (pxl_app_just_active(app, PXL_KEYB_T)) {
 		ui->mode = (ui->mode == GAME_1P) ? GAME_2P : GAME_1P;
 	}
 
 	/* Focus-based pause: auto-pause on focus loss */
-	if (pxl_app_is_pressed(app, PXL_WM_FOCUS_LOST) ||
-	    pxl_app_is_pressed(app, PXL_WM_MOUSE_FOCUS_LOST)) {
+	if (pxl_app_is_active(app, PXL_WM_FOCUS_LOST) ||
+	    pxl_app_is_active(app, PXL_WM_MOUSE_FOCUS_LOST)) {
 		ui->show_pause = true;
 	}
 
 	/* Manual unpause: movement keys clear pause */
-	if (pxl_app_is_pressed(app, PXL_KEYB_J) || pxl_app_is_pressed(app, PXL_KEYB_K) ||
-	    pxl_app_is_pressed(app, PXL_KEYB_Z) || pxl_app_is_pressed(app, PXL_KEYB_S)) {
+	if (pxl_app_is_active(app, PXL_KEYB_J) || pxl_app_is_active(app, PXL_KEYB_K) ||
+	    pxl_app_is_active(app, PXL_KEYB_Z) || pxl_app_is_active(app, PXL_KEYB_S)) {
 		ui->show_pause = false;
 	}
 
 	/* Manual pause toggle */
-	if (pxl_app_was_pressed(app, PXL_KEYB_P)) {
+	if (pxl_app_just_active(app, PXL_KEYB_P)) {
 		ui->show_pause = !ui->show_pause;
 	}
 
 	/* Help screen toggle */
-	ui->show_help = pxl_app_is_pressed(app, PXL_KEYB_H);
+	ui->show_help = pxl_app_is_active(app, PXL_KEYB_H);
 
 	app->paused = ui->show_pause || ui->show_help;
 }
@@ -475,14 +475,8 @@ main(void) {
 		"Player 1: UP/DOWN or K/J=up/down. Player 2: Z/S=up/down.\n"
 		"T=toggle 1P/2P, P=pause, H=help, ESC=quit\n");
 
-	pxl_app_t app = {
-		.title = "PXL Pong",
-		.width = W,
-		.height = H,
-		.physics_dt = 1.0 / FPS,
-	};
-
-	if (pxl_app_init(&app) != PXL_SUCCESS)
+	pxl_app_t app;
+	if (pxl_app_init(&app, "PXL Pong", W, H, 0, 1.0 / FPS) != PXL_SUCCESS)
 		return 1;
 
 	ui_t ui = {
@@ -526,7 +520,7 @@ main(void) {
 	 *   }
 	 */
 	while (pxl_app_advance(&app)) {
-		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
+		if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 

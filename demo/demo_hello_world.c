@@ -14,19 +14,14 @@
 
 int
 main(void) {
-	pxl_app_t app = {
-		.title = "Hello World - PXL",
-		.width = 800,
-		.height = 600
-		/* physics_dt not needed for static drawing (defaults to 0) */
-	};
-
-	if (pxl_app_init(&app) != PXL_SUCCESS)
+	pxl_app_t app;
+	/* physics_dt = 0: static drawing, no physics stepper */
+	if (pxl_app_init(&app, "Hello World - PXL", 800, 600, 0, 0.0) != PXL_SUCCESS)
 		return 1;
 
 	/* Main loop: advance_wait blocks until next frame (simpler than stepper) */
 	while (pxl_app_advance_wait(&app)) {
-		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE))
+		if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE))
 			break;
 
 		pxl_buf_t pb;

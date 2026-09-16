@@ -24,17 +24,12 @@
  *       2. Process input events.
  *
  * Usage:
- *   pxl_app_t app = {
- *       .title = "My Game",
- *       .width = 800,
- *       .height = 600,
- *       .physics_dt = 1.0 / 60.0,  // Fixed timestep for physics
- *   };
- *   pxl_app_init(&app);
+ *   pxl_app_t app;
+ *   pxl_app_init(&app, "My Game", 800, 600, 0, 1.0 / 60.0);
  *
  *   while (pxl_app_advance(&app)) {
- *       if (pxl_app_was_pressed(&app, PXL_KEY_P)) app.paused = !app.paused;
- *       if (pxl_app_was_pressed(&app, PXL_KEY_LEFT_SHIFT)) app.time_scale = 0.5f;
+ *       if (pxl_app_just_active(&app, PXL_KEY_P)) app.paused = !app.paused;
+ *       if (pxl_app_just_active(&app, PXL_KEY_LEFT_SHIFT)) app.time_scale = 0.5f;
  *
  *       // Use app.effective_dt for custom timers:
  *       pxl_timer_advance(&my_timer, app.effective_dt);
@@ -47,13 +42,6 @@
  */
 
 typedef struct {
-	/* --- User Configuration --- */
-	const char* title;            /* Window title. */
-	int width, height;            /* Window dimensions. */
-	pxl_backend_flags_t backend_flags;  /* Backend-specific flags. */
-
-	double physics_dt;            /* Fixed timestep for physics (0 = disable). */
-
 	/* Time control (external, managed by user) */
 	float time_scale;            /* Global time scale (default: 1.0). */
 	bool paused;                  /* Global pause flag (default: false). */
@@ -70,12 +58,19 @@ typedef struct {
 	double effective_dt;          /* Effective dt for current frame (clamped, scaled, paused-aware). */
 } pxl_app_t;
 
-/* Initialize the app and backend. */
+/* Initialize the app and backend.
+ *
+ * title:          Window title.
+ * w, h:           Window dimensions.
+ * backend_flags:  Backend-specific flags (PXL_BACKEND_*), 0 for none.
+ * physics_dt:     Fixed timestep for physics (seconds). 0 disables the stepper.
+ */
 static inline pxl_err_t
-pxl_app_init(pxl_app_t *app) {
+pxl_app_init(pxl_app_t *app, const char *title, int w, int h,
+             pxl_backend_flags_t backend_flags, double physics_dt) {
 	assert(app);
 
-	if (pxl_backend_init(app->title, app->width, app->height, app->backend_flags) != PXL_SUCCESS) {
+	if (pxl_backend_init(title, w, h, backend_flags) != PXL_SUCCESS) {
 		return PXL_E_BACKEND_INIT;
 	}
 
@@ -89,7 +84,7 @@ pxl_app_init(pxl_app_t *app) {
 	app->effective_dt = 0.0;
 
 	/* Initialize physics stepper (dt = 0 means disabled) */
-	pxl_stepper_init(&app->physics_ts, app->physics_dt);
+	pxl_stepper_init(&app->physics_ts, physics_dt);
 
 	return PXL_SUCCESS;
 }
@@ -171,22 +166,29 @@ pxl_app_advance_physics(pxl_app_t *app) {
 	return pxl_stepper_advance(&app->physics_ts);
 }
 
-/* --- Input Helpers --- */
+/* --- Input Helpers ---
+ *
+ * Naming covers keys, mouse buttons and window-manager events uniformly:
+ *   pxl_app_is_active:       code is active in the current frame (pressed key,
+ *                            held mouse button, or active WM event).
+ *   pxl_app_just_active:    code became active this frame (was inactive, now active).
+ *   pxl_app_just_inactive:  code became inactive this frame (was active, now inactive).
+ */
 static inline bool
-pxl_app_is_pressed(const pxl_app_t *app, pxl_input_code_t code) {
+pxl_app_is_active(const pxl_app_t *app, pxl_input_code_t code) {
 	assert(app);
 	return pxl_input_state(&app->curr, code);
 }
 
 static inline bool
-pxl_app_was_pressed(const pxl_app_t *app, pxl_input_code_t code) {
+pxl_app_just_active(const pxl_app_t *app, pxl_input_code_t code) {
 	assert(app);
 	return pxl_input_state(&app->curr, code) &&
 	       !pxl_input_state(&app->prev, code);
 }
 
 static inline bool
-pxl_app_was_released(const pxl_app_t *app, pxl_input_code_t code) {
+pxl_app_just_inactive(const pxl_app_t *app, pxl_input_code_t code) {
 	assert(app);
 	return !pxl_input_state(&app->curr, code) &&
 	       pxl_input_state(&app->prev, code);
