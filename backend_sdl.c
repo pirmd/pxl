@@ -13,8 +13,10 @@ static struct {
     SDL_Window   *window;
     SDL_Renderer *renderer;
     SDL_Texture  *texture;
-    int width;
-    int height;
+    int window_w;     /* desired window/framebuffer width  */
+    int window_h;     /* desired window/framebuffer height */
+    int pb_w;         /* actual pixel-buffer width  */
+    int pb_h;         /* actual pixel-buffer height */
     /* Text input buffer for typed characters (UTF-8) */
     char text_buffer[128];
     int text_buffer_len;
@@ -37,30 +39,54 @@ create_pb_texture(int w, int h) {
 	);
 	if (!g_sdl.texture) return false;
 
-	g_sdl.width = w;
-	g_sdl.height = h;
+	g_sdl.pb_w = w;
+	g_sdl.pb_h = h;
 	return true;
 }
 
 static void
 destroy_pb_texture(void) {
 	if (g_sdl.texture) { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
-	g_sdl.width = 0;
-	g_sdl.height = 0;
+	g_sdl.pb_w = 0;
+	g_sdl.pb_h = 0;
+}
+
+void
+pxl_backend_get_window_size(int *out_w, int *out_h) {
+	assert(out_w && out_h);
+	*out_w = g_sdl.window_w;
+	*out_h = g_sdl.window_h;
 }
 
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	pxl_backend_deinit();
 
-	/* Validate parameters */
-	if (!title || w <= 0 || h <= 0) {
+	/* Title is always required. w/h are required unless fullscreen, in which
+	 * case they are overridden by the desktop resolution. */
+	if (!title) {
+		return PXL_E_INVALID_PARAM;
+	}
+	if (!(flags & PXL_BACKEND_FULLSCREEN) && (w <= 0 || h <= 0)) {
 		return PXL_E_INVALID_PARAM;
 	}
 
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		pxl_log(SDL_GetError());
 		return PXL_E_BACKEND_INIT;
+	}
+
+	/* Resolve target size: in fullscreen, ignore w/h and use the desktop
+	 * resolution so both the window and the pixel buffer match it from the
+	 * first frame (no async WM race). */
+	if (flags & PXL_BACKEND_FULLSCREEN) {
+		SDL_DisplayMode dm;
+		if (SDL_GetDesktopDisplayMode(0, &dm) != 0) {
+			pxl_log(SDL_GetError());
+			return PXL_E_BACKEND_INIT;
+		}
+		w = dm.w;
+		h = dm.h;
 	}
 
 	/* Build window flags */
@@ -87,6 +113,11 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	);
 	if (!g_sdl.window) goto fail;
 
+	/* The window size is the source of truth: it reflects the actual geometry
+	 * (which may differ from the request, e.g. fullscreen mode adjustment). */
+	SDL_GetWindowSize(g_sdl.window, &g_sdl.window_w, &g_sdl.window_h);
+	if (g_sdl.window_w <= 0 || g_sdl.window_h <= 0) goto fail;
+
 	/* Build renderer flags */
 	uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
 	if (flags & PXL_BACKEND_VSYNC) {
@@ -99,7 +130,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	);
 	if (!g_sdl.renderer) goto fail;
 
-	if (!create_pb_texture(w, h)) goto fail;
+	if (!create_pb_texture(g_sdl.window_w, g_sdl.window_h)) goto fail;
 
 	/* Enable text input for character retrieval */
 	SDL_StartTextInput();
@@ -116,6 +147,8 @@ pxl_backend_deinit(void) {
     SDL_StopTextInput();
     g_sdl.text_buffer_len = 0;  /* No null-termination needed */
     destroy_pb_texture();
+    g_sdl.window_w = 0;
+    g_sdl.window_h = 0;
     if (g_sdl.renderer) { SDL_DestroyRenderer(g_sdl.renderer); g_sdl.renderer = NULL; }
     if (g_sdl.window)   { SDL_DestroyWindow(g_sdl.window); g_sdl.window = NULL; }
     SDL_Quit();
@@ -124,6 +157,17 @@ pxl_backend_deinit(void) {
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
 	assert(out_pb);
+	assert(g_sdl.renderer);
+
+    /* Lazily reconcile the pixel buffer with the desired window size. This
+     * covers init-time fullscreen, runtime resizes and manual size changes:
+     * window_w/window_h are the single source of truth, updated by events,
+     * and the texture is (re)created here, at most once per size transition. */
+    if (g_sdl.pb_w != g_sdl.window_w || g_sdl.pb_h != g_sdl.window_h) {
+        if (!create_pb_texture(g_sdl.window_w, g_sdl.window_h)) {
+            return PXL_E_BACKEND_FRAME;
+        }
+    }
 
     void *pixels;
     int pitch;
@@ -134,8 +178,8 @@ pxl_backend_begin_frame(pxl_buf_t *out_pb) {
 
     assert(pitch % (int)sizeof(pxl_t) == 0);
 
-    out_pb->width = g_sdl.width;
-    out_pb->height = g_sdl.height;
+    out_pb->width = g_sdl.pb_w;
+    out_pb->height = g_sdl.pb_h;
     out_pb->stride = pitch / (int)sizeof(pxl_t);
     out_pb->data = (pxl_t *)pixels;
 
@@ -343,6 +387,11 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
                 pxl_input_release(in, PXL_WM_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                 pxl_input_press(in, PXL_WM_FOCUS_LOST);
+            } else if (event->window.event == SDL_WINDOWEVENT_RESIZED ||
+                       event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                g_sdl.window_w = event->window.data1;
+                g_sdl.window_h = event->window.data2;
+                pxl_input_press(in, PXL_WM_RESIZED);
             }
             break;
 

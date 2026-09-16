@@ -57,6 +57,61 @@ test_pxl_backend_flags(void) {
 	pxl_backend_deinit();
 }
 
+/* Fullscreen & window size ------------------------------------------------- */
+
+static void
+test_pxl_backend_fullscreen_ignores_wh(void) {
+	/* In fullscreen, invalid w/h must be accepted (overridden by screen size) */
+	ASSERT(pxl_backend_init("test", 0, 0, PXL_BACKEND_FULLSCREEN | PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+	pxl_backend_deinit();
+	ASSERT(pxl_backend_init("test", -1, -1, PXL_BACKEND_FULLSCREEN | PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+	pxl_backend_deinit();
+}
+
+static void
+test_pxl_backend_get_window_size_windowed(void) {
+	int w = 100, h = 100;
+	ASSERT(pxl_backend_init("test", w, h, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	int gw, gh;
+	pxl_backend_get_window_size(&gw, &gh);
+	ASSERT(gw == w);
+	ASSERT(gh == h);
+
+	pxl_backend_deinit();
+}
+
+static void
+test_pxl_backend_get_window_size_fullscreen(void) {
+	/* In fullscreen, window size must reflect the screen size (positive), not
+	 * the (invalid) requested w/h. */
+	ASSERT(pxl_backend_init("test", 0, 0, PXL_BACKEND_FULLSCREEN | PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	int gw, gh;
+	pxl_backend_get_window_size(&gw, &gh);
+	ASSERT(gw > 0);
+	ASSERT(gh > 0);
+
+	pxl_backend_deinit();
+}
+
+static void
+test_pxl_backend_frame_matches_window_size(void) {
+	int w = 100, h = 100;
+	ASSERT(pxl_backend_init("test", w, h, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	pxl_buf_t pb;
+	ASSERT(pxl_backend_begin_frame(&pb) == PXL_SUCCESS);
+
+	int gw, gh;
+	pxl_backend_get_window_size(&gw, &gh);
+	ASSERT(pb.width == gw);
+	ASSERT(pb.height == gh);
+
+	ASSERT(pxl_backend_end_frame() == PXL_SUCCESS);
+	pxl_backend_deinit();
+}
+
 /* Utilities ---------------------------------------------------------------- */
 
 static void
@@ -170,6 +225,10 @@ main(void) {
 	test_pxl_backend_init_invalid_params();
 	test_pxl_backend_deinit_safety();
 	test_pxl_backend_flags();
+	test_pxl_backend_fullscreen_ignores_wh();
+	test_pxl_backend_get_window_size_windowed();
+	test_pxl_backend_get_window_size_fullscreen();
+	test_pxl_backend_frame_matches_window_size();
 	test_pxl_backend_get_time_basic();
 	test_pxl_backend_poll_events_null_input();
 	test_pxl_backend_frame_flow();

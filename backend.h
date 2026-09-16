@@ -35,7 +35,11 @@ typedef enum {
 	PXL_BACKEND_CENTERED   = (1 << 3),  /* Center window on screen */
 } pxl_backend_flags_t;
 
-/* Initialize the backend */
+/* Initialize the backend.
+ *
+ * If PXL_BACKEND_FULLSCREEN is set, w and h are ignored and the window
+ * (and its pixel buffer) are created at the maximum screen resolution.
+ */
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags);
 
@@ -43,7 +47,23 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags);
 void
 pxl_backend_deinit(void);
 
-/* Begin frame - fill out_pb with drawable memory */
+/* Get the current window size in pixels.
+ *
+ * This is the desired size of the framebuffer: it reflects the requested
+ * dimensions at init (or the screen size in fullscreen) and is kept up to
+ * date on window resize. The actual pixel buffer is reconciled to this size
+ * lazily in pxl_backend_begin_frame(), so it may transiently differ for at
+ * most one frame after a size change.
+ */
+void
+pxl_backend_get_window_size(int *out_w, int *out_h);
+
+/* Begin frame - fill out_pb with drawable memory.
+ *
+ * Reconciles the internal pixel buffer with the current window size if they
+ * diverge (e.g. after a resize), recreating it as needed. The returned buffer
+ * is guaranteed to match the size reported by pxl_backend_get_window_size().
+ */
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb);
 

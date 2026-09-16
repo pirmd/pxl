@@ -88,6 +88,7 @@ typedef enum {
 	PXL_WM_FOCUS_LOST,
 	PXL_WM_MOUSE_FOCUS_LOST,
 	PXL_WM_QUIT,
+	PXL_WM_RESIZED,
 
     PXL_IN_COUNT
 } pxl_input_code_t;

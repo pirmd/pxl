@@ -31,7 +31,10 @@ static struct {
     XImage         *img;
     Visual         *visual;
     int             depth;
-    int             width, height;
+    int             window_w;     /* desired window/framebuffer width  */
+    int             window_h;     /* desired window/framebuffer height */
+    int             pb_w;         /* actual pixel-buffer width  */
+    int             pb_h;         /* actual pixel-buffer height */
     Atom            wm_delete;
     /* Input method / input context: required for Xutf8LookupString to
      * produce correct UTF-8 text (dead keys, compose sequences, non-Latin1
@@ -102,8 +105,8 @@ create_pb_image(int w, int h) {
 
 	if (!XShmAttach(g_x11.display, &g_x11.shm)) goto fail;
 
-	g_x11.width = w;
-	g_x11.height = h;
+	g_x11.pb_w = w;
+	g_x11.pb_h = h;
 	return true;
 
 fail:
@@ -122,15 +125,27 @@ destroy_pb_image(void) {
 		XDestroyImage(g_x11.img);
 		g_x11.img = NULL;
 	}
-	g_x11.width = 0;
-	g_x11.height = 0;
+	g_x11.pb_w = 0;
+	g_x11.pb_h = 0;
+}
+
+void
+pxl_backend_get_window_size(int *out_w, int *out_h) {
+	assert(out_w && out_h);
+	*out_w = g_x11.window_w;
+	*out_h = g_x11.window_h;
 }
 
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     pxl_backend_deinit();
 
-    if (!title || w <= 0 || h <= 0) {
+    /* Title is always required. w/h are required unless fullscreen, in which
+     * case they are overridden by the screen resolution. */
+    if (!title) {
+        return PXL_E_INVALID_PARAM;
+    }
+    if (!(flags & PXL_BACKEND_FULLSCREEN) && (w <= 0 || h <= 0)) {
         return PXL_E_INVALID_PARAM;
     }
 
@@ -154,6 +169,17 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     int scr = DefaultScreen(g_x11.display);
     Window root = RootWindow(g_x11.display, scr);
     Colormap cmap = XCreateColormap(g_x11.display, root, visual, AllocNone);
+
+    /* Resolve target size: in fullscreen, ignore w/h and use the screen
+     * resolution so both the window and the pixel buffer match it from the
+     * first frame (no async WM race). */
+    if (flags & PXL_BACKEND_FULLSCREEN) {
+        w = DisplayWidth(g_x11.display, scr);
+        h = DisplayHeight(g_x11.display, scr);
+    }
+
+    g_x11.window_w = w;
+    g_x11.window_h = h;
 
     XSetWindowAttributes attrs = {
         .colormap = cmap,
@@ -202,7 +228,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     XMapWindow(g_x11.display, g_x11.window);
     XSync(g_x11.display, False);
 
-    if (!create_pb_image(w, h)) goto fail;
+    if (!create_pb_image(g_x11.window_w, g_x11.window_h)) goto fail;
 
     g_x11.gc = XCreateGC(g_x11.display, g_x11.window, 0, NULL);
     if (!g_x11.gc) goto fail;
@@ -246,6 +272,8 @@ pxl_backend_deinit(void) {
     if (!g_x11.display) return;
 
     destroy_pb_image();
+    g_x11.window_w = 0;
+    g_x11.window_h = 0;
 
     if (g_x11.gc) {
         XFreeGC(g_x11.display, g_x11.gc);
@@ -275,11 +303,23 @@ pxl_backend_deinit(void) {
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
 	assert(out_pb);
-	assert(g_x11.display && g_x11.img && g_x11.img->data);
+	assert(g_x11.display);
+
+    /* Lazily reconcile the pixel buffer with the desired window size. This
+     * covers init-time fullscreen, runtime resizes and manual size changes:
+     * window_w/window_h are the single source of truth, updated by events,
+     * and the image is (re)created here, at most once per size transition. */
+    if (g_x11.pb_w != g_x11.window_w || g_x11.pb_h != g_x11.window_h) {
+        if (!create_pb_image(g_x11.window_w, g_x11.window_h)) {
+            return PXL_E_BACKEND_FRAME;
+        }
+    }
+
+	assert(g_x11.img && g_x11.img->data);
     assert(g_x11.img->bytes_per_line % (int)sizeof(pxl_t) == 0);
 
-    out_pb->width  = g_x11.width;
-    out_pb->height = g_x11.height;
+    out_pb->width  = g_x11.pb_w;
+    out_pb->height = g_x11.pb_h;
     out_pb->stride = g_x11.img->bytes_per_line / (int)sizeof(pxl_t);
     out_pb->data   = (pxl_t *)g_x11.img->data;
 
@@ -291,7 +331,7 @@ pxl_backend_end_frame(void) {
     assert(g_x11.display && g_x11.img && g_x11.img->data);
 
     Bool success = XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
-                                g_x11.img, 0, 0, 0, 0, (unsigned int)g_x11.width, (unsigned int)g_x11.height,
+                                g_x11.img, 0, 0, 0, 0, (unsigned int)g_x11.pb_w, (unsigned int)g_x11.pb_h,
                                 False);
     XSync(g_x11.display, False);
     
@@ -502,6 +542,15 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         case FocusOut:
             pxl_input_press(in, PXL_WM_FOCUS_LOST);
             if (g_x11.xic) XUnsetICFocus(g_x11.xic);
+            break;
+
+        case ConfigureNotify:
+            if (g_x11.window_w != event->xconfigure.width ||
+                g_x11.window_h != event->xconfigure.height) {
+                g_x11.window_w = event->xconfigure.width;
+                g_x11.window_h = event->xconfigure.height;
+                pxl_input_press(in, PXL_WM_RESIZED);
+            }
             break;
     }
 }
