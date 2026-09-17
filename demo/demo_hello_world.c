@@ -22,7 +22,7 @@ main(void) {
 
 	/* Main loop: advance_wait blocks until next frame (simpler than stepper) */
 	while (pxl_app_advance_wait(&app)) {
-		if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE))
+		if (pxl_app_just_triggered(&app, PXL_KEYB_ESCAPE))
 			break;
 
 		pxl_buf_t pb;

@@ -414,37 +414,37 @@ handle_fountain_input(pxl_app_t *app, particle_type_t current_type, fountain_inp
 	*input = (fountain_input_t){0};
 
 	/* Particle type selection */
-	if (pxl_app_just_active(app, PXL_KEYB_1)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_1)) {
 		input->emit_type = PARTICLE_FIRE;
 		input->emit_type_changed = true;
 	}
-	if (pxl_app_just_active(app, PXL_KEYB_2)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_2)) {
 		input->emit_type = PARTICLE_SMOKE;
 		input->emit_type_changed = true;
 	}
-	if (pxl_app_just_active(app, PXL_KEYB_3)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_3)) {
 		input->emit_type = PARTICLE_SPARK;
 		input->emit_type_changed = true;
 	}
 
 	/* Emission rate */
-	if (pxl_app_just_active(app, PXL_KEYB_UP) || pxl_app_just_active(app, PXL_KEYB_K)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_UP) || pxl_app_just_triggered(app, PXL_KEYB_K)) {
 		input->emit_rate_change = +5;
 	}
-	if (pxl_app_just_active(app, PXL_KEYB_DOWN) || pxl_app_just_active(app, PXL_KEYB_J)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_DOWN) || pxl_app_just_triggered(app, PXL_KEYB_J)) {
 		input->emit_rate_change = -5;
 	}
 
 	/* Change particle type with keyboard or left mouse button */
-	if (pxl_app_just_active(app, PXL_KEYB_LEFT)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_LEFT)) {
 		input->emit_type = (current_type - 1 + PARTICLE_COUNT) % PARTICLE_COUNT;
 		input->emit_type_changed = true;
 	}
-	if (pxl_app_just_active(app, PXL_KEYB_RIGHT)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_RIGHT)) {
 		input->emit_type = (current_type + 1) % PARTICLE_COUNT;
 		input->emit_type_changed = true;
 	}
-	if (pxl_app_just_active(app, PXL_MOUSE_LEFT)) {
+	if (pxl_app_just_triggered(app, PXL_MOUSE_LEFT)) {
 		input->emit_type = (current_type + 1) % PARTICLE_COUNT;
 		input->emit_type_changed = true;
 	}
@@ -560,24 +560,24 @@ handle_input(pxl_app_t *app, ui_t *ui, particle_type_t current_type, fountain_in
 	assert(app != NULL && ui != NULL && fountain_input != NULL);
 
 	/* Focus-based pause: auto-pause on focus loss */
-	bool auto_paused = pxl_app_is_active(app, PXL_WM_FOCUS_LOST) ||
-		pxl_app_is_active(app, PXL_WM_MOUSE_FOCUS_LOST);
+	bool auto_paused = pxl_app_is_down(app, PXL_WM_FOCUS_LOST) ||
+		pxl_app_is_down(app, PXL_WM_MOUSE_FOCUS_LOST);
 	if (auto_paused) {
 		ui->show_pause = true;
 	}
 
 	/* Manual unpause: mouse buttons clear pause */
-	if (pxl_app_just_active(app, PXL_MOUSE_LEFT) || pxl_app_just_active(app, PXL_MOUSE_RIGHT)) {
+	if (pxl_app_just_triggered(app, PXL_MOUSE_LEFT) || pxl_app_just_triggered(app, PXL_MOUSE_RIGHT)) {
 		ui->show_pause = false;
 	}
 
 	/* Manual pause toggle */
-	if (pxl_app_just_active(app, PXL_KEYB_P)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_P)) {
 		ui->show_pause = !ui->show_pause;
 	}
 
 	/* Help screen toggle */
-	ui->show_help = pxl_app_is_active(app, PXL_KEYB_H);
+	ui->show_help = pxl_app_is_down(app, PXL_KEYB_H);
 
 	/* Update physics pause state */
 	app->paused = ui->show_pause || ui->show_help;
@@ -617,7 +617,7 @@ main(void) {
 	int fps = 0;
 
 	while (pxl_app_advance(&app)) {
-		if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE)) {
+		if (pxl_app_just_triggered(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 

@@ -198,7 +198,7 @@ render_typewriter(pxl_canvas_t *cnv, typewriter_t *tw) {
 static bool
 any_printable_key_held(const pxl_app_t *app) {
     for (pxl_input_code_t c = PXL_KEYB_SPACE; c <= PXL_KEYB_Z; ++c) {
-        if (pxl_app_is_active(app, c)) return true;
+        if (pxl_app_is_down(app, c)) return true;
     }
     return false;
 }
@@ -210,27 +210,27 @@ any_printable_key_held(const pxl_app_t *app) {
 static void
 handle_input(pxl_app_t *app, typewriter_t *tw) {
 	/* Handle special keys for cursor movement */
-	if (pxl_app_just_active(app, PXL_KEYB_LEFT)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_LEFT)) {
 		carriage_left(tw);
 	}
 
-	if (pxl_app_just_active(app, PXL_KEYB_RIGHT)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_RIGHT)) {
 		carriage_right(tw);
 	}
 
-	if (pxl_app_just_active(app, PXL_KEYB_UP)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_UP)) {
 		carriage_up(tw);
 	}
 
-	if (pxl_app_just_active(app, PXL_KEYB_DOWN)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_DOWN)) {
 		carriage_down(tw);
 	}
 
-	if (pxl_app_just_active(app, PXL_KEYB_HOME)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_HOME)) {
 		carriage_home(tw);
 	}
 
-	if (pxl_app_just_active(app, PXL_KEYB_ENTER)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_ENTER)) {
 		carriage_return(tw);
 	}
 
@@ -282,7 +282,7 @@ main(void) {
 	int fps = 0;
 
     while (pxl_app_advance_wait(&app)) {
-		if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE)) {
+		if (pxl_app_just_triggered(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 

@@ -31,7 +31,7 @@ Quick start:
     if (pxl_app_init(&app, &cfg) != PXL_SUCCESS) return 1;
 
     while (pxl_app_advance_wait(&app)) {
-        if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE)) break;
+        if (pxl_app_just_triggered(&app, PXL_KEYB_ESCAPE)) break;
 
         pxl_buf_t pb;
         if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {

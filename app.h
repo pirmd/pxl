@@ -30,8 +30,8 @@
  *   if (pxl_app_init(&app, &cfg) != PXL_SUCCESS) return 1;
  *
  *   while (pxl_app_advance(&app)) {
- *       if (pxl_app_just_active(&app, PXL_KEY_P)) app.paused = !app.paused;
- *       if (pxl_app_just_active(&app, PXL_KEY_LEFT_SHIFT)) app.time_scale = 0.5f;
+ *       if (pxl_app_just_triggered(&app, PXL_KEY_P)) app.paused = !app.paused;
+ *       if (pxl_app_just_triggered(&app, PXL_KEY_LEFT_SHIFT)) app.time_scale = 0.5f;
  *
  *       // Use app.effective_dt for custom timers:
  *       pxl_timer_advance(&my_timer, app.effective_dt);
@@ -199,26 +199,28 @@ pxl_app_advance_physics(pxl_app_t *app) {
 /* --- Input Helpers ---
  *
  * Naming covers keys, mouse buttons and window-manager events uniformly:
- *   pxl_app_is_active:       code is active in the current frame (pressed key,
- *                            held mouse button, or active WM event).
- *   pxl_app_just_active:    code became active this frame (was inactive, now active).
- *   pxl_app_just_inactive:  code became inactive this frame (was active, now inactive).
+ *   pxl_app_is_down:        code is active in the current frame (held key or
+ *                            mouse button, or active WM event).
+ *   pxl_app_just_triggered: code became active this frame (key/mouse button
+ *                            pressed, or WM event fired).
+ *   pxl_app_just_released:  code became inactive this frame (key/mouse button
+ *                            released, or WM event cleared).
  */
 static inline bool
-pxl_app_is_active(const pxl_app_t *app, pxl_input_code_t code) {
+pxl_app_is_down(const pxl_app_t *app, pxl_input_code_t code) {
 	assert(app);
 	return pxl_input_state(&app->curr, code);
 }
 
 static inline bool
-pxl_app_just_active(const pxl_app_t *app, pxl_input_code_t code) {
+pxl_app_just_triggered(const pxl_app_t *app, pxl_input_code_t code) {
 	assert(app);
 	return pxl_input_state(&app->curr, code) &&
 	       !pxl_input_state(&app->prev, code);
 }
 
 static inline bool
-pxl_app_just_inactive(const pxl_app_t *app, pxl_input_code_t code) {
+pxl_app_just_released(const pxl_app_t *app, pxl_input_code_t code) {
 	assert(app);
 	return !pxl_input_state(&app->curr, code) &&
 	       pxl_input_state(&app->prev, code);

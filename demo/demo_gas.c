@@ -326,40 +326,40 @@ handle_input(pxl_app_t *app, ui_t *ui, int *add_particles) {
 	*add_particles = 0;
 	
 	/* UP/DOWN: add/remove particles (5 at a time) */
-	if (pxl_app_is_active(app, PXL_KEYB_UP)) {
+	if (pxl_app_is_down(app, PXL_KEYB_UP)) {
 		*add_particles = +5;
 	}
-	if (pxl_app_is_active(app, PXL_KEYB_DOWN)) {
+	if (pxl_app_is_down(app, PXL_KEYB_DOWN)) {
 		*add_particles = -5;
 	}
 	
 	/* Speed controls - Page Up/Down (time scale affects physics speed only) */
-	if (pxl_app_just_active(app, PXL_KEYB_PAGE_UP)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_PAGE_UP)) {
 		app->time_scale = fminf(app->time_scale * 1.25f, 8.0f);
 	}
-	if (pxl_app_just_active(app, PXL_KEYB_PAGE_DOWN)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_PAGE_DOWN)) {
 		app->time_scale = fmaxf(app->time_scale / 1.25f, 0.125f);
 	}
 	
 	/* Focus-based pause: auto-pause on focus loss */
-	bool auto_paused = pxl_app_is_active(app, PXL_WM_FOCUS_LOST) ||
-		pxl_app_is_active(app, PXL_WM_MOUSE_FOCUS_LOST);
+	bool auto_paused = pxl_app_is_down(app, PXL_WM_FOCUS_LOST) ||
+		pxl_app_is_down(app, PXL_WM_MOUSE_FOCUS_LOST);
 	if (auto_paused) {
 		ui->show_pause = true;
 	}
 	
 	/* Manual unpause: movement keys clear pause */
-	if (pxl_app_is_active(app, PXL_KEYB_UP) || pxl_app_is_active(app, PXL_KEYB_DOWN)) {
+	if (pxl_app_is_down(app, PXL_KEYB_UP) || pxl_app_is_down(app, PXL_KEYB_DOWN)) {
 		ui->show_pause = false;
 	}
 	
 	/* Manual pause toggle */
-	if (pxl_app_just_active(app, PXL_KEYB_P)) {
+	if (pxl_app_just_triggered(app, PXL_KEYB_P)) {
 		ui->show_pause = !ui->show_pause;
 	}
 	
 	/* Help screen toggle */
-	ui->show_help = pxl_app_is_active(app, PXL_KEYB_H);
+	ui->show_help = pxl_app_is_down(app, PXL_KEYB_H);
 	
 	/* Update physics pause state (stops simulation when paused) */
 	app->paused = ui->show_pause || ui->show_help;
@@ -408,7 +408,7 @@ main(void) {
 	 * This ensures deterministic physics regardless of frame rate.
 	 */
 	while (pxl_app_advance(&app)) {
-		if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE)) {
+		if (pxl_app_just_triggered(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 
