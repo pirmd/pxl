@@ -260,7 +260,8 @@ handle_input(pxl_app_t *app, typewriter_t *tw) {
 int
 main(void) {
     pxl_app_t app;
-    if (pxl_app_init(&app, "PXL Typewriter", W, H, 0, 0.0) != PXL_SUCCESS)
+    pxl_app_cfg_t cfg = pxl_app_cfg_default("PXL Typewriter", W, H);
+    if (pxl_app_init(&app, &cfg) != PXL_SUCCESS)
         return 1;
 
     printf("Typewriter Demo.\n"

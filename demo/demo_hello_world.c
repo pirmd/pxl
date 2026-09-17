@@ -15,8 +15,9 @@
 int
 main(void) {
 	pxl_app_t app;
+	pxl_app_cfg_t cfg = pxl_app_cfg_default("Hello World - PXL", 800, 600);
 	/* physics_dt = 0: static drawing, no physics stepper */
-	if (pxl_app_init(&app, "Hello World - PXL", 800, 600, 0, 0.0) != PXL_SUCCESS)
+	if (pxl_app_init(&app, &cfg) != PXL_SUCCESS)
 		return 1;
 
 	/* Main loop: advance_wait blocks until next frame (simpler than stepper) */

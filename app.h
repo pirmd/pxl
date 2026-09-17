@@ -25,7 +25,9 @@
  *
  * Usage:
  *   pxl_app_t app;
- *   pxl_app_init(&app, "My Game", 800, 600, 0, 1.0 / 60.0);
+ *   pxl_app_cfg_t cfg = pxl_app_cfg_default("My Game", 800, 600);
+ *   cfg.physics_dt = 1.0 / 60.0;  // Fixed timestep for physics (0 = disabled)
+ *   if (pxl_app_init(&app, &cfg) != PXL_SUCCESS) return 1;
  *
  *   while (pxl_app_advance(&app)) {
  *       if (pxl_app_just_active(&app, PXL_KEY_P)) app.paused = !app.paused;
@@ -40,6 +42,32 @@
  *   }
  *   pxl_app_deinit(&app);
  */
+
+/*
+ * App configuration. Build one with pxl_app_cfg_default() then tweak the
+ * fields you need; the rest keep sensible defaults.
+ */
+typedef struct {
+	const char* title;            /* Window title. May be NULL for a default title. */
+	int width, height;            /* Window dimensions in pixels (must be > 0). */
+	pxl_backend_flags_t backend_flags;  /* Backend-specific flags (PXL_BACKEND_*), 0 for none. */
+	double physics_dt;            /* Fixed timestep for physics (seconds). 0 disables the stepper. */
+} pxl_app_cfg_t;
+
+/* Build a configuration with sensible defaults for the given window.
+ * Override fields as needed before passing to pxl_app_init().
+ */
+static inline pxl_app_cfg_t
+pxl_app_cfg_default(const char *title, int width, int height) {
+	pxl_app_cfg_t cfg = {
+		.title = title ? title : "PXL",
+		.width = width,
+		.height = height,
+		.backend_flags = 0,
+		.physics_dt = 0.0,
+	};
+	return cfg;
+}
 
 typedef struct {
 	/* Time control (external, managed by user) */
@@ -58,19 +86,21 @@ typedef struct {
 	double effective_dt;          /* Effective dt for current frame (clamped, scaled, paused-aware). */
 } pxl_app_t;
 
-/* Initialize the app and backend.
+/* Initialize the app and backend from a configuration.
  *
- * title:          Window title.
- * w, h:           Window dimensions.
- * backend_flags:  Backend-specific flags (PXL_BACKEND_*), 0 for none.
- * physics_dt:     Fixed timestep for physics (seconds). 0 disables the stepper.
+ * cfg->width and cfg->height MUST be strictly positive.
+ * cfg->physics_dt may be 0 (disables the physics stepper) or positive.
  */
 static inline pxl_err_t
-pxl_app_init(pxl_app_t *app, const char *title, int w, int h,
-             pxl_backend_flags_t backend_flags, double physics_dt) {
+pxl_app_init(pxl_app_t *app, const pxl_app_cfg_t *cfg) {
 	assert(app);
+	assert(cfg);
+	assert(cfg->title);
+	assert(cfg->width > 0);
+	assert(cfg->height > 0);
+	assert(cfg->physics_dt >= 0.0);
 
-	if (pxl_backend_init(title, w, h, backend_flags) != PXL_SUCCESS) {
+	if (pxl_backend_init(cfg->title, cfg->width, cfg->height, cfg->backend_flags) != PXL_SUCCESS) {
 		return PXL_E_BACKEND_INIT;
 	}
 
@@ -84,7 +114,7 @@ pxl_app_init(pxl_app_t *app, const char *title, int w, int h,
 	app->effective_dt = 0.0;
 
 	/* Initialize physics stepper (dt = 0 means disabled) */
-	pxl_stepper_init(&app->physics_ts, physics_dt);
+	pxl_stepper_init(&app->physics_ts, cfg->physics_dt);
 
 	return PXL_SUCCESS;
 }

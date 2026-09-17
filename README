@@ -27,7 +27,8 @@ Build:
 Quick start:
     /* Minimal PXL application */
     pxl_app_t app;
-    if (pxl_app_init(&app, "My App", 800, 600, 0, 0.0) != PXL_SUCCESS) return 1;
+    pxl_app_cfg_t cfg = pxl_app_cfg_default("My App", 800, 600);
+    if (pxl_app_init(&app, &cfg) != PXL_SUCCESS) return 1;
 
     while (pxl_app_advance_wait(&app)) {
         if (pxl_app_just_active(&app, PXL_KEYB_ESCAPE)) break;

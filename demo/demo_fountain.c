@@ -596,7 +596,9 @@ main(void) {
 	       "P=pause, H=help, ESC=quit\n\n");
 
 	pxl_app_t app;
-	if (pxl_app_init(&app, "PXL Fountain", W, H, 0, 1.0 / FPS) != PXL_SUCCESS)
+	pxl_app_cfg_t cfg = pxl_app_cfg_default("PXL Fountain", W, H);
+	cfg.physics_dt = 1.0 / FPS;
+	if (pxl_app_init(&app, &cfg) != PXL_SUCCESS)
 		return 1;
 
 	/* Initialize RNG */

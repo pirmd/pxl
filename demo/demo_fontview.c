@@ -497,8 +497,9 @@ render(pxl_canvas_t *cnv, const font_view_t *fv) {
 int
 main(void) {
 	pxl_app_t app;
+	pxl_app_cfg_t cfg = pxl_app_cfg_default("PXL Font Viewer", W, H);
 	/* physics_dt = 0: no physics stepper */
-	if (pxl_app_init(&app, "PXL Font Viewer", W, H, 0, 0.0) != PXL_SUCCESS)
+	if (pxl_app_init(&app, &cfg) != PXL_SUCCESS)
 		return 1;
 
 	printf("Font Viewer.\n"
