@@ -334,10 +334,10 @@ handle_input(pxl_app_t *app, ui_t *ui, int *add_particles) {
 	}
 	
 	/* Speed controls - Page Up/Down (time scale affects physics speed only) */
-	if (pxl_app_just_triggered(app, PXL_KEYB_PAGE_UP)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_PAGE_UP)) {
 		app->time_scale = fminf(app->time_scale * 1.25f, 8.0f);
 	}
-	if (pxl_app_just_triggered(app, PXL_KEYB_PAGE_DOWN)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_PAGE_DOWN)) {
 		app->time_scale = fmaxf(app->time_scale / 1.25f, 0.125f);
 	}
 	
@@ -354,7 +354,7 @@ handle_input(pxl_app_t *app, ui_t *ui, int *add_particles) {
 	}
 	
 	/* Manual pause toggle */
-	if (pxl_app_just_triggered(app, PXL_KEYB_P)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_P)) {
 		ui->show_pause = !ui->show_pause;
 	}
 	
@@ -408,7 +408,7 @@ main(void) {
 	 * This ensures deterministic physics regardless of frame rate.
 	 */
 	while (pxl_app_advance(&app)) {
-		if (pxl_app_just_triggered(&app, PXL_KEYB_ESCAPE)) {
+		if (pxl_app_was_triggered(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 

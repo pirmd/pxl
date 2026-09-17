@@ -11,8 +11,8 @@ test_app_transitions_pressed(void) {
 	pxl_input_press(&app.curr, PXL_KEYB_A);
 
 	ASSERT(pxl_app_is_down(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_just_triggered(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_just_released(&app, PXL_KEYB_A) == false);
+	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == true);
+	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == false);
 }
 
 static void
@@ -26,8 +26,8 @@ test_app_transitions_released(void) {
 	/* Current frame: A is up */
 
 	ASSERT(pxl_app_is_down(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_just_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_just_released(&app, PXL_KEYB_A) == true);
+	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == true);
 }
 
 static void
@@ -41,16 +41,16 @@ test_app_transitions_no_change(void) {
 	pxl_input_press(&app.curr, PXL_KEYB_A);
 
 	ASSERT(pxl_app_is_down(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_just_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_just_released(&app, PXL_KEYB_A) == false);
+	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == false);
 
 	/* A is up in both frames */
 	app.prev = (pxl_input_t){0};
 	app.curr = (pxl_input_t){0};
 
 	ASSERT(pxl_app_is_down(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_just_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_just_released(&app, PXL_KEYB_A) == false);
+	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == false);
 }
 
 static void
@@ -63,10 +63,10 @@ test_app_transitions_multiple_keys(void) {
 	pxl_input_press(&app.prev, PXL_KEYB_A);
 	pxl_input_press(&app.curr, PXL_KEYB_B);
 
-	ASSERT(pxl_app_just_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_just_released(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_just_triggered(&app, PXL_KEYB_B) == true);
-	ASSERT(pxl_app_just_released(&app, PXL_KEYB_B) == false);
+	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == true);
+	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_B) == true);
+	ASSERT(pxl_app_was_released(&app, PXL_KEYB_B) == false);
 }
 
 static void

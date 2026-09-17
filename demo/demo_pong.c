@@ -273,7 +273,7 @@ handle_pong_input(pxl_app_t *app, const ui_t *ui, const pong_t *pong, pong_input
 static void
 handle_input(pxl_app_t *app, ui_t *ui) {
 	/* Cycle through game modes: 1 player <-> 2 players */
-	if (pxl_app_just_triggered(app, PXL_KEYB_T)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_T)) {
 		ui->mode = (ui->mode == GAME_1P) ? GAME_2P : GAME_1P;
 	}
 
@@ -290,7 +290,7 @@ handle_input(pxl_app_t *app, ui_t *ui) {
 	}
 
 	/* Manual pause toggle */
-	if (pxl_app_just_triggered(app, PXL_KEYB_P)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_P)) {
 		ui->show_pause = !ui->show_pause;
 	}
 
@@ -522,7 +522,7 @@ main(void) {
 	 *   }
 	 */
 	while (pxl_app_advance(&app)) {
-		if (pxl_app_just_triggered(&app, PXL_KEYB_ESCAPE)) {
+		if (pxl_app_was_triggered(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 
