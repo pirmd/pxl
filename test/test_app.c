@@ -91,25 +91,6 @@ test_app_mouse_wheel_reset(void) {
 }
 
 static void
-test_app_should_close(void) {
-	pxl_app_t app = {0};
-	app.curr = (pxl_input_t){0};
-	app.prev = (pxl_input_t){0};
-
-	/* No quit condition */
-	ASSERT(pxl_app_should_close(&app) == false);
-
-	/* WM_QUIT pressed */
-	pxl_input_press(&app.curr, PXL_WM_QUIT);
-	ASSERT(pxl_app_should_close(&app) == true);
-
-	/* Reset and test ESCAPE (should NOT trigger should_close) */
-	app.curr = (pxl_input_t){0};
-	pxl_input_press(&app.curr, PXL_KEYB_ESCAPE);
-	ASSERT(pxl_app_should_close(&app) == false);
-}
-
-static void
 test_app_physics_disabled(void) {
 	pxl_app_t app = {0};
 
@@ -134,7 +115,6 @@ main(void) {
 	test_app_transitions_no_change();
 	test_app_transitions_multiple_keys();
 	test_app_mouse_wheel_reset();
-	test_app_should_close();
 	test_app_physics_disabled();
 	test_app_physics_stepper_transparent();
 

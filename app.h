@@ -126,14 +126,8 @@ pxl_app_deinit(pxl_app_t *app) {
 	pxl_backend_deinit();
 }
 
-/* Check if the app should close (WM_QUIT only; user handles other keys). */
-static inline bool
-pxl_app_should_close(const pxl_app_t *app) {
-	assert(app);
-	return pxl_input_state(&app->curr, PXL_WM_QUIT);
-}
-
-/* Advance one frame using poll mode (non-blocking, active loop). */
+/* Advance one frame using poll mode (non-blocking, active loop).
+ * Returns false once a WM_QUIT event has been received, ending the main loop. */
 static inline bool
 pxl_app_advance(pxl_app_t *app) {
 	assert(app);
@@ -159,7 +153,7 @@ pxl_app_advance(pxl_app_t *app) {
 
 	pxl_backend_poll_events(&app->curr);
 
-	return !pxl_app_should_close(app);
+	return !pxl_input_state(&app->curr, PXL_WM_QUIT);
 }
 
 /* Advance one frame using wait mode (blocking until event). */
@@ -186,7 +180,7 @@ pxl_app_advance_wait(pxl_app_t *app) {
 
 	pxl_backend_wait_events(&app->curr);
 
-	return !pxl_app_should_close(app);
+	return !pxl_input_state(&app->curr, PXL_WM_QUIT);
 }
 
 /* Advance physics stepper by one fixed step. */
