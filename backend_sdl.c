@@ -14,8 +14,7 @@ static struct {
     SDL_Texture  *texture;
     int width;
     int height;
-    /* Text input buffer for typed characters (UTF-8) */
-    char text_buffer[128];
+    char text_buffer[PXL_BACKEND_TEXT_BUFFER_SIZE];
     int text_buffer_len;
 } g_sdl;
 
@@ -31,8 +30,11 @@ init_display(void) {
 static bool
 init_window(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	uint32_t window_flags = 0;
+	if (flags & PXL_BACKEND_RESIZABLE) {
+		window_flags |= SDL_WINDOW_RESIZABLE;
+	}
 	if (flags & PXL_BACKEND_FULLSCREEN) {
-		window_flags |= SDL_WINDOW_FULLSCREEN;
+		window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 	}
 	if (flags & PXL_BACKEND_HIDDEN) {
 		window_flags |= SDL_WINDOW_HIDDEN;
@@ -45,10 +47,30 @@ init_window(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	}
 
 	g_sdl.window = SDL_CreateWindow(title, x, y, w, h, window_flags);
-	if (!g_sdl.window) return false;
+	if (!g_sdl.window) {
+		pxl_log(SDL_GetError());
+		return false;
+	}
 
 	g_sdl.width = w;
 	g_sdl.height = h;
+	return true;
+}
+
+static bool
+resize_renderer(int w, int h) {
+	SDL_Texture *new_texture = SDL_CreateTexture(
+		g_sdl.renderer,
+		SDL_PIXELFORMAT_ARGB8888,  /* Match PXL color format */
+		SDL_TEXTUREACCESS_STREAMING,
+		w, h
+	);
+	if (!new_texture) {
+		pxl_log(SDL_GetError());
+		return false;
+	}
+	SDL_DestroyTexture(g_sdl.texture);
+	g_sdl.texture = new_texture;
 	return true;
 }
 
@@ -60,21 +82,16 @@ init_renderer(int w, int h, pxl_backend_flags_t flags) {
 	}
 
 	g_sdl.renderer = SDL_CreateRenderer(g_sdl.window, -1, renderer_flags);
-	if (!g_sdl.renderer) return false;
+	if (!g_sdl.renderer) {
+		pxl_log(SDL_GetError());
+		return false;
+	}
 
-	g_sdl.texture = SDL_CreateTexture(
-		g_sdl.renderer,
-		SDL_PIXELFORMAT_ARGB8888,  /* ARGB8888 to match PXL color native format */
-		SDL_TEXTUREACCESS_STREAMING,
-		w, h
-	);
-	if (!g_sdl.texture) return false;
-	return true;
+	return resize_renderer(w, h);
 }
 
 static bool
 init_input_method(void) {
-	/* Enable text input for character retrieval */
 	SDL_StartTextInput();
 	return true;
 }
@@ -100,11 +117,25 @@ pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	pxl_backend_deinit();
 
-	if (!title || w <= 0 || h <= 0) {
+	if (!title) {
 		return PXL_E_INVALID_PARAM;
 	}
 
 	if (!init_display())                        goto fail;
+
+	if (flags & PXL_BACKEND_FULLSCREEN) {
+		SDL_DisplayMode mode;
+		if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
+			w = mode.w;
+			h = mode.h;
+		} else {
+			pxl_log(SDL_GetError());
+			goto fail;
+		}
+	} else if (w <= 0 || h <= 0) {
+		return PXL_E_INVALID_PARAM;
+	}
+
 	if (!init_window(title, w, h, flags))       goto fail;
 	if (!init_renderer(w, h, flags))            goto fail;
 	if (!init_input_method())                  goto fail;
@@ -121,12 +152,18 @@ pxl_backend_deinit(void) {
 	deinit_renderer();
 	deinit_window();
 	deinit_display();
-	g_sdl.text_buffer_len = 0;  /* No null-termination needed */
+
+	// Reset global state
+	g_sdl.width = 0;
+	g_sdl.height = 0;
+	g_sdl.text_buffer_len = 0;
+	memset(g_sdl.text_buffer, 0, sizeof(g_sdl.text_buffer));
 }
 
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
 	assert(out_pb);
+	assert(g_sdl.width > 0 && g_sdl.height > 0);
 
     void *pixels;
     int pitch;
@@ -150,10 +187,8 @@ pxl_backend_end_frame(void) {
     SDL_UnlockTexture(g_sdl.texture);
     SDL_RenderClear(g_sdl.renderer);
     SDL_RenderCopy(g_sdl.renderer, g_sdl.texture, NULL, NULL);
-    
+
     SDL_RenderPresent(g_sdl.renderer);
-    /* Note: SDL errors are not checked here for performance.
-     * SDL_RenderPresent failures are rare and typically unrecoverable. */
     return PXL_SUCCESS;
 }
 
@@ -300,7 +335,7 @@ sdl_button_to_pxl_input_code(const Uint8 button) {
     }
 }
 
-/* Process a single SDL event and update input state */
+/* Process SDL event */
 static void
 process_sdl_event(SDL_Event *event, pxl_input_t *in) {
     switch (event->type) {
@@ -345,15 +380,26 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
                 pxl_input_release(in, PXL_WM_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                 pxl_input_press(in, PXL_WM_FOCUS_LOST);
+            } else if (event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+                       event->window.event == SDL_WINDOWEVENT_RESIZED) {
+                int new_w = event->window.data1;
+                int new_h = event->window.data2;
+
+                if (resize_renderer(new_w, new_h)) {
+                    g_sdl.width = new_w;
+                    g_sdl.height = new_h;
+                    pxl_input_press(in, PXL_WM_RESIZE);
+                } else {
+                    pxl_log("SDL resize failed - ignoring resize event");
+                }
             }
             break;
 
         case SDL_TEXTINPUT:
-            /* FIFO: Append UTF-8 text to internal buffer (no null-termination) */
             {
                 int len = strlen(event->text.text);
-                if (g_sdl.text_buffer_len + len > (int)sizeof(g_sdl.text_buffer)) {
-                    int excess = (g_sdl.text_buffer_len + len) - (int)sizeof(g_sdl.text_buffer);
+                if (g_sdl.text_buffer_len + len > (int)PXL_BACKEND_TEXT_BUFFER_SIZE) {
+                    int excess = (g_sdl.text_buffer_len + len) - (int)PXL_BACKEND_TEXT_BUFFER_SIZE;
                     memmove(g_sdl.text_buffer, g_sdl.text_buffer + excess, g_sdl.text_buffer_len - excess);
                     g_sdl.text_buffer_len -= excess;
                 }
@@ -366,6 +412,8 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
 
 void
 pxl_backend_poll_events(pxl_input_t *in) {
+    assert(in);
+    
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         process_sdl_event(&event, in);
@@ -374,6 +422,8 @@ pxl_backend_poll_events(pxl_input_t *in) {
 
 void
 pxl_backend_wait_events(pxl_input_t *in) {
+    assert(in);
+    
     SDL_Event event;
     if (SDL_WaitEvent(&event)) {
         process_sdl_event(&event, in);
@@ -393,13 +443,19 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     assert(out_text);
     assert(out_text_max_len > 0);
 
-    if (g_sdl.text_buffer_len == 0) return 0;
+    if (g_sdl.text_buffer_len == 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
     int copy_len = (g_sdl.text_buffer_len < out_text_max_len)
         ? g_sdl.text_buffer_len
         : out_text_max_len - 1;
 
-    if (copy_len <= 0) return 0;
+    if (copy_len <= 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
     memcpy(out_text, g_sdl.text_buffer, copy_len);
     out_text[copy_len] = '\0';
@@ -408,4 +464,22 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     memmove(g_sdl.text_buffer, g_sdl.text_buffer + copy_len, g_sdl.text_buffer_len);
 
     return copy_len;
+}
+
+void
+pxl_backend_get_window_size(int *out_w, int *out_h) {
+    assert(out_w && out_h);
+    *out_w = g_sdl.width;
+    *out_h = g_sdl.height;
+}
+
+pxl_err_t
+pxl_backend_toggle_fullscreen(void) {
+    uint32_t current_flags = SDL_GetWindowFlags(g_sdl.window);
+    uint32_t new_flags = (current_flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+        ? 0
+        : SDL_WINDOW_FULLSCREEN_DESKTOP;
+
+    SDL_SetWindowFullscreen(g_sdl.window, new_flags);
+    return PXL_SUCCESS;
 }

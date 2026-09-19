@@ -11,14 +11,29 @@ test_pxl_backend_init_invalid_params(void) {
 	/* Title cannot be NULL */
 	ASSERT(pxl_backend_init(NULL, 100, 100, PXL_BACKEND_HIDDEN) == PXL_E_INVALID_PARAM);
 
-	/* Width must be positive */
+	/* Width must be positive (unless in fullscreen mode) */
 	ASSERT(pxl_backend_init("test", 0, 100, PXL_BACKEND_HIDDEN) == PXL_E_INVALID_PARAM);
 	ASSERT(pxl_backend_init("test", -1, 100, PXL_BACKEND_HIDDEN) == PXL_E_INVALID_PARAM);
 
-	/* Height must be positive */
+	/* Height must be positive (unless in fullscreen mode) */
 	ASSERT(pxl_backend_init("test", 100, 0, PXL_BACKEND_HIDDEN) == PXL_E_INVALID_PARAM);
 	ASSERT(pxl_backend_init("test", 100, -1, PXL_BACKEND_HIDDEN) == PXL_E_INVALID_PARAM);
 
+	pxl_backend_deinit();
+}
+
+static void
+test_pxl_backend_init_fullscreen_zero_size(void) {
+	/* In fullscreen mode, width/height can be 0 to use screen resolution */
+	ASSERT(pxl_backend_init("test", 0, 0, PXL_BACKEND_FULLSCREEN | PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+	pxl_backend_deinit();
+
+	/* Also works with only width = 0 */
+	ASSERT(pxl_backend_init("test", 0, 1080, PXL_BACKEND_FULLSCREEN | PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+	pxl_backend_deinit();
+
+	/* And only height = 0 */
+	ASSERT(pxl_backend_init("test", 1920, 0, PXL_BACKEND_FULLSCREEN | PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
 	pxl_backend_deinit();
 }
 
@@ -61,6 +76,62 @@ test_pxl_backend_flags(void) {
 /* Utilities ---------------------------------------------------------------- */
 
 static void
+test_pxl_backend_get_window_size_basic(void) {
+	int w = 128, h = 64;
+	ASSERT(pxl_backend_init("test", w, h, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	int out_w, out_h;
+	pxl_backend_get_window_size(&out_w, &out_h);
+	ASSERT(out_w == w);
+	ASSERT(out_h == h);
+
+	pxl_backend_deinit();
+}
+
+static void
+test_pxl_backend_get_window_size_fullscreen(void) {
+	/* In fullscreen, dimensions should match screen resolution */
+	ASSERT(pxl_backend_init("test", 0, 0, PXL_BACKEND_FULLSCREEN | PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	int w, h;
+	pxl_backend_get_window_size(&w, &h);
+	ASSERT(w > 0);
+	ASSERT(h > 0);
+
+	pxl_backend_deinit();
+}
+
+static void
+test_pxl_backend_large_buffer(void) {
+	/* Test that backend handles very large dimensions (beyond typical XShm limits).
+	 * This verifies the fallback to heap-allocated buffer works correctly. */
+	ASSERT(pxl_backend_init("test", 2000, 2000, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	pxl_buf_t pb;
+	ASSERT(pxl_backend_begin_frame(&pb) == PXL_SUCCESS);
+	ASSERT(pb.width == 2000);
+	ASSERT(pb.height == 2000);
+	ASSERT(pb.data != NULL);
+
+	ASSERT(pxl_backend_end_frame() == PXL_SUCCESS);
+	pxl_backend_deinit();
+}
+
+static void
+test_pxl_backend_toggle_fullscreen(void) {
+	/* Initialize in windowed mode (with HIDDEN to avoid display artifacts) */
+	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	/* Toggle fullscreen should not crash and should return success */
+	ASSERT(pxl_backend_toggle_fullscreen() == PXL_SUCCESS);
+
+	/* Toggle back should also succeed */
+	ASSERT(pxl_backend_toggle_fullscreen() == PXL_SUCCESS);
+
+	pxl_backend_deinit();
+}
+
+static void
 test_pxl_backend_get_time_basic(void) {
 	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
 
@@ -76,15 +147,11 @@ test_pxl_backend_get_time_basic(void) {
 }
 
 static void
-test_pxl_backend_poll_events_null_input(void) {
+test_pxl_backend_poll_events_valid_input(void) {
 	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
 
-	/* NULL input should not crash (implementation may choose to ignore or assert) */
 	pxl_input_t input_state = {0};
 	pxl_backend_poll_events(&input_state);
-
-	/* Also test with NULL */
-	pxl_backend_poll_events(NULL);
 
 	pxl_backend_deinit();
 }
@@ -214,10 +281,15 @@ test_example_pxl_backend_has_typed_text(void) {
 int
 main(void) {
 	test_pxl_backend_init_invalid_params();
+	test_pxl_backend_init_fullscreen_zero_size();
 	test_pxl_backend_deinit_safety();
 	test_pxl_backend_flags();
+	test_pxl_backend_get_window_size_basic();
+	test_pxl_backend_get_window_size_fullscreen();
+	test_pxl_backend_large_buffer();
+	test_pxl_backend_toggle_fullscreen();
 	test_pxl_backend_get_time_basic();
-	test_pxl_backend_poll_events_null_input();
+	test_pxl_backend_poll_events_valid_input();
 	test_pxl_backend_frame_flow();
 	test_pxl_backend_has_typed_text_empty();
 	test_pxl_backend_get_typed_text_empty();

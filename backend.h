@@ -5,6 +5,8 @@
 #include "buf.h"
 #include "input.h"
 
+#define PXL_BACKEND_TEXT_BUFFER_SIZE  1024  /* UTF-8 text input buffer size */
+
 /*
  * When adding a new backend, ensure that:
  *   . All backends MUST use ARGB8888 pixel format (A: bits 24-31, R: 16-23,
@@ -16,16 +18,20 @@
  *   . All backends must return pixel-aligned stride in out_pb->stride
  *     (i.e., out_pb->stride * sizeof(pxl_t) must be a valid memory offset)
  *     This has to be enforced by checks in backend implementations.
+ *   . X11 backend: Uses XShm for performance, falls back to heap-allocated XImage
+ *     if XShm is unavailable (e.g., size too large, SHM limits).
  */
 
 /* Backend initialization flags.
  *
  * Usage:
  *   pxl_backend_init("Window", 800, 600, PXL_BACKEND_CENTERED | PXL_BACKEND_VSYNC);
+ *   pxl_backend_init("Game", 0, 0, PXL_BACKEND_FULLSCREEN);
  *
  * Notes:
  *   - PXL_BACKEND_VSYNC: May be ignored by some backends (e.g., X11).
  *   - PXL_BACKEND_HIDDEN: Useful for testing (no window visible).
+ *   - PXL_BACKEND_FULLSCREEN: Screen resolution is used, w and h are ignored.
  *   - Flags can be combined using bitwise OR (|).
  */
 typedef enum {
@@ -33,9 +39,14 @@ typedef enum {
 	PXL_BACKEND_HIDDEN     = (1 << 1),  /* Hidden window (for headless testing) */
 	PXL_BACKEND_VSYNC      = (1 << 2),  /* Enable vertical sync */
 	PXL_BACKEND_CENTERED   = (1 << 3),  /* Center window on screen */
+	PXL_BACKEND_RESIZABLE  = (1 << 4),  /* Allow window resizing */
 } pxl_backend_flags_t;
 
-/* Initialize the backend */
+/* Initialize the backend.
+ *
+ * If PXL_BACKEND_FULLSCREEN flag is set, screen resolution is used and w and h are ignored.
+ * Otherwise, w and h must be > 0.
+ */
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags);
 
@@ -56,6 +67,16 @@ pxl_backend_end_frame(void);
  */
 double
 pxl_backend_get_time(void);
+
+/* Get current window size in logical coordinates */
+void
+pxl_backend_get_window_size(int *out_w, int *out_h);
+
+/* Toggles between fullscreen and windowed mode.
+ * On success, the window size changes and PXL_WM_RESIZE event will be triggered.
+ */
+pxl_err_t
+pxl_backend_toggle_fullscreen(void);
 
 /* Poll events - drains the event queue and updates the provided input state.
  *
@@ -99,7 +120,7 @@ pxl_backend_has_typed_text(void);
  * converted according to the OS keyboard layout (e.g., AZERTY, QWERTY).
  * The returned string is guaranteed to be valid UTF-8.
  *
- * The function uses an internal fixed-size buffer with FIFO behavior:
+ * The function uses an internal fixed-size buffer (PXL_BACKEND_TEXT_BUFFER_SIZE) with FIFO behavior:
  * if the buffer is full, oldest characters are discarded to make room for new ones.
  *
  * Note: Text input must be enabled for this to work. It is automatically

@@ -51,9 +51,6 @@ static const char *font_family_names[] = {
 
 #define NUM_FONT_FAMILIES (sizeof(font_families) / sizeof(font_families[0]))
 
-#define W 720
-#define H 360
-
 #define BG                   0xFFFDF6E3  /* Solarized Base3 */
 #define GRID_VIEW_BG         0xFFEEE8D5  /* Solarized Base2 */
 #define GRID_VIEW_FG         0xFF657B83  /* Solarized Base0 */
@@ -68,6 +65,8 @@ static const char *font_family_names[] = {
 #define GLYPH_FG             GRID_VIEW_SELECT_FG
 #define FOOTER_BG            GRID_VIEW_BG
 #define FOOTER_FG            GRID_VIEW_FG
+#define TEXT_PREVIEW_BG      GRID_VIEW_BG
+#define TEXT_PREVIEW_FG      GRID_VIEW_FG
 
 /* Lorem ipsum texts for each font family */
 static const char *lorem_texts[] = {
@@ -77,51 +76,147 @@ static const char *lorem_texts[] = {
 
 #define W_PADDING 8
 #define H_PADDING 16
-
-#define TITLE_X GRID_VIEW_X
-#define TITLE_Y ((H - TITLE_H - H_PADDING - GRID_H - H_PADDING - GLYPH_ZOOM_H - H_PADDING - TEXT_PREVIEW_H - H_PADDING - FOOTER_H) / 2)
-#define TITLE_W GRID_W
-#define TITLE_H 16
-
 #define GRID_VIEW_CELL_W 16
 #define GRID_VIEW_CELL_H 16
-#define GRID_VIEW_COLS  35
-#define GRID_VIEW_ROWS   7
-#define GRID_VIEW_X  (W - GRID_W) / 2
-#define GRID_VIEW_Y  (TITLE_Y + TITLE_H + H_PADDING)
-#define GRID_VIEW_W  (GRID_VIEW_COLS * GRID_VIEW_CELL_W)
-#define GRID_VIEW_H  (GRID_VIEW_ROWS * GRID_VIEW_CELL_H)
-
-#define SCROLLBAR_X (GRID_VIEW_X + GRID_VIEW_W + W_PADDING)
-#define SCROLLBAR_Y GRID_VIEW_Y
-#define SCROLLBAR_W 8
-#define SCROLLBAR_H GRID_VIEW_H
-
-#define GRID_W (GRID_VIEW_W + W_PADDING + SCROLLBAR_W)
-#define GRID_H GRID_VIEW_H
-
 #define GLYPH_ZOOM_FACTOR 3
-#define GLYPH_ZOOM_X GRID_VIEW_X
-#define GLYPH_ZOOM_Y (GRID_VIEW_Y + GRID_H + H_PADDING)
-#define GLYPH_ZOOM_W 60
-#define GLYPH_ZOOM_H 60
-
-#define GLYPH_X (GLYPH_ZOOM_X + GLYPH_ZOOM_W + W_PADDING)
-#define GLYPH_Y GLYPH_ZOOM_Y
-#define GLYPH_W (GRID_W - GLYPH_ZOOM_W - W_PADDING)
-#define GLYPH_H GLYPH_ZOOM_H
-
-#define TEXT_PREVIEW_X    GRID_VIEW_X
-#define TEXT_PREVIEW_Y    (GLYPH_Y + GLYPH_H + H_PADDING)
-#define TEXT_PREVIEW_W    GRID_W
 #define TEXT_PREVIEW_H    40
-#define TEXT_PREVIEW_BG   GRID_VIEW_BG
-#define TEXT_PREVIEW_FG   GRID_VIEW_FG
+#define TITLE_H 16
+#define SCROLLBAR_W 8
 
-#define FOOTER_X GRID_VIEW_X
-#define FOOTER_Y (TEXT_PREVIEW_Y + TEXT_PREVIEW_H + H_PADDING)
-#define FOOTER_W GRID_W
-#define FOOTER_H TITLE_H
+/* Minimum dimensions for various components */
+#define MIN_GRID_COLS 10
+#define MIN_GRID_ROWS 3
+#define MIN_GLYPH_ZOOM_SIZE 40
+
+/* Layout structure to hold dynamically calculated dimensions */
+typedef struct {
+    int window_w;
+    int window_h;
+    
+    /* Title area */
+    int title_x;
+    int title_y;
+    int title_w;
+    int title_h;
+    
+    /* Grid view area */
+    int grid_view_x;
+    int grid_view_y;
+    int grid_view_w;
+    int grid_view_h;
+    int grid_view_cols;
+    int grid_view_rows;
+    
+    /* Scrollbar */
+    int scrollbar_x;
+    int scrollbar_y;
+    int scrollbar_w;
+    int scrollbar_h;
+    
+    /* Grid (grid view + scrollbar) */
+    int grid_x;
+    int grid_y;
+    int grid_w;
+    int grid_h;
+    
+    /* Glyph zoom */
+    int glyph_zoom_x;
+    int glyph_zoom_y;
+    int glyph_zoom_w;
+    int glyph_zoom_h;
+    
+    /* Glyph characteristics */
+    int glyph_x;
+    int glyph_y;
+    int glyph_w;
+    int glyph_h;
+    
+    /* Text preview */
+    int text_preview_x;
+    int text_preview_y;
+    int text_preview_w;
+    int text_preview_h;
+    
+    /* Footer */
+    int footer_x;
+    int footer_y;
+    int footer_w;
+    int footer_h;
+} layout_t;
+
+/* Calculate all UI element positions and sizes based on window dimensions.
+ * Adjusts grid columns/rows to fit available space, shows/hides scrollbar as needed. */
+static void
+layout_calculate(layout_t *layout, int window_w, int window_h) {
+    assert(layout);
+    assert(window_w > 0 && window_h > 0);
+    
+    layout->window_w = window_w;
+    layout->window_h = window_h;
+    
+    /* Calculate grid view dimensions based on available space */
+    /* Use 80% of window width for grid, leave margins */
+    int grid_max_w = (int)((float)window_w * 0.8f);
+    int grid_max_h = (int)((float)window_h * 0.4f);  /* Grid takes ~40% of height */
+    
+    /* Calculate max columns and rows that fit */
+    int max_cols = grid_max_w / GRID_VIEW_CELL_W;
+    int max_rows = grid_max_h / GRID_VIEW_CELL_H;
+    
+    /* Clamp to minimum values */
+    layout->grid_view_cols = max_cols < MIN_GRID_COLS ? MIN_GRID_COLS : max_cols;
+    layout->grid_view_rows = max_rows < MIN_GRID_ROWS ? MIN_GRID_ROWS : max_rows;
+    
+    /* Recalculate grid view dimensions */
+    layout->grid_view_w = layout->grid_view_cols * GRID_VIEW_CELL_W;
+    layout->grid_view_h = layout->grid_view_rows * GRID_VIEW_CELL_H;
+    
+    /* Center grid horizontally, position vertically with padding */
+    layout->grid_view_x = (window_w - layout->grid_view_w) / 2;
+    layout->grid_view_y = H_PADDING + TITLE_H + H_PADDING;
+    
+    /* Scrollbar dimensions */
+    layout->scrollbar_w = SCROLLBAR_W;
+    layout->scrollbar_h = layout->grid_view_h;
+    layout->scrollbar_x = layout->grid_view_x + layout->grid_view_w + W_PADDING;
+    layout->scrollbar_y = layout->grid_view_y;
+    
+    /* Grid area (grid view + scrollbar) */
+    layout->grid_x = layout->grid_view_x;
+    layout->grid_y = layout->grid_view_y;
+    layout->grid_w = layout->grid_view_w + (W_PADDING + layout->scrollbar_w);
+    layout->grid_h = layout->grid_view_h;
+    
+    /* Title area (centered horizontally, above grid) */
+    layout->title_x = layout->grid_x;
+    layout->title_y = H_PADDING;
+    layout->title_w = layout->grid_w;
+    layout->title_h = TITLE_H;
+    
+    /* Glyph zoom area (below grid) */
+    layout->glyph_zoom_w = MIN_GLYPH_ZOOM_SIZE;
+    layout->glyph_zoom_h = MIN_GLYPH_ZOOM_SIZE;
+    layout->glyph_zoom_x = layout->grid_x;
+    layout->glyph_zoom_y = layout->grid_view_y + layout->grid_view_h + H_PADDING;
+    
+    /* Glyph characteristics area (right of glyph zoom) */
+    layout->glyph_x = layout->glyph_zoom_x + layout->glyph_zoom_w + W_PADDING;
+    layout->glyph_y = layout->glyph_zoom_y;
+    layout->glyph_w = layout->grid_w - layout->glyph_zoom_w - W_PADDING;
+    layout->glyph_h = layout->glyph_zoom_h;
+    
+    /* Text preview area (below glyph zoom and characteristics) */
+    layout->text_preview_x = layout->grid_x;
+    layout->text_preview_y = layout->glyph_y + layout->glyph_h + H_PADDING;
+    layout->text_preview_w = layout->grid_w;
+    layout->text_preview_h = TEXT_PREVIEW_H;
+    
+    /* Footer area (below text preview) */
+    layout->footer_x = layout->grid_x;
+    layout->footer_y = layout->text_preview_y + layout->text_preview_h + H_PADDING;
+    layout->footer_w = layout->grid_w;
+    layout->footer_h = TITLE_H;
+}
 
 
 static void
@@ -163,6 +258,9 @@ typedef struct {
 	int               font_family_size;
 	const char       *font_family_name;
 	int               font_family_glyph_count;
+	
+	/* Dynamic layout */
+	layout_t layout;
 } font_view_t;
 
 static int
@@ -242,18 +340,19 @@ font_view_next_font(font_view_t *fv) {
 		fv->font_family_glyph_count += font_count;
 	}
 
+	/* Update grid dimensions from layout */
+	fv->cols = fv->layout.grid_view_cols;
+	fv->rows = fv->layout.grid_view_rows;
+	fv->glyph_per_page = fv->cols * fv->rows;
+
 	fv->glyph_idx  = -1;
 	font_view_next_glyph(fv, 1);
 }
 
 static void
 font_view_init(font_view_t *fv) {
-	fv->cols = GRID_VIEW_COLS;
-	fv->rows = GRID_VIEW_ROWS;
-
-	fv->glyph_per_page = fv->cols * fv->rows;
-
 	fv->family_idx = -1;
+	fv->layout = (layout_t){0};
 	font_view_next_font(fv);
 }
 
@@ -278,7 +377,38 @@ font_view_mem_size(const font_view_t *fv) {
 }
 
 static void
+handle_resize(font_view_t *fv) {
+    int window_w, window_h;
+    pxl_backend_get_window_size(&window_w, &window_h);
+
+	/* Recalculate layout with new window dimensions */
+	layout_calculate(&fv->layout, window_w, window_h);
+	
+	/* Update grid dimensions from layout */
+	fv->cols = fv->layout.grid_view_cols;
+	fv->rows = fv->layout.grid_view_rows;
+	fv->glyph_per_page = fv->cols * fv->rows;
+	
+	/* Recalculate start/end indices to ensure they're valid */
+	if (fv->glyph_idx >= fv->glyph_per_page) {
+		fv->glyph_idx = fv->glyph_per_page - 1;
+		if (fv->glyph_idx < 0) fv->glyph_idx = 0;
+	}
+	
+	fv->start_idx = (fv->glyph_idx / fv->glyph_per_page) * fv->glyph_per_page;
+	fv->end_idx = fv->start_idx + fv->glyph_per_page;
+	if (fv->end_idx > fv->font_family_glyph_count) {
+		fv->end_idx = fv->font_family_glyph_count;
+	}
+}
+
+static void
 handle_input(font_view_t *fv, pxl_app_t *app) {
+	/* Handle window resize via event or size change */
+	if (pxl_app_was_pressed(app, PXL_WM_RESIZE)) {
+		handle_resize(fv);
+	}
+
 	if (pxl_app_was_pressed(app, PXL_KEYB_F)) {
 		font_view_next_font(fv);
 	}
@@ -304,7 +434,7 @@ render_title(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_rect_t title_bounds = pxl_str_bounds(title_text);
 
 	pxl_canvas_set_color(cnv, TITLE_FG);
-	pxl_rect_t aligned = pxl_rect_align(title_bounds, (pxl_rect_t){0, 0, TITLE_W, TITLE_H}, PXL_H_CENTER | PXL_V_CENTER);
+	pxl_rect_t aligned = pxl_rect_align(title_bounds, (pxl_rect_t){0, 0, fv->layout.title_w, fv->layout.title_h}, PXL_H_CENTER | PXL_V_CENTER);
 	int title_x = aligned.x;
 	int title_y = aligned.y;
 	pxl_draw_str(cnv, title_x, title_y, title_text);
@@ -351,7 +481,7 @@ render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
 		return;
 	}
 
-	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, glyph.width * GLYPH_ZOOM_FACTOR, glyph.height * GLYPH_ZOOM_FACTOR}, (pxl_rect_t){0, 0, GLYPH_ZOOM_W, GLYPH_ZOOM_H}, PXL_H_CENTER | PXL_V_CENTER);
+	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, glyph.width * GLYPH_ZOOM_FACTOR, glyph.height * GLYPH_ZOOM_FACTOR}, (pxl_rect_t){0, 0, fv->layout.glyph_zoom_w, fv->layout.glyph_zoom_h}, PXL_H_CENTER | PXL_V_CENTER);
 	int zoom_x = aligned.x;
 	int zoom_y = aligned.y;
 
@@ -376,25 +506,21 @@ render_glyph_characteristics(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_canvas_set_color(cnv, GLYPH_FG);
 
 	pxl_rect_t text_bounds = pxl_str_bounds(text);
-	int text_x = (GLYPH_W - text_bounds.w) / 16;
-	pxl_rect_t aligned = pxl_rect_align(text_bounds, (pxl_rect_t){0, 0, GLYPH_W, GLYPH_H}, PXL_H_LEFT | PXL_V_CENTER);
+	int text_x = (fv->layout.glyph_w - text_bounds.w) / 16;
+	pxl_rect_t aligned = pxl_rect_align(text_bounds, (pxl_rect_t){0, 0, fv->layout.glyph_w, fv->layout.glyph_h}, PXL_H_LEFT | PXL_V_CENTER);
 	int text_y = aligned.y;
 	pxl_draw_str(cnv, text_x, text_y, text);
 }
 
 static void
 render_scrollbar(pxl_canvas_t *cnv, const font_view_t *fv) {
-	if (fv->font_family_glyph_count <= fv->glyph_per_page) {
-		return;
-	}
-
-	int page_h = (fv->glyph_per_page * SCROLLBAR_H) / fv->font_family_glyph_count;
+	int page_h = (fv->glyph_per_page * fv->layout.scrollbar_h) / fv->font_family_glyph_count;
 	if (page_h < 8) page_h = 8;
-	int page_y = (fv->start_idx * (SCROLLBAR_H - page_h)) / (fv->font_family_glyph_count - fv->glyph_per_page);
+	int page_y = (fv->start_idx * (fv->layout.scrollbar_h - page_h)) / (fv->font_family_glyph_count - fv->glyph_per_page);
 
 	pxl_canvas_set_color(cnv, SCROLLBAR_FG);
 	/* Position relative to the scrollbar canvas (0,0 is top-left of subview) */
-	pxl_fill_rect(cnv, 0, page_y, SCROLLBAR_W, page_h);
+	pxl_fill_rect(cnv, 0, page_y, fv->layout.scrollbar_w, page_h);
 }
 
 static void
@@ -413,7 +539,7 @@ render_footer(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 	pxl_rect_t footer_bounds = pxl_str_bounds(footer_text);
 
-	pxl_rect_t aligned = pxl_rect_align(footer_bounds, (pxl_rect_t){0, 0, FOOTER_W, FOOTER_H}, PXL_H_CENTER | PXL_V_CENTER);
+	pxl_rect_t aligned = pxl_rect_align(footer_bounds, (pxl_rect_t){0, 0, fv->layout.footer_w, fv->layout.footer_h}, PXL_H_CENTER | PXL_V_CENTER);
 	int footer_x = aligned.x;
 	int footer_y = aligned.y;
 
@@ -441,27 +567,27 @@ render(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_canvas_set_color(cnv, BG);
 	pxl_canvas_clear(cnv);
 
-	/* Setup viewports for each area */
+	/* Setup viewports for each area using layout dimensions */
 	pxl_canvas_t cnv_title;
-	pxl_canvas_set_subview(&cnv_title, cnv, TITLE_X, TITLE_Y, TITLE_W, TITLE_H);
+	pxl_canvas_set_subview(&cnv_title, cnv, fv->layout.title_x, fv->layout.title_y, fv->layout.title_w, fv->layout.title_h);
 
 	pxl_canvas_t cnv_grid;
-	pxl_canvas_set_subview(&cnv_grid, cnv, GRID_VIEW_X, GRID_VIEW_Y, GRID_VIEW_W, GRID_VIEW_H);
+	pxl_canvas_set_subview(&cnv_grid, cnv, fv->layout.grid_view_x, fv->layout.grid_view_y, fv->layout.grid_view_w, fv->layout.grid_view_h);
 
 	pxl_canvas_t cnv_scrollbar;
-	pxl_canvas_set_subview(&cnv_scrollbar, cnv, SCROLLBAR_X, SCROLLBAR_Y, SCROLLBAR_W, SCROLLBAR_H);
+    pxl_canvas_set_subview(&cnv_scrollbar, cnv, fv->layout.scrollbar_x, fv->layout.scrollbar_y, fv->layout.scrollbar_w, fv->layout.scrollbar_h);
 
 	pxl_canvas_t cnv_glyph_zoom;
-	pxl_canvas_set_subview(&cnv_glyph_zoom, cnv, GLYPH_ZOOM_X, GLYPH_ZOOM_Y, GLYPH_ZOOM_W, GLYPH_ZOOM_H);
+	pxl_canvas_set_subview(&cnv_glyph_zoom, cnv, fv->layout.glyph_zoom_x, fv->layout.glyph_zoom_y, fv->layout.glyph_zoom_w, fv->layout.glyph_zoom_h);
 
 	pxl_canvas_t cnv_glyph;
-	pxl_canvas_set_subview(&cnv_glyph, cnv, GLYPH_X, GLYPH_Y, GLYPH_W, GLYPH_H);
+	pxl_canvas_set_subview(&cnv_glyph, cnv, fv->layout.glyph_x, fv->layout.glyph_y, fv->layout.glyph_w, fv->layout.glyph_h);
 
 	pxl_canvas_t cnv_text_preview;
-	pxl_canvas_set_subview(&cnv_text_preview, cnv, TEXT_PREVIEW_X, TEXT_PREVIEW_Y, TEXT_PREVIEW_W, TEXT_PREVIEW_H);
+	pxl_canvas_set_subview(&cnv_text_preview, cnv, fv->layout.text_preview_x, fv->layout.text_preview_y, fv->layout.text_preview_w, fv->layout.text_preview_h);
 
 	pxl_canvas_t cnv_footer;
-	pxl_canvas_set_subview(&cnv_footer, cnv, FOOTER_X, FOOTER_Y, FOOTER_W, FOOTER_H);
+	pxl_canvas_set_subview(&cnv_footer, cnv, fv->layout.footer_x, fv->layout.footer_y, fv->layout.footer_w, fv->layout.footer_h);
 
 	/* Draw title */
 	pxl_canvas_set_color(&cnv_title, TITLE_BG);
@@ -474,9 +600,9 @@ render(pxl_canvas_t *cnv, const font_view_t *fv) {
 	render_font_view(&cnv_grid, fv);
 
 	/* Draw scrollbar */
-	pxl_canvas_set_color(&cnv_scrollbar, SCROLLBAR_BG);
-	pxl_canvas_clear(&cnv_scrollbar);
-	render_scrollbar(&cnv_scrollbar, fv);
+    pxl_canvas_set_color(&cnv_scrollbar, SCROLLBAR_BG);
+    pxl_canvas_clear(&cnv_scrollbar);
+    render_scrollbar(&cnv_scrollbar, fv);
 
 	/* Draw selected glyph bitmask */
 	pxl_canvas_set_color(&cnv_glyph_zoom, GLYPH_ZOOM_BG);
@@ -503,8 +629,9 @@ int
 main(void) {
 	pxl_app_t app = {
 		.title = "PXL Font Viewer",
-		.width = W,
-		.height = H
+		.width = 720,
+		.height = 360,
+		.backend_flags = PXL_BACKEND_RESIZABLE,
 		/* physics_dt defaults to 0 (no physics stepper) */
 	};
 
@@ -513,7 +640,7 @@ main(void) {
 
 	printf("Font Viewer.\n"
 	       "Arrow/HJKL=navigate, F=switch font family.\n"
-	       "ESC=quit\n");
+	       "Resize window to adjust grid. ESC=quit\n");
 
 	font_view_t fv;
 	font_view_init(&fv);
@@ -544,7 +671,9 @@ main(void) {
 				pxl_t fg = 0xFFFFFFFFU;
 				pxl_canvas_set_color(&cnv, fg);
 				/* Align to right/bottom with 10px margin */
-				pxl_rect_t aligned = pxl_rect_align(fps_bounds, (pxl_rect_t){0, 0, W - 10, H - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
+				int w = pxl_canvas_view_width(&cnv);
+				int h = pxl_canvas_view_height(&cnv);
+				pxl_rect_t aligned = pxl_rect_align(fps_bounds, (pxl_rect_t){0, 0, w - 10, h - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
 				int fps_x = aligned.x;
 				int fps_y = aligned.y;
 				pxl_writer_set_cursor(&writer, fps_x, fps_y);

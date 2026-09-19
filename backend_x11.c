@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>  /* for bool, false, true */
+#include <stdlib.h>   /* for malloc, free */
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/X.h>       /* for Atom, None, ClientMessage, KeySym */
@@ -30,14 +31,22 @@ static struct {
     XShmSegmentInfo shm;
     XImage         *img;
     int             width, height;
+    bool            uses_shm;
     Atom            wm_delete;
     /* Input method/context: required for correct UTF-8 text input (dead keys, non-Latin1 layouts) */
     XIM             xim;
     XIC             xic;
     /* Text input buffer for typed characters (UTF-8) */
-    char            text_buffer[128];
+    char            text_buffer[PXL_BACKEND_TEXT_BUFFER_SIZE];
     int             text_buffer_len;
-} g_x11;
+} g_x11 = {.shm.shmid = -1, .uses_shm = false};
+
+/* X11 error handler for XShmAttach: captures X11 errors during SHM attachment.
+ * Returns 0 to ignore the error; we check the result via XShmAttach return value. */
+static int xshm_error_handler(Display *d, XErrorEvent *e) {
+	(void)d; (void)e;
+	return 0;
+}
 
 static bool
 select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
@@ -61,8 +70,7 @@ select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
         XFree(vi);
         return true;
     }
-
-    XFree(vi);
+    if (vi) XFree(vi);
     return false;
 }
 
@@ -78,6 +86,16 @@ init_display(void) {
         return false;
     }
     return true;
+}
+
+static void
+set_window_hints(int w, int h, pxl_backend_flags_t flags) {
+    if (!(flags & PXL_BACKEND_RESIZABLE)) {
+        XSizeHints hints = {.flags = PMinSize | PMaxSize,
+                            .min_width = w, .max_width = w,
+                            .min_height = h, .max_height = h};
+        XSetWMNormalHints(g_x11.display, g_x11.window, &hints);
+    }
 }
 
 static bool
@@ -118,9 +136,11 @@ init_window(const char *title, int w, int h, pxl_backend_flags_t flags) {
         ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
         StructureNotifyMask | EnterWindowMask | LeaveWindowMask | FocusChangeMask);
 
+    set_window_hints(w, h, flags);
+
     XkbSetDetectableAutoRepeat(g_x11.display, True, NULL);
 
-    /* Advertise WM_DELETE_WINDOW protocol to receive close requests as ClientMessage */
+    /* Set up WM_DELETE_WINDOW protocol */
     g_x11.wm_delete = XInternAtom(g_x11.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(g_x11.display, g_x11.window, &g_x11.wm_delete, 1);
 
@@ -143,42 +163,138 @@ init_input_method(void) {
     return true;
 }
 
+/* Allocates rendering buffer for given dimensions.
+ * Tries XShm first (fast), falls back to heap-allocated XImage (always available). */
+static bool
+resize_render(int w, int h) {
+    XImage *old_img = g_x11.img;
+    XShmSegmentInfo old_shm = g_x11.shm;
+    bool old_uses_shm = g_x11.uses_shm;
+
+    g_x11.uses_shm = false;
+    g_x11.img = NULL;
+    g_x11.shm.shmid = -1;
+    g_x11.shm.shmaddr = NULL;
+
+    /* Try XShm */
+    Visual *visual = NULL;
+    int depth = 0;
+    if (!select_argb_visual(g_x11.display, &visual, &depth)) {
+        pxl_log("Failed to select ARGB visual");
+        goto fallback;
+    }
+
+    g_x11.img = XShmCreateImage(g_x11.display, visual, (unsigned int)depth,
+                               ZPixmap, NULL, &g_x11.shm, (unsigned int)w, (unsigned int)h);
+    if (!g_x11.img) {
+        pxl_log("XShmCreateImage failed");
+        goto fallback;
+    }
+
+    if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) {
+        pxl_log("XShm image bytes_per_line not aligned");
+        XDestroyImage(g_x11.img);
+        g_x11.img = NULL;
+        goto fallback;
+    }
+
+    /* Prevent integer overflow in shared memory size calculation */
+    if (g_x11.img->bytes_per_line > INT_MAX / h) {
+        pxl_log("Shared memory size would overflow");
+        XDestroyImage(g_x11.img);
+        g_x11.img = NULL;
+        goto fallback;
+    }
+
+    size_t shm_size = (size_t)g_x11.img->bytes_per_line * (size_t)h;
+    g_x11.shm.shmid = shmget(IPC_PRIVATE, shm_size, IPC_CREAT | 0777);
+    if (g_x11.shm.shmid < 0) {
+        pxl_log("shmget failed");
+        goto fallback;
+    }
+
+    g_x11.shm.shmaddr = g_x11.img->data = shmat(g_x11.shm.shmid, 0, 0);
+    if (g_x11.shm.shmaddr == (char *)-1) {
+        pxl_log("shmat failed");
+        goto fallback;
+    }
+
+    /* Set up error handler for XShmAttach */
+    int (*old_handler)(Display *, XErrorEvent *) = XSetErrorHandler(xshm_error_handler);
+    bool attach_ok = XShmAttach(g_x11.display, &g_x11.shm);
+    XSync(g_x11.display, False);
+    XSetErrorHandler(old_handler);
+
+    if (attach_ok) {
+        g_x11.shm.readOnly = False;
+        g_x11.uses_shm = true;
+        goto cleanup_old;
+    }
+
+    /* Clean up SHM resources before fallback */
+    if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
+        shmdt(g_x11.shm.shmaddr);
+    }
+    if (g_x11.shm.shmid != -1) {
+        shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
+    }
+    XDestroyImage(g_x11.img);
+    g_x11.img = NULL;
+
+fallback:
+    /* Fallback: heap-allocated XImage */
+    pxl_log("XShm unavailable, falling back to standard XImage");
+    size_t buf_size = (size_t)w * (size_t)h * sizeof(pxl_t);
+    void *data = malloc(buf_size);
+    if (!data) goto fail;
+
+    g_x11.img = XCreateImage(g_x11.display, visual, (unsigned int)depth,
+                            ZPixmap, 0, (char *)data, (unsigned int)w, (unsigned int)h, 32, 0);
+    if (!g_x11.img) {
+        free(data);
+        goto fail;
+    }
+
+cleanup_old:
+    if (old_img) {
+        if (old_uses_shm) {
+            XShmDetach(g_x11.display, &old_shm);
+            XSync(g_x11.display, False);
+            if (old_shm.shmaddr && old_shm.shmaddr != (char *)-1) {
+                shmdt(old_shm.shmaddr);
+            }
+            if (old_shm.shmid != -1) {
+                shmctl(old_shm.shmid, IPC_RMID, NULL);
+            }
+        } else {
+            free(old_img->data);
+        }
+        XDestroyImage(old_img);
+    }
+    return true;
+
+fail:
+    g_x11.img = old_img;
+    g_x11.shm = old_shm;
+    g_x11.uses_shm = old_uses_shm;
+    return false;
+}
+
 static bool
 init_render(int w, int h, pxl_backend_flags_t flags) {
-    /* Map window temporarily for XShmAttach to work */
+    /* Map window (required for XShmAttach) */
     XMapWindow(g_x11.display, g_x11.window);
     XSync(g_x11.display, False);
 
-    /* Create the shared-memory XImage used as the frame pixel buffer. */
-    Visual *visual = NULL;
-    int depth = 0;
-    if (!select_argb_visual(g_x11.display, &visual, &depth)) return false;
-
-    g_x11.img = XShmCreateImage(g_x11.display, visual, (unsigned int)depth, ZPixmap, NULL,
-                                &g_x11.shm, (unsigned int)w, (unsigned int)h);
-    if (!g_x11.img) goto fail;
-
-    if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) goto fail;
-
-    /* Prevent integer overflow in shared memory size calculation */
-    if (g_x11.img->bytes_per_line > INT_MAX / h) goto fail;
-
-    g_x11.shm.shmid = shmget(IPC_PRIVATE,
-                             (size_t)g_x11.img->bytes_per_line * (size_t)h,
-                             IPC_CREAT | 0777);
-    if (g_x11.shm.shmid < 0) goto fail;
-
-    g_x11.shm.shmaddr = g_x11.img->data = shmat(g_x11.shm.shmid, 0, 0);
-    if (g_x11.shm.shmaddr == (char *)-1) goto fail;
-
-    g_x11.shm.readOnly = False;
-
-    if (!XShmAttach(g_x11.display, &g_x11.shm)) goto fail;
+    if (!resize_render(w, h)) goto fail;
 
     g_x11.gc = XCreateGC(g_x11.display, g_x11.window, 0, NULL);
-    if (!g_x11.gc) goto fail;
+    if (!g_x11.gc) {
+        pxl_log("XCreateGC failed");
+        goto fail;
+    }
 
-    /* Apply window visibility/fullscreen after buffer is ready to avoid flash */
+    /* Apply visibility/fullscreen */
     if (flags & PXL_BACKEND_HIDDEN) {
         XUnmapWindow(g_x11.display, g_x11.window);
         XSync(g_x11.display, False);
@@ -210,14 +326,21 @@ fail:
     return false;
 }
 
+
 static void
 deinit_render(void) {
     if (g_x11.img) {
-        XShmDetach(g_x11.display, &g_x11.shm);
-        if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
-            shmdt(g_x11.shm.shmaddr);
+        if (g_x11.uses_shm && g_x11.shm.shmid != -1) {
+            XShmDetach(g_x11.display, &g_x11.shm);
+            if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
+                shmdt(g_x11.shm.shmaddr);
+            }
+            shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
+            g_x11.shm.shmid = -1;
+        } else if (!g_x11.uses_shm) {
+            /* Free malloc'd data from fallback */
+            free(g_x11.img->data);
         }
-        shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
         XDestroyImage(g_x11.img);
         g_x11.img = NULL;
     }
@@ -225,6 +348,7 @@ deinit_render(void) {
         XFreeGC(g_x11.display, g_x11.gc);
         g_x11.gc = 0;
     }
+    g_x11.uses_shm = false;
 }
 
 static void
@@ -258,11 +382,27 @@ pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     pxl_backend_deinit();
 
-    if (!title || w <= 0 || h <= 0) {
+    if (!title) {
         return PXL_E_INVALID_PARAM;
     }
 
-    if (!init_display())                              goto fail;
+    /* Non-fullscreen mode requires positive w and h */
+    if (!(flags & PXL_BACKEND_FULLSCREEN) && (w <= 0 || h <= 0)) {
+        return PXL_E_INVALID_PARAM;
+    }
+
+    if (!g_x11.display) {
+        if (!init_display()) return PXL_E_BACKEND_INIT;
+    }
+    
+    if (flags & PXL_BACKEND_FULLSCREEN) {
+        int scr = DefaultScreen(g_x11.display);
+        w = DisplayWidth(g_x11.display, scr);
+        h = DisplayHeight(g_x11.display, scr);
+        /* Ensure we got valid dimensions */
+        if (w <= 0 || h <= 0) return PXL_E_BACKEND_INIT;
+    }
+    
     if (!init_window(title, w, h, flags))            goto fail;
     if (!init_input_method())                        goto fail;
     if (!init_render(w, h, flags))                    goto fail;
@@ -287,12 +427,16 @@ pxl_backend_deinit(void) {
     g_x11.text_buffer_len = 0;
     g_x11.width = 0;
     g_x11.height = 0;
+    g_x11.shm.shmid = -1;
+    g_x11.uses_shm = false;
+    memset(g_x11.text_buffer, 0, sizeof(g_x11.text_buffer));
 }
 
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
 	assert(out_pb);
 	assert(g_x11.display && g_x11.img && g_x11.img->data);
+	assert(g_x11.width > 0 && g_x11.height > 0);
     assert(g_x11.img->bytes_per_line % (int)sizeof(pxl_t) == 0);
 
     out_pb->width  = g_x11.width;
@@ -307,15 +451,21 @@ pxl_err_t
 pxl_backend_end_frame(void) {
     assert(g_x11.display && g_x11.img && g_x11.img->data);
 
-    Bool success = XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
-                                g_x11.img, 0, 0, 0, 0, (unsigned int)g_x11.width, (unsigned int)g_x11.height,
-                                False);
-    XSync(g_x11.display, False);
-    
-    if (!success) {
-        pxl_log("XShmPutImage failed");
+    if (g_x11.uses_shm) {
+        Bool success = XShmPutImage(g_x11.display, g_x11.window, g_x11.gc,
+                                    g_x11.img, 0, 0, 0, 0, (unsigned int)g_x11.width, (unsigned int)g_x11.height,
+                                    False);
+        XSync(g_x11.display, False);
+        if (!success) {
+            pxl_log("XShmPutImage failed");
+            return PXL_E_BACKEND_FRAME;
+        }
+    } else {
+        XPutImage(g_x11.display, g_x11.window, g_x11.gc, g_x11.img,
+                 0, 0, 0, 0, (unsigned int)g_x11.width, (unsigned int)g_x11.height);
+        XSync(g_x11.display, False);
     }
-    return success ? PXL_SUCCESS : PXL_E_BACKEND_FRAME;
+    return PXL_SUCCESS;
 }
 
 double
@@ -438,7 +588,6 @@ x11_button_to_pxl_input_code(const unsigned int button) {
     }
 }
 
-/* Process a single X11 event and update input state */
 static void
 process_x11_event(XEvent *event, pxl_input_t *in) {
     switch (event->type) {
@@ -451,16 +600,18 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         case KeyPress: {
             pxl_input_press(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
 
-            /* Get character from OS keyboard layout via Xutf8LookupString */
+            if (!g_x11.xic) return;
+
+            /* Get UTF-8 text */
             char buf[32];
             KeySym keysym_return;
             Status status;
             int len = Xutf8LookupString(g_x11.xic, &event->xkey, buf, sizeof(buf) - 1,
                                          &keysym_return, &status);
             if (len > 0 && (status == XLookupChars || status == XLookupBoth)) {
-                /* FIFO: if buffer is full, shift left to make room for new characters */
-                if (g_x11.text_buffer_len + len > (int)sizeof(g_x11.text_buffer)) {
-                    int excess = (g_x11.text_buffer_len + len) - (int)sizeof(g_x11.text_buffer);
+                /* FIFO: shift buffer if full */
+                if (g_x11.text_buffer_len + len > (int)PXL_BACKEND_TEXT_BUFFER_SIZE) {
+                    int excess = (g_x11.text_buffer_len + len) - (int)PXL_BACKEND_TEXT_BUFFER_SIZE;
                     memmove(g_x11.text_buffer, g_x11.text_buffer + excess, (size_t)(g_x11.text_buffer_len - excess));
                     g_x11.text_buffer_len -= excess;
                 }
@@ -477,7 +628,7 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         case ButtonPress: {
             pxl_input_code_t b = x11_button_to_pxl_input_code(event->xbutton.button);
             if (b != PXL_IN_UNKNOWN) {
-				pxl_input_press(in, b);
+                pxl_input_press(in, b);
             } else if (event->xbutton.button == 4) {
                 in->mouse_wheel_y += 1;
             } else if (event->xbutton.button == 5) {
@@ -491,7 +642,7 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         }
 
         case ButtonRelease:
-			pxl_input_release(in, x11_button_to_pxl_input_code(event->xbutton.button));
+            pxl_input_release(in, x11_button_to_pxl_input_code(event->xbutton.button));
             break;
 
         case MotionNotify:
@@ -518,15 +669,31 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
             pxl_input_press(in, PXL_WM_FOCUS_LOST);
             if (g_x11.xic) XUnsetICFocus(g_x11.xic);
             break;
+
+        case ConfigureNotify: {
+            int new_w = event->xconfigure.width;
+            int new_h = event->xconfigure.height;
+            
+            /* Resize render buffer */
+            if (resize_render(new_w, new_h)) {
+                g_x11.width = new_w;
+                g_x11.height = new_h;
+                pxl_input_press(in, PXL_WM_RESIZE);
+            } else {
+                pxl_log("Resize failed - ignoring resize event");
+            }
+            break;
+        }
     }
 }
 
 void
 pxl_backend_poll_events(pxl_input_t *in) {
+    assert(in);
+    
     XEvent event;
     while (XPending(g_x11.display)) {
         XNextEvent(g_x11.display, &event);
-        /* Skip events consumed by input method (e.g., dead-key sequences) */
         if (XFilterEvent(&event, None)) continue;
         process_x11_event(&event, in);
     }
@@ -534,6 +701,8 @@ pxl_backend_poll_events(pxl_input_t *in) {
 
 void
 pxl_backend_wait_events(pxl_input_t *in) {
+    assert(in);
+    
     XEvent event;
     XNextEvent(g_x11.display, &event);
     if (!XFilterEvent(&event, None)) {
@@ -556,13 +725,19 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     assert(out_text);
     assert(out_text_max_len > 0);
 
-    if (g_x11.text_buffer_len == 0) return 0;
+    if (g_x11.text_buffer_len == 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
     int copy_len = (g_x11.text_buffer_len < out_text_max_len)
         ? g_x11.text_buffer_len
         : out_text_max_len - 1;
 
-    if (copy_len <= 0) return 0;
+    if (copy_len <= 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
     memcpy(out_text, g_x11.text_buffer, (size_t)copy_len);
     out_text[copy_len] = '\0';
@@ -571,4 +746,33 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     memmove(g_x11.text_buffer, g_x11.text_buffer + copy_len, (size_t)g_x11.text_buffer_len);
 
     return copy_len;
+}
+
+void
+pxl_backend_get_window_size(int *out_w, int *out_h) {
+    assert(out_w && out_h);
+    *out_w = g_x11.width;
+    *out_h = g_x11.height;
+}
+
+pxl_err_t
+pxl_backend_toggle_fullscreen(void) {
+    Atom wm_state = XInternAtom(g_x11.display, "_NET_WM_STATE", False);
+    Atom fullscreen_atom = XInternAtom(g_x11.display, "_NET_WM_STATE_FULLSCREEN", False);
+
+    XEvent e = {.xclient = {
+        .type = ClientMessage,
+        .serial = 0,
+        .send_event = True,
+        .display = g_x11.display,
+        .window = g_x11.window,
+        .message_type = wm_state,
+        .format = 32,
+        .data.l = {2L, (long)fullscreen_atom, 0, 0, 0}  /* 2 = _NET_WM_STATE_TOGGLE */
+    }};
+
+    XSendEvent(g_x11.display, RootWindow(g_x11.display, DefaultScreen(g_x11.display)),
+               False, SubstructureRedirectMask | SubstructureNotifyMask, &e);
+    XFlush(g_x11.display);
+    return PXL_SUCCESS;
 }

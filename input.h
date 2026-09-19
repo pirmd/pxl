@@ -39,7 +39,7 @@ typedef enum {
     PXL_KEYB_LALT,   PXL_KEYB_RALT,
     PXL_KEYB_LSUPER, PXL_KEYB_RSUPER,
 
-    /* Punctuation / symbols */
+    /* Punctuation & symbols */
     PXL_KEYB_SPACE,
     PXL_KEYB_APOSTROPHE,
     PXL_KEYB_COMMA,
@@ -68,7 +68,7 @@ typedef enum {
     PXL_KEYB_F13, PXL_KEYB_F14, PXL_KEYB_F15, PXL_KEYB_F16, PXL_KEYB_F17, PXL_KEYB_F18, PXL_KEYB_F19, PXL_KEYB_F20,
     PXL_KEYB_F21, PXL_KEYB_F22, PXL_KEYB_F23, PXL_KEYB_F24,
 
-    /* Numpad */
+    /* Numeric pad */
     PXL_KEYB_KP_0, PXL_KEYB_KP_1, PXL_KEYB_KP_2, PXL_KEYB_KP_3, PXL_KEYB_KP_4,
     PXL_KEYB_KP_5, PXL_KEYB_KP_6, PXL_KEYB_KP_7, PXL_KEYB_KP_8, PXL_KEYB_KP_9,
     PXL_KEYB_KP_DECIMAL,
@@ -79,15 +79,16 @@ typedef enum {
     PXL_KEYB_KP_ENTER,
     PXL_KEYB_KP_EQUAL,
 
-	/* Mouse buttons */
+    /* Mouse buttons */
     PXL_MOUSE_LEFT,
     PXL_MOUSE_RIGHT,
     PXL_MOUSE_MIDDLE,
 
-	/* WM events */
-	PXL_WM_FOCUS_LOST,
-	PXL_WM_MOUSE_FOCUS_LOST,
-	PXL_WM_QUIT,
+    /* WM events */
+    PXL_WM_FOCUS_LOST,
+    PXL_WM_MOUSE_FOCUS_LOST,
+    PXL_WM_QUIT,
+    PXL_WM_RESIZE,
 
     PXL_IN_COUNT
 } pxl_input_code_t;

@@ -588,10 +588,10 @@ main(void) {
 			pxl_canvas_init(&cnv, &pb);
 
 			pxl_canvas_t cnv_score;
-			pxl_canvas_init_view(&cnv_score, &pb, 0, 0, W, 50);
+			pxl_canvas_init_view(&cnv_score, &pb, 0, 0, pb.width, 50);
 
 			pxl_canvas_t cnv_game;
-			pxl_canvas_init_view(&cnv_game, &pb, 0, 0, W, H);
+			pxl_canvas_init_view(&cnv_game, &pb, 0, 50, pb.width, pb.height - 50);
 
 			/* Clear */
 			pxl_canvas_set_color(&cnv, BG_COLOR);
