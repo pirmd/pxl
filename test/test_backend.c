@@ -117,13 +117,18 @@ test_pxl_backend_frame_flow(void) {
 /* Text input ---------------------------------------------------------------- */
 
 static void
+test_pxl_backend_has_typed_text_empty(void) {
+	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+	ASSERT(!pxl_backend_has_typed_text());
+	pxl_backend_deinit();
+}
+
+static void
 test_pxl_backend_get_typed_text_empty(void) {
 	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
 
 	char buf[32];
 	int len = pxl_backend_get_typed_text(buf, sizeof(buf));
-
-	/* Empty buffer returns 0, but output is null-terminated */
 	ASSERT(len == 0);
 	ASSERT(buf[0] == '\0');
 
@@ -135,7 +140,6 @@ test_pxl_backend_get_typed_text_edge_cases(void) {
 	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
 
 	char buf[32];
-
 	/* out_text_max_len = 1 (only room for null terminator) */
 	ASSERT(pxl_backend_get_typed_text(buf, 1) == 0);
 	ASSERT(buf[0] == '\0');
@@ -148,17 +152,58 @@ test_pxl_backend_get_typed_text_null_termination(void) {
 	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
 
 	char buf[32];
-	/* Even when empty, buffer should be null-terminated */
 	pxl_backend_get_typed_text(buf, sizeof(buf));
 	ASSERT(buf[0] == '\0');
 
-	/* Poll events to clear any potential pending input */
 	pxl_input_t input = {0};
 	pxl_backend_poll_events(&input);
 
-	/* Still empty, still null-terminated */
 	ASSERT(pxl_backend_get_typed_text(buf, sizeof(buf)) == 0);
 	ASSERT(buf[0] == '\0');
+
+	pxl_backend_deinit();
+}
+
+/* Example tests -------------------------------------------------------------- */
+
+static void
+test_example_pxl_backend_get_typed_text(void) {
+	/* This test verifies the example in backend.h compiles and works as documented */
+	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	if (pxl_backend_has_typed_text()) {
+		char utf8_buf[32];
+		int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
+		ASSERT(len > 0);
+		uint32_t rune;
+		int consumed = pxl_utf8_decode(utf8_buf, &rune);
+		ASSERT(consumed > 0);
+	}
+
+	char utf8_buf[32];
+	int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
+	ASSERT(len >= 0);
+	ASSERT(utf8_buf[0] == '\0' || len > 0);
+
+	pxl_input_t input = {0};
+	pxl_backend_poll_events(&input);
+	if (pxl_input_state(&input, PXL_KEYB_ENTER)) {
+		/* Handle Enter key - verify it compiles */
+	}
+
+	pxl_backend_deinit();
+}
+
+static void
+test_example_pxl_backend_has_typed_text(void) {
+	/* This test verifies the example in backend.h for pxl_backend_has_typed_text */
+	ASSERT(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
+
+	if (pxl_backend_has_typed_text()) {
+		char utf8_buf[32];
+		int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
+		ASSERT(len > 0);
+	}
 
 	pxl_backend_deinit();
 }
@@ -173,8 +218,11 @@ main(void) {
 	test_pxl_backend_get_time_basic();
 	test_pxl_backend_poll_events_null_input();
 	test_pxl_backend_frame_flow();
+	test_pxl_backend_has_typed_text_empty();
 	test_pxl_backend_get_typed_text_empty();
 	test_pxl_backend_get_typed_text_edge_cases();
 	test_pxl_backend_get_typed_text_null_termination();
+	test_example_pxl_backend_get_typed_text();
+	test_example_pxl_backend_has_typed_text();
 	return 0;
 }

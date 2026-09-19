@@ -78,6 +78,21 @@ pxl_backend_poll_events(pxl_input_t *in);
 void
 pxl_backend_wait_events(pxl_input_t *in);
 
+/* Check if typed text is available for reading (non-destructive check).
+ *
+ * Returns true if text is pending, false otherwise. Useful for checking
+ * input before reading, without consuming it.
+ *
+ * Example usage:
+ *   if (pxl_backend_has_typed_text()) {
+ *       char utf8_buf[32];
+ *       int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
+ *       // len is always > 0 here
+ *   }
+ */
+bool
+pxl_backend_has_typed_text(void);
+
 /* Text input: get typed text as UTF-8 string.
  *
  * This function retrieves raw UTF-8 text from keyboard input events,
@@ -96,8 +111,8 @@ pxl_backend_wait_events(pxl_input_t *in);
  * or your own decoder.
  *
  * Example usage:
- *   char utf8_buf[32];
  *   if (pxl_backend_has_typed_text()) {
+ *       char utf8_buf[32];
  *       int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
  *       if (len > 0) {
  *           uint32_t rune;

@@ -359,6 +359,11 @@ pxl_backend_wait_events(pxl_input_t *in) {
     }
 }
 
+bool
+pxl_backend_has_typed_text(void) {
+    return g_sdl.text_buffer_len > 0;
+}
+
 int
 pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
     assert(out_text);
@@ -370,13 +375,11 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
         ? g_sdl.text_buffer_len
         : out_text_max_len - 1;
 
-    /* Early return if nothing to copy (kept for clarity and to avoid useless operations) */
     if (copy_len <= 0) return 0;
 
     memcpy(out_text, g_sdl.text_buffer, copy_len);
     out_text[copy_len] = '\0';
 
-    /* Consume copied bytes (no null-termination in internal buffer) */
     g_sdl.text_buffer_len -= copy_len;
     memmove(g_sdl.text_buffer, g_sdl.text_buffer + copy_len, g_sdl.text_buffer_len);
 
