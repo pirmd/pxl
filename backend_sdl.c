@@ -19,21 +19,17 @@ static struct {
     int text_buffer_len;
 } g_sdl;
 
-pxl_err_t
-pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
-	pxl_backend_deinit();
-
-	/* Validate parameters */
-	if (!title || w <= 0 || h <= 0) {
-		return PXL_E_INVALID_PARAM;
-	}
-
+static bool
+init_display(void) {
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		pxl_log(SDL_GetError());
-		return PXL_E_BACKEND_INIT;
+		return false;
 	}
+	return true;
+}
 
-	/* Build window flags */
+static bool
+init_window(const char *title, int w, int h, pxl_backend_flags_t flags) {
 	uint32_t window_flags = 0;
 	if (flags & PXL_BACKEND_FULLSCREEN) {
 		window_flags |= SDL_WINDOW_FULLSCREEN;
@@ -42,32 +38,29 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 		window_flags |= SDL_WINDOW_HIDDEN;
 	}
 
-	/* Calculate position for centered window */
 	int x = SDL_WINDOWPOS_UNDEFINED, y = SDL_WINDOWPOS_UNDEFINED;
 	if (flags & PXL_BACKEND_CENTERED) {
 		x = SDL_WINDOWPOS_CENTERED;
 		y = SDL_WINDOWPOS_CENTERED;
 	}
 
-	g_sdl.window = SDL_CreateWindow(
-		title,
-		x, y,
-		w, h,
-		window_flags
-	);
-	if (!g_sdl.window) goto fail;
+	g_sdl.window = SDL_CreateWindow(title, x, y, w, h, window_flags);
+	if (!g_sdl.window) return false;
 
-	/* Build renderer flags */
+	g_sdl.width = w;
+	g_sdl.height = h;
+	return true;
+}
+
+static bool
+init_renderer(int w, int h, pxl_backend_flags_t flags) {
 	uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
 	if (flags & PXL_BACKEND_VSYNC) {
 		renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
 	}
 
-	g_sdl.renderer = SDL_CreateRenderer(
-		g_sdl.window, -1,
-		renderer_flags
-	);
-	if (!g_sdl.renderer) goto fail;
+	g_sdl.renderer = SDL_CreateRenderer(g_sdl.window, -1, renderer_flags);
+	if (!g_sdl.renderer) return false;
 
 	g_sdl.texture = SDL_CreateTexture(
 		g_sdl.renderer,
@@ -75,29 +68,60 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
 		SDL_TEXTUREACCESS_STREAMING,
 		w, h
 	);
-	if (!g_sdl.texture) goto fail;
+	if (!g_sdl.texture) return false;
+	return true;
+}
 
-	g_sdl.width = w;
-	g_sdl.height = h;
-
+static bool
+init_input_method(void) {
 	/* Enable text input for character retrieval */
 	SDL_StartTextInput();
+	return true;
+}
+
+static void
+deinit_renderer(void) {
+	if (g_sdl.texture)  { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
+	if (g_sdl.renderer) { SDL_DestroyRenderer(g_sdl.renderer); g_sdl.renderer = NULL; }
+}
+
+static void
+deinit_window(void) {
+	if (g_sdl.window) { SDL_DestroyWindow(g_sdl.window); g_sdl.window = NULL; }
+}
+
+static void
+deinit_display(void) {
+	SDL_StopTextInput();
+	SDL_Quit();
+}
+
+pxl_err_t
+pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
+	pxl_backend_deinit();
+
+	if (!title || w <= 0 || h <= 0) {
+		return PXL_E_INVALID_PARAM;
+	}
+
+	if (!init_display())                        goto fail;
+	if (!init_window(title, w, h, flags))       goto fail;
+	if (!init_renderer(w, h, flags))            goto fail;
+	if (!init_input_method())                  goto fail;
 
 	return PXL_SUCCESS;
 
 fail:
-    pxl_backend_deinit();
-    return PXL_E_BACKEND_INIT;
+	pxl_backend_deinit();
+	return PXL_E_BACKEND_INIT;
 }
 
 void
 pxl_backend_deinit(void) {
-    SDL_StopTextInput();
-    g_sdl.text_buffer_len = 0;  /* No null-termination needed */
-    if (g_sdl.texture)  { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
-    if (g_sdl.renderer) { SDL_DestroyRenderer(g_sdl.renderer); g_sdl.renderer = NULL; }
-    if (g_sdl.window)   { SDL_DestroyWindow(g_sdl.window); g_sdl.window = NULL; }
-    SDL_Quit();
+	deinit_renderer();
+	deinit_window();
+	deinit_display();
+	g_sdl.text_buffer_len = 0;  /* No null-termination needed */
 }
 
 pxl_err_t

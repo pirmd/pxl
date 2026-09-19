@@ -31,10 +31,7 @@ static struct {
     XImage         *img;
     int             width, height;
     Atom            wm_delete;
-    /* Input method / input context: required for Xutf8LookupString to
-     * produce correct UTF-8 text (dead keys, compose sequences, non-Latin1
-     * layouts). Without this, XLookupString would only yield raw Latin-1
-     * bytes for accented characters, which is NOT valid UTF-8. */
+    /* Input method/context: required for correct UTF-8 text input (dead keys, non-Latin1 layouts) */
     XIM             xim;
     XIC             xic;
     /* Text input buffer for typed characters (UTF-8) */
@@ -69,28 +66,26 @@ select_argb_visual(Display *display, Visual **out_visual, int *out_depth) {
     return false;
 }
 
-pxl_err_t
-pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
-    pxl_backend_deinit();
-
-    if (!title || w <= 0 || h <= 0) {
-        return PXL_E_INVALID_PARAM;
-    }
-
-    /* Required for Xutf8LookupString to produce correct UTF-8 output and
-     * for XIM to negotiate a proper input method with the OS/desktop. */
+static bool
+init_display(void) {
+    /* Required for Xutf8LookupString to produce UTF-8 output and for XIM input */
     setlocale(LC_CTYPE, "");
     XSetLocaleModifiers("");
 
     g_x11.display = XOpenDisplay(NULL);
     if (!g_x11.display) {
         pxl_log("XOpenDisplay failed");
-        return PXL_E_BACKEND_INIT;
+        return false;
     }
+    return true;
+}
 
+static bool
+init_window(const char *title, int w, int h, pxl_backend_flags_t flags) {
+    /* Pick an ARGB TrueColor visual so we match PXL's native pixel format. */
     Visual *visual = NULL;
     int depth = 0;
-    if (!select_argb_visual(g_x11.display, &visual, &depth)) goto fail;
+    if (!select_argb_visual(g_x11.display, &visual, &depth)) return false;
 
     int scr = DefaultScreen(g_x11.display);
     Window root = RootWindow(g_x11.display, scr);
@@ -102,7 +97,6 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
         .border_pixel = 0,
     };
 
-    /* Calculate position for centered window */
     int x = 0, y = 0;
     if (flags & PXL_BACKEND_CENTERED) {
         x = (DisplayWidth(g_x11.display, scr) - w) / 2;
@@ -116,44 +110,58 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
         CWColormap | CWBackPixel | CWBorderPixel,
         &attrs
     );
-    if (!g_x11.window) goto fail;
+    if (!g_x11.window) return false;
 
     XStoreName(g_x11.display, g_x11.window, title);
     XSelectInput(g_x11.display, g_x11.window,
         ExposureMask | KeyPressMask | KeyReleaseMask |
         ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
         StructureNotifyMask | EnterWindowMask | LeaveWindowMask | FocusChangeMask);
-	
-	XkbSetDetectableAutoRepeat(g_x11.display, True, NULL);
 
+    XkbSetDetectableAutoRepeat(g_x11.display, True, NULL);
+
+    /* Advertise WM_DELETE_WINDOW protocol to receive close requests as ClientMessage */
     g_x11.wm_delete = XInternAtom(g_x11.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(g_x11.display, g_x11.window, &g_x11.wm_delete, 1);
 
+    g_x11.width = w;
+    g_x11.height = h;
+    return true;
+}
+
+static bool
+init_input_method(void) {
     g_x11.xim = XOpenIM(g_x11.display, NULL, NULL, NULL);
-    if (!g_x11.xim) goto fail;
+    if (!g_x11.xim) return false;
 
     g_x11.xic = XCreateIC(g_x11.xim,
         XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
         XNClientWindow, g_x11.window,
         XNFocusWindow, g_x11.window,
         NULL);
-    if (!g_x11.xic) goto fail;
+    if (!g_x11.xic) return false;
+    return true;
+}
 
+static bool
+init_render(int w, int h, pxl_backend_flags_t flags) {
     /* Map window temporarily for XShmAttach to work */
     XMapWindow(g_x11.display, g_x11.window);
     XSync(g_x11.display, False);
+
+    /* Create the shared-memory XImage used as the frame pixel buffer. */
+    Visual *visual = NULL;
+    int depth = 0;
+    if (!select_argb_visual(g_x11.display, &visual, &depth)) return false;
 
     g_x11.img = XShmCreateImage(g_x11.display, visual, (unsigned int)depth, ZPixmap, NULL,
                                 &g_x11.shm, (unsigned int)w, (unsigned int)h);
     if (!g_x11.img) goto fail;
 
-	/* ensure we are pixel-aligned */
     if (g_x11.img->bytes_per_line % (int)sizeof(pxl_t) != 0) goto fail;
 
-	/* Prevent integer overflow in shared memory size calculation */
-	if (h > 0 && g_x11.img->bytes_per_line > INT_MAX / h) {
-		goto fail;
-	}
+    /* Prevent integer overflow in shared memory size calculation */
+    if (g_x11.img->bytes_per_line > INT_MAX / h) goto fail;
 
     g_x11.shm.shmid = shmget(IPC_PRIVATE,
                              (size_t)g_x11.img->bytes_per_line * (size_t)h,
@@ -170,10 +178,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     g_x11.gc = XCreateGC(g_x11.display, g_x11.window, 0, NULL);
     if (!g_x11.gc) goto fail;
 
-    g_x11.width = w;
-    g_x11.height = h;
-
-    /* Unmap if hidden flag is set */
+    /* Apply window visibility/fullscreen after buffer is ready to avoid flash */
     if (flags & PXL_BACKEND_HIDDEN) {
         XUnmapWindow(g_x11.display, g_x11.window);
         XSync(g_x11.display, False);
@@ -199,6 +204,68 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     }
 
     XFlush(g_x11.display);
+    return true;
+
+fail:
+    return false;
+}
+
+static void
+deinit_render(void) {
+    if (g_x11.img) {
+        XShmDetach(g_x11.display, &g_x11.shm);
+        if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
+            shmdt(g_x11.shm.shmaddr);
+        }
+        shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
+        XDestroyImage(g_x11.img);
+        g_x11.img = NULL;
+    }
+    if (g_x11.gc) {
+        XFreeGC(g_x11.display, g_x11.gc);
+        g_x11.gc = 0;
+    }
+}
+
+static void
+deinit_input_method(void) {
+    if (g_x11.xic) {
+        XDestroyIC(g_x11.xic);
+        g_x11.xic = NULL;
+    }
+    if (g_x11.xim) {
+        XCloseIM(g_x11.xim);
+        g_x11.xim = NULL;
+    }
+}
+
+static void
+deinit_window(void) {
+    if (g_x11.window) {
+        XDestroyWindow(g_x11.display, g_x11.window);
+        g_x11.window = 0;
+    }
+}
+
+static void
+deinit_display(void) {
+    if (!g_x11.display) return;
+    XCloseDisplay(g_x11.display);
+    g_x11.display = NULL;
+}
+
+pxl_err_t
+pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
+    pxl_backend_deinit();
+
+    if (!title || w <= 0 || h <= 0) {
+        return PXL_E_INVALID_PARAM;
+    }
+
+    if (!init_display())                              goto fail;
+    if (!init_window(title, w, h, flags))            goto fail;
+    if (!init_input_method())                        goto fail;
+    if (!init_render(w, h, flags))                    goto fail;
 
     return PXL_SUCCESS;
 
@@ -211,39 +278,15 @@ void
 pxl_backend_deinit(void) {
     if (!g_x11.display) return;
 
-    if (g_x11.img) {
-        XShmDetach(g_x11.display, &g_x11.shm);
-        if (g_x11.shm.shmaddr && g_x11.shm.shmaddr != (char *)-1) {
-            shmdt(g_x11.shm.shmaddr);
-        }
-        shmctl(g_x11.shm.shmid, IPC_RMID, NULL);
-        XDestroyImage(g_x11.img);
-        g_x11.img = NULL;
-    }
-
-    if (g_x11.gc) {
-        XFreeGC(g_x11.display, g_x11.gc);
-        g_x11.gc = 0;
-    }
-
-    if (g_x11.xic) {
-        XDestroyIC(g_x11.xic);
-        g_x11.xic = NULL;
-    }
-    if (g_x11.xim) {
-        XCloseIM(g_x11.xim);
-        g_x11.xim = NULL;
-    }
-
-    if (g_x11.window) {
-        XDestroyWindow(g_x11.display, g_x11.window);
-        g_x11.window = 0;
-    }
+    /* Teardown in reverse order of init */
+    deinit_render();
+    deinit_input_method();
+    deinit_window();
+    deinit_display();
 
     g_x11.text_buffer_len = 0;
-
-    XCloseDisplay(g_x11.display);
-    g_x11.display = NULL;
+    g_x11.width = 0;
+    g_x11.height = 0;
 }
 
 pxl_err_t
@@ -406,11 +449,9 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
             break;
 
         case KeyPress: {
-            /* Get the physical key code */
             pxl_input_press(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
 
-            /* Get the actual character from the OS keyboard layout / IME using
-             * Xutf8LookupString. */
+            /* Get character from OS keyboard layout via Xutf8LookupString */
             char buf[32];
             KeySym keysym_return;
             Status status;
@@ -485,8 +526,7 @@ pxl_backend_poll_events(pxl_input_t *in) {
     XEvent event;
     while (XPending(g_x11.display)) {
         XNextEvent(g_x11.display, &event);
-        /* Events consumed by the input method (e.g. mid-compose dead-key
-         * sequences) must not be processed as normal key events. */
+        /* Skip events consumed by input method (e.g., dead-key sequences) */
         if (XFilterEvent(&event, None)) continue;
         process_x11_event(&event, in);
     }
@@ -495,7 +535,7 @@ pxl_backend_poll_events(pxl_input_t *in) {
 void
 pxl_backend_wait_events(pxl_input_t *in) {
     XEvent event;
-    XNextEvent(g_x11.display, &event); /* Block until first event */
+    XNextEvent(g_x11.display, &event);
     if (!XFilterEvent(&event, None)) {
         process_x11_event(&event, in);
     }

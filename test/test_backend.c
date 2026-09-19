@@ -2,6 +2,7 @@
 #include "backend.h"
 #include "buf.h"
 #include "err.h"
+#include "text.h"
 
 /* Lifecycle ---------------------------------------------------------------- */
 
