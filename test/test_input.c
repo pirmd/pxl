@@ -18,20 +18,20 @@ test_pxl_input_state(void) {
 }
 
 static void
-test_pxl_input_press_release(void) {
+test_pxl_input_set_clear(void) {
 	pxl_input_t in = {0};
 
-	pxl_input_press(&in, PXL_KEYB_A);
+	pxl_input_set(&in, PXL_KEYB_A);
 	ASSERT(pxl_input_state(&in, PXL_KEYB_A) == true);
 	ASSERT(pxl_input_state(&in, PXL_KEYB_B) == false);
 
-	pxl_input_release(&in, PXL_KEYB_A);
+	pxl_input_unset(&in, PXL_KEYB_A);
 	ASSERT(pxl_input_state(&in, PXL_KEYB_A) == false);
 
-	pxl_input_press(&in, PXL_IN_COUNT - 1);
+	pxl_input_set(&in, PXL_IN_COUNT - 1);
 	ASSERT(pxl_input_state(&in, PXL_IN_COUNT - 1) == true);
 
-	pxl_input_release(&in, PXL_IN_COUNT - 1);
+	pxl_input_unset(&in, PXL_IN_COUNT - 1);
 	ASSERT(pxl_input_state(&in, PXL_IN_COUNT - 1) == false);
 }
 
@@ -39,7 +39,7 @@ test_pxl_input_press_release(void) {
 int
 main(void) {
 	test_pxl_input_state();
-	test_pxl_input_press_release();
+	test_pxl_input_set_clear();
 
 	return 0;
 }

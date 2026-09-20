@@ -340,25 +340,25 @@ static void
 process_sdl_event(SDL_Event *event, pxl_input_t *in) {
     switch (event->type) {
         case SDL_QUIT:
-			pxl_input_press(in, PXL_WM_QUIT);
+			pxl_input_set(in, PXL_WM_QUIT);
             break;
 
         case SDL_KEYDOWN:
             if (!event->key.repeat) {
-				pxl_input_press(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
+				pxl_input_set(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
             }
             break;
 
         case SDL_KEYUP:
-			pxl_input_release(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
+			pxl_input_unset(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
             break;
 
         case SDL_MOUSEBUTTONDOWN:
-			pxl_input_press(in, sdl_button_to_pxl_input_code(event->button.button));
+			pxl_input_set(in, sdl_button_to_pxl_input_code(event->button.button));
             break;
 
         case SDL_MOUSEBUTTONUP:
-			pxl_input_release(in, sdl_button_to_pxl_input_code(event->button.button));
+			pxl_input_unset(in, sdl_button_to_pxl_input_code(event->button.button));
             break;
 
         case SDL_MOUSEMOTION:
@@ -373,13 +373,13 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
 
         case SDL_WINDOWEVENT:
             if (event->window.event == SDL_WINDOWEVENT_ENTER) {
-                pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
+                pxl_input_unset(in, PXL_WM_MOUSE_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_LEAVE) {
-                pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
+                pxl_input_set(in, PXL_WM_MOUSE_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                pxl_input_release(in, PXL_WM_FOCUS_LOST);
+                pxl_input_unset(in, PXL_WM_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                pxl_input_press(in, PXL_WM_FOCUS_LOST);
+                pxl_input_set(in, PXL_WM_FOCUS_LOST);
             } else if (event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
                        event->window.event == SDL_WINDOWEVENT_RESIZED) {
                 int new_w = event->window.data1;
@@ -388,7 +388,7 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
                 if (resize_renderer(new_w, new_h)) {
                     g_sdl.width = new_w;
                     g_sdl.height = new_h;
-                    pxl_input_press(in, PXL_WM_RESIZE);
+                    pxl_input_set(in, PXL_WM_RESIZE);
                 } else {
                     pxl_log("SDL resize failed - ignoring resize event");
                 }
@@ -427,9 +427,7 @@ pxl_backend_wait_events(pxl_input_t *in) {
     SDL_Event event;
     if (SDL_WaitEvent(&event)) {
         process_sdl_event(&event, in);
-        while (SDL_PollEvent(&event)) {
-            process_sdl_event(&event, in);
-        }
+        pxl_backend_poll_events(in);
     }
 }
 

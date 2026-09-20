@@ -593,12 +593,12 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
     switch (event->type) {
         case ClientMessage:
             if ((Atom)event->xclient.data.l[0] == g_x11.wm_delete) {
-                pxl_input_press(in, PXL_WM_QUIT);
+                pxl_input_set(in, PXL_WM_QUIT);
             }
             break;
 
         case KeyPress: {
-            pxl_input_press(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
+            pxl_input_set(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
 
             if (!g_x11.xic) return;
 
@@ -622,13 +622,13 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         }
 
         case KeyRelease:
-            pxl_input_release(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
+            pxl_input_unset(in, x11_keysym_to_pxl_input_code(XLookupKeysym(&event->xkey, 0)));
             break;
 
         case ButtonPress: {
             pxl_input_code_t b = x11_button_to_pxl_input_code(event->xbutton.button);
             if (b != PXL_IN_UNKNOWN) {
-                pxl_input_press(in, b);
+                pxl_input_set(in, b);
             } else if (event->xbutton.button == 4) {
                 in->mouse_wheel_y += 1;
             } else if (event->xbutton.button == 5) {
@@ -642,7 +642,7 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         }
 
         case ButtonRelease:
-            pxl_input_release(in, x11_button_to_pxl_input_code(event->xbutton.button));
+            pxl_input_unset(in, x11_button_to_pxl_input_code(event->xbutton.button));
             break;
 
         case MotionNotify:
@@ -651,22 +651,22 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
             break;
 
         case EnterNotify:
-            pxl_input_release(in, PXL_WM_MOUSE_FOCUS_LOST);
+            pxl_input_unset(in, PXL_WM_MOUSE_FOCUS_LOST);
             in->mouse_x = event->xcrossing.x;
             in->mouse_y = event->xcrossing.y;
             break;
 
         case LeaveNotify:
-            pxl_input_press(in, PXL_WM_MOUSE_FOCUS_LOST);
+            pxl_input_set(in, PXL_WM_MOUSE_FOCUS_LOST);
             break;
 
         case FocusIn:
-            pxl_input_release(in, PXL_WM_FOCUS_LOST);
+            pxl_input_unset(in, PXL_WM_FOCUS_LOST);
             if (g_x11.xic) XSetICFocus(g_x11.xic);
             break;
 
         case FocusOut:
-            pxl_input_press(in, PXL_WM_FOCUS_LOST);
+            pxl_input_set(in, PXL_WM_FOCUS_LOST);
             if (g_x11.xic) XUnsetICFocus(g_x11.xic);
             break;
 
@@ -678,7 +678,7 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
             if (resize_render(new_w, new_h)) {
                 g_x11.width = new_w;
                 g_x11.height = new_h;
-                pxl_input_press(in, PXL_WM_RESIZE);
+                pxl_input_set(in, PXL_WM_RESIZE);
             } else {
                 pxl_log("Resize failed - ignoring resize event");
             }
@@ -708,11 +708,7 @@ pxl_backend_wait_events(pxl_input_t *in) {
     if (!XFilterEvent(&event, None)) {
         process_x11_event(&event, in);
     }
-    while (XPending(g_x11.display)) {
-        XNextEvent(g_x11.display, &event);
-        if (XFilterEvent(&event, None)) continue;
-        process_x11_event(&event, in);
-    }
+    pxl_backend_poll_events(in);
 }
 
 bool

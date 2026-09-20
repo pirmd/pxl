@@ -405,24 +405,24 @@ handle_resize(font_view_t *fv) {
 static void
 handle_input(font_view_t *fv, pxl_app_t *app) {
 	/* Handle window resize via event or size change */
-	if (pxl_app_was_pressed(app, PXL_WM_RESIZE)) {
+	if (pxl_app_was_triggered(app, PXL_WM_RESIZE)) {
 		handle_resize(fv);
 	}
 
-	if (pxl_app_was_pressed(app, PXL_KEYB_F)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_F)) {
 		font_view_next_font(fv);
 	}
 
-	if (pxl_app_was_pressed(app, PXL_KEYB_H) || pxl_app_is_pressed(app, PXL_KEYB_LEFT)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_H) || pxl_app_is_active(app, PXL_KEYB_LEFT)) {
 		font_view_next_glyph(fv, -1);
 	}
-	if (pxl_app_was_pressed(app, PXL_KEYB_J) || pxl_app_is_pressed(app, PXL_KEYB_DOWN)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_J) || pxl_app_is_active(app, PXL_KEYB_DOWN)) {
 		font_view_next_glyph(fv, fv->cols);
 	}
-	if (pxl_app_was_pressed(app, PXL_KEYB_K) || pxl_app_is_pressed(app, PXL_KEYB_UP)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_K) || pxl_app_is_active(app, PXL_KEYB_UP)) {
 		font_view_next_glyph(fv, -fv->cols);
 	}
-	if (pxl_app_was_pressed(app, PXL_KEYB_L) || pxl_app_is_pressed(app, PXL_KEYB_RIGHT)) {
+	if (pxl_app_was_triggered(app, PXL_KEYB_L) || pxl_app_is_active(app, PXL_KEYB_RIGHT)) {
 		font_view_next_glyph(fv, 1);
 	}
 }
@@ -627,15 +627,16 @@ render(pxl_canvas_t *cnv, const font_view_t *fv) {
 
 int
 main(void) {
-	pxl_app_t app = {
+	pxl_app_cfg_t cfg = {
 		.title = "PXL Font Viewer",
 		.width = 720,
 		.height = 360,
 		.backend_flags = PXL_BACKEND_RESIZABLE,
 		/* physics_dt defaults to 0 (no physics stepper) */
 	};
+	pxl_app_t app;
 
-	if (pxl_app_init(&app) != PXL_SUCCESS)
+	if (pxl_app_init(&app, &cfg) != PXL_SUCCESS)
 		return 1;
 
 	printf("Font Viewer.\n"
@@ -648,7 +649,7 @@ main(void) {
 	int fps = 0;
 
 	while (pxl_app_advance_wait(&app)) {
-		if (pxl_app_was_pressed(&app, PXL_KEYB_ESCAPE)) {
+		if (pxl_app_was_triggered(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 
