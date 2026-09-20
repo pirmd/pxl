@@ -224,7 +224,7 @@ test_pxl_draw_tile_last_tile(void) {
 	 */
 	fixture_reset();
 
-	int last_tile_idx = g_ts.cols * g_ts.rows - 1;  // = 15
+	int last_tile_idx = g_ts.cols * g_ts.rows - 1;  /* = 15 */
 	pxl_draw_tile(&g_cnv, &g_ts, last_tile_idx, 0, 0);
 
 	/* Verify last tile was drawn at expected position */

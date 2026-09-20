@@ -1,8 +1,9 @@
 #ifndef PXL_BUF_H
 #define PXL_BUF_H
 
-#include <assert.h>  /* for assert */
-#include <stdint.h>  /* for uint32_t */
+#include <assert.h>
+#include <limits.h>
+#include <stdint.h>
 
 typedef uint32_t pxl_t;  /* 32-bit ARGB pixel */
 
@@ -30,6 +31,7 @@ typedef struct {
 /* Calculate aligned stride for a buffer width */
 static inline int
 pxl_calc_stride(int w) {
+	assert(w <= INT_MAX - (PXL_BUF_ALIGN - 1));
 	return (w + PXL_BUF_ALIGN - 1) & ~(PXL_BUF_ALIGN - 1);
 }
 

@@ -17,16 +17,7 @@ test_pxl_stepper_init(void) {
 /* Update tests */
 
 static void
-test_pxl_stepper_update_basic(void) {
-	pxl_time_stepper_t ts;
-	pxl_stepper_init(&ts, 0.016);
-
-	pxl_stepper_update(&ts, 0.017);
-	ASSERT(ts.accumulator == 0.017);
-}
-
-static void
-test_pxl_stepper_update_accumulate(void) {
+test_pxl_stepper_update(void) {
 	pxl_time_stepper_t ts;
 	pxl_stepper_init(&ts, 0.016);
 
@@ -106,8 +97,7 @@ test_pxl_stepper_zero_dt_init(void) {
 int
 main(void) {
 	test_pxl_stepper_init();
-	test_pxl_stepper_update_basic();
-	test_pxl_stepper_update_accumulate();
+	test_pxl_stepper_update();
 	test_pxl_stepper_advance_trigger();
 	test_pxl_stepper_advance_no_trigger();
 	test_pxl_stepper_advance_multiple_steps();

@@ -5,12 +5,10 @@
 /* --- pxl_min/pxl_max ------------------------------------------------------ */
 static void
 test_min_max(void) {
-	// pxl_min
 	ASSERT(pxl_min(10, 20) == 10);
 	ASSERT(pxl_min(20, 10) == 10);
 	ASSERT(pxl_min(-5, 0) == -5);
 
-	// pxl_max
 	ASSERT(pxl_max(10, 20) == 20);
 	ASSERT(pxl_max(20, 10) == 20);
 	ASSERT(pxl_max(-5, 0) == 0);
@@ -165,6 +163,18 @@ test_pxl_rect_align_preserves_dimensions(void) {
 	}
 }
 
+/* Example test from geom.h documentation */
+static void
+test_example_pxl_rect_align(void) {
+	pxl_rect_t bounds = {0, 0, 100, 50};
+	pxl_rect_t container = {0, 0, 800, 600};
+	pxl_rect_t aligned = pxl_rect_align(bounds, container, PXL_H_CENTER | PXL_V_CENTER);
+	ASSERT(aligned.w == bounds.w);
+	ASSERT(aligned.h == bounds.h);
+	ASSERT(aligned.x == 350);  /* (800 - 100) / 2 = 350 */
+	ASSERT(aligned.y == 275);  /* (600 - 50) / 2 = 275 */
+}
+
 /* --- Main ----------------------------------------------------------------- */
 int
 main(void) {
@@ -185,6 +195,9 @@ main(void) {
 	test_pxl_rect_align_right_bottom();
 	test_pxl_rect_align_all_combinations();
 	test_pxl_rect_align_preserves_dimensions();
+
+	/* Example tests */
+	test_example_pxl_rect_align();
 
 	return 0;
 }

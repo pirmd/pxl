@@ -103,7 +103,6 @@ test_canvas_init_view_clipped(void) {
 }
 
 
-
 /* --- Core Canvas Tests --------------------------------------------------- */
 
 static void
@@ -141,6 +140,22 @@ test_canvas_set_scissor_clipped(void) {
 	pxl_canvas_set_scissor(&g_cnv, -10, -10, 200, 200);
 	ASSERT(g_cnv.scissor.x == 0 && g_cnv.scissor.y == 0);
 	ASSERT(g_cnv.scissor.w == FIXTURE_W && g_cnv.scissor.h == FIXTURE_H);
+}
+
+static void
+test_canvas_set_scissor_zero(void) {
+	fixture_reset();
+	
+	/* Zero width and height are valid (w >= 0, h >= 0) */
+	pxl_canvas_set_scissor(&g_cnv, 0, 0, 0, 0);
+	ASSERT(g_cnv.scissor.w == 0 && g_cnv.scissor.h == 0);
+	
+	/* clear() with empty scissor must do nothing */
+	buf_fill(0xFF0000FF);
+	pxl_canvas_set_color(&g_cnv, 0xFFFFFFFF);
+	pxl_canvas_clear(&g_cnv);
+	/* Buffer unchanged */
+	ASSERT(*pxl_buf_ptr(&g_buf, 0, 0) == 0xFF0000FF);
 }
 
 static void
@@ -247,11 +262,12 @@ main(void) {
 	test_canvas_init_view_at_origin();
 	test_canvas_init_view_clipped();
 	
-	// Core canvas tests
+	/* Core canvas tests */
 	test_canvas_init();
 	test_canvas_set_color();
 	test_canvas_set_scissor();
 	test_canvas_set_scissor_clipped();
+	test_canvas_set_scissor_zero();
 	test_canvas_reset_scissor();
 	test_canvas_set_offset();
 	test_canvas_reset_offset();

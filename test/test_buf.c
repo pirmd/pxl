@@ -81,6 +81,22 @@ test_pxl_buf_ptr_corners(void) {
 }
 
 static void
+test_pxl_buf_ptr_minimal_buffer(void) {
+	/* Test with minimal valid buffer (1x1) */
+	pxl_t data[4];  /* stride=4 for width=1 */
+	pxl_buf_t buf = {
+		.data = data,
+		.width = 1,
+		.height = 1,
+		.stride = 4
+	};
+	pxl_t *ptr = pxl_buf_ptr(&buf, 0, 0);
+	ASSERT(ptr == &data[0]);
+	*ptr = 0xCAFEBABE;
+	ASSERT(*pxl_buf_ptr(&buf, 0, 0) == 0xCAFEBABE);
+}
+
+static void
 test_pxl_buf_ptr_stride_calculation(void) {
 	fixture_reset();
 	
@@ -123,6 +139,7 @@ main(void) {
 	test_pxl_buf_ptr_corners();
 	test_pxl_buf_ptr_stride_calculation();
 	test_pxl_buf_ptr_grid_access();
+	test_pxl_buf_ptr_minimal_buffer();
 
 	return 0;
 }

@@ -114,17 +114,17 @@ int
 main(void) {
 	fixture_reset();
 	
-	// move_camera tests
+	/* move_camera tests */
 	test_camera_move_from_origin();
 	test_camera_move_negative();
 	test_camera_move_cumulative();
 	
-	// set_camera tests
+	/* set_camera tests */
 	test_camera_set_absolute();
 	test_camera_set_origin();
 	test_camera_set_negative();
 	
-	// reset_camera tests
+	/* reset_camera tests */
 	test_camera_reset();
 	test_camera_reset_after_move();
 	

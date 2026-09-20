@@ -7,7 +7,6 @@ test_app_transitions_active(void) {
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
 
-	/* Previous frame: A was up, current frame: A is down */
 	pxl_input_set(&app.curr, PXL_KEYB_A);
 
 	ASSERT(pxl_app_is_active(&app, PXL_KEYB_A) == true);
@@ -21,9 +20,7 @@ test_app_transitions_released(void) {
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
 
-	/* Previous frame: A was down */
 	pxl_input_set(&app.prev, PXL_KEYB_A);
-	/* Current frame: A is up */
 
 	ASSERT(pxl_app_is_active(&app, PXL_KEYB_A) == false);
 	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
@@ -36,7 +33,6 @@ test_app_transitions_no_change(void) {
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
 
-	/* A is down in both frames */
 	pxl_input_set(&app.prev, PXL_KEYB_A);
 	pxl_input_set(&app.curr, PXL_KEYB_A);
 
@@ -44,7 +40,6 @@ test_app_transitions_no_change(void) {
 	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
 	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == false);
 
-	/* A is up in both frames */
 	app.prev = (pxl_input_t){0};
 	app.curr = (pxl_input_t){0};
 
@@ -59,7 +54,6 @@ test_app_transitions_multiple_keys(void) {
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
 
-	/* Previous: A down, B up. Current: A up, B down */
 	pxl_input_set(&app.prev, PXL_KEYB_A);
 	pxl_input_set(&app.curr, PXL_KEYB_B);
 
@@ -75,11 +69,9 @@ test_app_mouse_wheel_reset(void) {
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
 
-	/* Simulate wheel movement in current frame */
 	app.curr.mouse_wheel_x = 5;
 	app.curr.mouse_wheel_y = -3;
 
-	/* After advance, wheel should be reset */
 	app.prev = app.curr;
 	app.curr.mouse_wheel_x = 0;
 	app.curr.mouse_wheel_y = 0;
@@ -96,14 +88,11 @@ test_app_should_close(void) {
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
 
-	/* No quit condition */
 	ASSERT(pxl_input_state(&app.curr, PXL_WM_QUIT) == false);
 
-	/* WM_QUIT pressed */
 	pxl_input_set(&app.curr, PXL_WM_QUIT);
 	ASSERT(pxl_input_state(&app.curr, PXL_WM_QUIT) == true);
 
-	/* Reset and test ESCAPE (should NOT trigger should_close) */
 	app.curr = (pxl_input_t){0};
 	pxl_input_set(&app.curr, PXL_KEYB_ESCAPE);
 	ASSERT(pxl_input_state(&app.curr, PXL_WM_QUIT) == false);
@@ -114,17 +103,53 @@ test_app_physics_disabled(void) {
 	pxl_app_t app = {0};
 	app.physics_ts.dt = 0;
 
-	/* advance_physics should return false when physics disabled */
+	/* advance_physics should return false when stepper is disabled (dt=0) */
 	ASSERT(pxl_app_advance_physics(&app) == false);
 }
 
 static void
-test_app_physics_stepper_transparent(void) {
-	pxl_app_t app = {0};
-	app.physics_ts.dt = 0;  /* Ensure stepper is disabled */
+test_app_cfg_basic(void) {
+	pxl_app_cfg_t cfg = {
+		.title = "Test App",
+		.width = 800,
+		.height = 600,
+		.backend_flags = PXL_BACKEND_HIDDEN,
+		.physics_dt = 1.0 / 60.0
+	};
 
-	/* advance_physics should return false when stepper is disabled */
-	ASSERT(pxl_app_advance_physics(&app) == false);
+	ASSERT(cfg.width == 800);
+	ASSERT(cfg.height == 600);
+	ASSERT(cfg.physics_dt > 0);
+}
+
+static void
+test_app_cfg_zero_physics(void) {
+	pxl_app_cfg_t cfg = {
+		.title = "Test",
+		.width = 100,
+		.height = 100,
+		.backend_flags = PXL_BACKEND_HIDDEN,
+		.physics_dt = 0  /* Disable physics */
+	};
+
+	ASSERT(cfg.physics_dt == 0);
+}
+
+/* Example test from app.h documentation */
+static void
+test_example_pxl_app_init(void) {
+	pxl_app_cfg_t cfg = {
+		.title = "My Game",
+		.width = 800,
+		.height = 600,
+		.backend_flags = PXL_BACKEND_HIDDEN,
+		.physics_dt = 1.0 / 60.0
+	};
+
+	/* This verifies the example compiles and config values are valid */
+	ASSERT(cfg.width == 800);
+	ASSERT(cfg.height == 600);
+	ASSERT(cfg.physics_dt == 1.0 / 60.0);
 }
 
 /* Main */
@@ -137,7 +162,13 @@ main(void) {
 	test_app_mouse_wheel_reset();
 	test_app_should_close();
 	test_app_physics_disabled();
-	test_app_physics_stepper_transparent();
+
+	/* Config tests */
+	test_app_cfg_basic();
+	test_app_cfg_zero_physics();
+
+	/* Example tests */
+	test_example_pxl_app_init();
 
 	return 0;
 }

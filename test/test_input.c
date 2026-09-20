@@ -5,13 +5,11 @@ static void
 test_pxl_input_state(void) {
 	pxl_input_t in = {0};
 
-	/* Set a key as down (code 42) */
 	in.state[42 / 64] = 1ULL << (42 % 64);
 	ASSERT(pxl_input_state(&in, 42) == true);
 	ASSERT(pxl_input_state(&in, 41) == false);
 	ASSERT(pxl_input_state(&in, 43) == false);
 
-	/* Set a key in the second word (code 63, last code) */
 	in.state[63 / 64] = 1ULL << (63 % 64);
 	ASSERT(pxl_input_state(&in, 63) == true);
 	ASSERT(pxl_input_state(&in, 62) == false);
