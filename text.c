@@ -1,5 +1,5 @@
 #include <assert.h>
-#include <stdbool.h>  /* for bool, true, false */
+#include <stdbool.h>
 
 #include "blit.h"
 #include "geom.h"
@@ -11,8 +11,7 @@
  */
 static bool
 pxl_writer_find_glyph(const pxl_writer_t *w, uint32_t rune,
-                      const pxl_font_t **out_font, int *out_idx)
-{
+                      const pxl_font_t **out_font, int *out_idx) {
 	assert(w && w->font_count > 0);
 
 	/* First, try to find the rune in any font */
@@ -231,12 +230,12 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 
 	if (width > b.w) b.w = width;
 
-	/* Calculate height: each \n creates a new line.
-	 * Total lines = newline_count + 1 (if any content/newlines exist).
-	 * Each line contributes glyph_height, each \n contributes leading.
-	 */
-	int total_lines = (newline_count == 0 && width == 0) ? 0 : newline_count + 1;
-	b.h = total_lines * glyph_height + newline_count * leading;
+	/* Calculate height: y advances by `leading` per \n (leading is the
+	 * full baseline-to-baseline distance already, see pxl_draw_rune).
+	 * So the box only needs one glyph_height, for the last line's own
+	 * row; each \n before it only adds leading. */
+	bool has_content = (newline_count > 0 || width > 0);
+	b.h = has_content ? (glyph_height + newline_count * leading) : 0;
 
 	return b;
 }
@@ -325,9 +324,10 @@ pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes) {
 
 	if (width > b.w) b.w = width;
 
-	/* Calculate height: newline_count + 1 lines if any content, else 0 */
-	int total_lines = newline_count + (newline_count > 0 || width > 0);
-	b.h = total_lines * glyph_height + newline_count * leading;
+	/* Calculate height: see pxl_text_bounds for why glyph_height is
+	 * counted once (last line) plus newline_count * leading. */
+	bool has_content = (newline_count > 0 || width > 0);
+	b.h = has_content ? (glyph_height + newline_count * leading) : 0;
 
 	return b;
 }
@@ -451,9 +451,7 @@ pxl_draw_textline(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt) {
 	}
 }
 
-/* =========================================================================
- * Scaled text functions
- * ========================================================================= */
+/* --- Scaled text functions --- */
 
 pxl_rect_t
 pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip) {

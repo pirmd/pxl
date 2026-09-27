@@ -460,7 +460,7 @@ test_pxl_text_bounds_crlf(void) {
 	/* \r\n should be treated as a single line break (2 lines total) */
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\r\nB");
 	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == 2 * g_w.fonts[0]->glyph_height + g_test_font.leading);
+	ASSERT(bounds.h == g_w.fonts[0]->glyph_height + g_test_font.leading);
 }
 
 static void
@@ -469,7 +469,7 @@ test_pxl_text_bounds_double_newline(void) {
 	/* \n\n should create an empty line (3 lines total: A, empty, B) */
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\n\nB");
 	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == 3 * g_w.fonts[0]->glyph_height + 2 * g_test_font.leading);
+	ASSERT(bounds.h == g_w.fonts[0]->glyph_height + 2 * g_test_font.leading);
 }
 
 static void
@@ -514,9 +514,12 @@ test_pxl_text_draw_consistency(void) {
 	setup_fixture();
 	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 
-	/* Test that pxl_text_bounds and pxl_draw_text agree on line count
-	 * pxl_text_bounds: height = total_lines * glyph_height + newline_count * leading
-	 * pxl_draw_text: y increases by leading for each \n
+	/* Test that pxl_text_bounds and pxl_draw_text actually agree:
+	 * the bbox height must equal the real drawn extent, not just two
+	 * formulas that happen to look similar.
+	 * leading is the full line-to-line advance (pxl_draw_rune only adds
+	 * leading per \n), so pxl_text_bounds must count glyph_height once,
+	 * for the last line, plus newline_count * leading.
 	 * For "A\nB\r\nC": 3 lines (A, B, C), 2 newlines (\n and \n after \r)
 	 */
 	const char *text = "A\nB\r\nC";
@@ -527,21 +530,22 @@ test_pxl_text_draw_consistency(void) {
 	pxl_writer_set_cursor(&g_w, 0, start_y);
 	pxl_draw_text(&g_cnv, &g_w, text);
 
-	/* Verify: bounds.h = total_lines * glyph_height + newline_count * leading
-	 *         drawn_height = newline_count * leading
-	 *         So: bounds.h = (drawn_height / leading + 1) * glyph_height + drawn_height
-	 * But simpler: just verify that the number of newlines matches
-	 */
 	int glyph_height = g_w.fonts[0]->glyph_height;
 	int leading = g_test_font.leading;
 	int newline_count = 2; /* "A\nB\r\nC" has 2 newlines */
-	int total_lines = newline_count + 1; /* 3 lines */
-	int expected_height = total_lines * glyph_height + newline_count * leading;
+	int expected_height = glyph_height + newline_count * leading;
 	ASSERT(bounds.h == expected_height);
 
 	/* Verify drawn y position: each \n advances by leading */
 	int drawn_height = g_w.y - start_y;
 	ASSERT(drawn_height == newline_count * leading);
+
+	/* The real cross-check: bounds.h must match where the last line
+	 * actually lands. drawn_height covers the advance to the top of the
+	 * last line; add that line's own glyph_height to get the full extent.
+	 * This is the assertion that would have caught draw/bounds drifting
+	 * apart, regardless of which side had the wrong formula. */
+	ASSERT(bounds.h == drawn_height + glyph_height);
 }
 
 static void
@@ -656,31 +660,33 @@ test_pxl_text_bounds_height(void) {
 	bounds = pxl_text_bounds(&g_w, "");
 	ASSERT(bounds.h == 0);
 
-	/* \n creates 2 lines: first line (empty), second line (empty) */
+	/* \n creates 2 lines: first line (empty), second line (empty).
+	 * leading is the full line-to-line advance (see pxl_draw_rune), so
+	 * only the last line contributes a full glyph_height. */
 	bounds = pxl_text_bounds(&g_w, "\n");
-	ASSERT(bounds.h == 2 * gh + ld);
+	ASSERT(bounds.h == gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\n");
-	ASSERT(bounds.h == 2 * gh + ld);
+	ASSERT(bounds.h == gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\nB");
-	ASSERT(bounds.h == 2 * gh + ld);
+	ASSERT(bounds.h == gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\nB\nC");
-	ASSERT(bounds.h == 3 * gh + 2 * ld);
+	ASSERT(bounds.h == gh + 2 * ld);
 
 	/* Empty lines: consecutive newlines create visual empty lines */
 	bounds = pxl_text_bounds(&g_w, "\n\n");
-	ASSERT(bounds.h == 3 * gh + 2 * ld);
+	ASSERT(bounds.h == gh + 2 * ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\n\nB");
-	ASSERT(bounds.h == 3 * gh + 2 * ld);
+	ASSERT(bounds.h == gh + 2 * ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\n\n");
-	ASSERT(bounds.h == 3 * gh + 2 * ld);
+	ASSERT(bounds.h == gh + 2 * ld);
 
 	bounds = pxl_text_bounds(&g_w, "\nA");
-	ASSERT(bounds.h == 2 * gh + ld);
+	ASSERT(bounds.h == gh + ld);
 }
 
 static void
@@ -714,9 +720,9 @@ test_pxl_text_bounds_zero_leading(void) {
 	pxl_writer_init(&g_w, fonts, 1);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\nB");
-	const int gh = g_w.fonts[0]->glyph_height;
 
-	ASSERT(bounds.h == 2 * gh);
+	const int gh = g_w.fonts[0]->glyph_height;
+	ASSERT(bounds.h == gh);
 }
 
 /* Tests for font cascade */
@@ -1043,12 +1049,14 @@ test_pxl_text_bounds_transformed_multiline_max_width(void) {
 	/* Regression test: verify width returns max line width, not total/sum.
 	 * Line 1: 'A' = 6px, Line 2: 'ABC' = 18px.
 	 * Width must be 18 (max), not 24 (sum).
-	 * Height is total: 2 lines * glyph_height(5) + 1 newline * leading(6) = 16. */
+	 * Height: glyph_height(5) + 1 newline * leading(6) = 11 -- only the
+	 * last line contributes a full glyph_height, each \n before it only
+	 * adds leading (leading is the full line-to-line advance already). */
 	setup_fixture();
 
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A\nABC", 1, PXL_FLIP_NONE);
 	ASSERT(bounds.w == 18);  /* Max line width */
-	ASSERT(bounds.h == 16);  /* Total height: 2*5 + 1*6 */
+	ASSERT(bounds.h == 11);  /* glyph_height + 1*leading */
 }
 
 static void
@@ -1068,6 +1076,38 @@ test_pxl_text_bounds_transformed_w_h_independence(void) {
 	/* 'A' = (5px + 1px) * 3 = 18px width, 5px * 3 = 15px height */
 	ASSERT(bounds.w == 18);
 	ASSERT(bounds.h == 15);
+}
+
+static void
+test_pxl_draw_text_transformed_bounds_consistency(void) {
+	/* Regression test: pxl_draw_text_transformed and
+	 * pxl_text_bounds_transformed must agree on multi-line height, at
+	 * scale > 1. leading is the full line-to-line advance (draw only
+	 * adds leading per \n); bounds must count glyph_height once, for the
+	 * last line, not once per line.
+	 * "A\nB\r\nC": 3 lines, 2 newlines.
+	 */
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "A\nB\r\nC";
+	int scale = 2;
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, scale, PXL_FLIP_NONE);
+
+	int start_y = 5;
+	pxl_writer_set_cursor(&g_w, 0, start_y);
+	pxl_draw_text_transformed(&g_cnv, &g_w, text, scale, PXL_FLIP_NONE);
+
+	int glyph_height = g_w.fonts[0]->glyph_height;
+	int leading = g_test_font.leading;
+	int newline_count = 2;
+
+	int drawn_height = g_w.y - start_y;
+	ASSERT(drawn_height == newline_count * leading * scale);
+
+	/* Cross-check: the bbox must exactly cover the drawn extent, same
+	 * invariant as test_pxl_text_draw_consistency but at scale > 1. */
+	ASSERT(bounds.h == drawn_height + glyph_height * scale);
 }
 
 /* Example tests */
@@ -1244,6 +1284,7 @@ main(void) {
 	test_pxl_text_bounds_transformed_exact_multichar();
 	test_pxl_text_bounds_transformed_multiline_max_width();
 	test_pxl_text_bounds_transformed_w_h_independence();
+	test_pxl_draw_text_transformed_bounds_consistency();
 
 	/* Example tests */
 	test_example_pxl_text_bounds_transformed();

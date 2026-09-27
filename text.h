@@ -138,7 +138,10 @@ pxl_next_textline(const char *txt) {
  *   pxl_rect_t bounds = pxl_text_bounds_transformed(&writer, "Hello", 2, PXL_FLIP_NONE);
  *   pxl_draw_text_transformed(&cnv, &writer, "Hello", 2, PXL_FLIP_NONE);
  */
-pxl_rect_t pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);
-void pxl_draw_text_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);
+pxl_rect_t
+pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);
+
+void
+pxl_draw_text_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);
 
 #endif /* PXL_TEXT_H */
