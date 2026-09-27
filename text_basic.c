@@ -220,11 +220,10 @@ pxl_str_bounds(const char *str) {
 			int remainder = cur_x % tab_stop;
 			cur_x += tab_stop - remainder;
 		} else {
-			if (cur_x + ASCII_ADVANCE_X > max_x) {
-				max_x = cur_x + ASCII_ADVANCE_X;
-			}
 			cur_x += ASCII_ADVANCE_X;
 		}
+
+        if (cur_x > max_x) max_x = cur_x;
 		str++;
 	}
 

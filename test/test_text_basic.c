@@ -167,6 +167,23 @@ test_pxl_draw_str_with_tab(void) {
 	ASSERT(has_pixels_in_rect(expected));
 }
 
+static void
+test_pxl_draw_str_with_trailing_tab(void) {
+	/* Regression test: draw and pxl_str_bounds must agree even when the
+	 * tab is the last (and widest) element of the line. */
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 2, y = 2;
+	pxl_draw_str(&g_cnv, x, y, "A\t");
+
+	pxl_rect_t expected = pxl_str_bounds("A\t");
+	expected.x += x;
+	expected.y += y;
+
+	ASSERT(has_pixels_in_rect(expected));
+}
+
 /* Tests for pxl_char_bounds */
 static void
 test_pxl_char_bounds_basic(void) {
@@ -205,6 +222,23 @@ test_pxl_str_bounds_with_newline(void) {
 	ASSERT(bounds.w == 9 && bounds.h == 18);
 }
 
+static void
+test_pxl_str_bounds_trailing_tab(void) {
+	/* Regression test: a tab as the last char must still extend max_x.
+	 * 'A' reaches x=9, then \t snaps forward to the next 36px tab stop. */
+	pxl_rect_t bounds = pxl_str_bounds("A\t");
+	ASSERT(bounds.w == 36);
+	ASSERT(bounds.h == 8);
+}
+
+static void
+test_pxl_str_bounds_only_tab(void) {
+	/* Regression test: a line made of only a tab must not report w == 0. */
+	pxl_rect_t bounds = pxl_str_bounds("\t");
+	ASSERT(bounds.w == 36);
+	ASSERT(bounds.h == 8);
+}
+
 int
 main(void) {
 	test_pxl_draw_char_basic();
@@ -217,12 +251,15 @@ main(void) {
 	test_pxl_draw_str_with_newline();
 	test_pxl_draw_str_with_offset();
 	test_pxl_draw_str_with_tab();
+	test_pxl_draw_str_with_trailing_tab();
 
 	test_pxl_char_bounds_basic();
 	test_pxl_char_bounds_special();
 	test_pxl_str_bounds_basic();
 	test_pxl_str_bounds_empty();
 	test_pxl_str_bounds_with_newline();
+	test_pxl_str_bounds_trailing_tab();
+	test_pxl_str_bounds_only_tab();
 
 	return 0;
 }
