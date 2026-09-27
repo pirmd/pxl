@@ -2,8 +2,8 @@
 #define PXL_CANVAS_H
 
 #include <assert.h>
-#include <limits.h>  /* for INT_MAX */
-#include <string.h>  /* for memset, size_t */
+#include <limits.h>
+#include <string.h>
 
 #include "buf.h"
 #include "geom.h"
@@ -77,39 +77,23 @@ pxl_canvas_reset_offset(pxl_canvas_t *cnv) {
 
 /* Views ------------------------------------------------------------------- */
 
-/* Initialize a canvas with a specific viewport (offset + scissor).
+/* Initialize a canvas with a specific view (offset + scissor).
  * Equivalent to pxl_canvas_init() followed by pxl_canvas_set_offset() and pxl_canvas_set_scissor().
  */
 static inline void
-pxl_canvas_init_view(pxl_canvas_t *cnv, pxl_buf_t *pb, int x, int y, int w, int h) {
+pxl_canvas_init_view(pxl_canvas_t *cnv, pxl_buf_t *pb, pxl_rect_t view) {
 	pxl_canvas_init(cnv, pb);
-	pxl_canvas_set_offset(cnv, x, y);
-	pxl_canvas_set_scissor(cnv, x, y, w, h);
+	pxl_canvas_set_offset(cnv, view.x, view.y);
+	pxl_canvas_set_scissor(cnv, view.x, view.y, view.w, view.h);
 }
 
-/* Derive a subview from an existing canvas.
- * Copies the source canvas state, then applies a relative offset and sets a new scissor.
- * The subview's offset is relative to the source canvas's offset.
+/* Get a canvas's view boundaries.
+ * Boundariess are relative to canvas's offset.
  */
-static inline void
-pxl_canvas_set_subview(pxl_canvas_t *dst, const pxl_canvas_t *src, int x, int y, int w, int h) {
-	*dst = *src;
-	pxl_canvas_set_offset(dst, dst->offset_x + x, dst->offset_y + y);
-	pxl_canvas_set_scissor(dst, x, y, w, h);
-}
-
-/* Get the width of the canvas's scissor (viewport width) */
-static inline int
-pxl_canvas_view_width(const pxl_canvas_t *cnv) {
-	assert(cnv);
-	return cnv->scissor.w;
-}
-
-/* Get the height of the canvas's scissor (viewport height) */
-static inline int
-pxl_canvas_view_height(const pxl_canvas_t *cnv) {
-	assert(cnv);
-	return cnv->scissor.h;
+static inline pxl_rect_t
+pxl_canvas_view(const pxl_canvas_t *cnv) {
+    assert(cnv);
+    return (pxl_rect_t){ 0, 0, cnv->scissor.w, cnv->scissor.h };
 }
 
 /* Drawing ----------------------------------------------------------------- */

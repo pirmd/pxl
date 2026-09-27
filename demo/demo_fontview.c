@@ -568,26 +568,33 @@ render(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_canvas_clear(cnv);
 
 	/* Setup viewports for each area using layout dimensions */
-	pxl_canvas_t cnv_title;
-	pxl_canvas_set_subview(&cnv_title, cnv, fv->layout.title_x, fv->layout.title_y, fv->layout.title_w, fv->layout.title_h);
+	pxl_canvas_t cnv_title = *cnv;
+	pxl_canvas_set_offset(&cnv_title, cnv->offset_x + fv->layout.title_x, cnv->offset_y + fv->layout.title_y);
+	pxl_canvas_set_scissor(&cnv_title, fv->layout.title_x, fv->layout.title_y, fv->layout.title_w, fv->layout.title_h);
 
-	pxl_canvas_t cnv_grid;
-	pxl_canvas_set_subview(&cnv_grid, cnv, fv->layout.grid_view_x, fv->layout.grid_view_y, fv->layout.grid_view_w, fv->layout.grid_view_h);
+	pxl_canvas_t cnv_grid = *cnv;
+	pxl_canvas_set_offset(&cnv_grid, cnv->offset_x + fv->layout.grid_view_x, cnv->offset_y + fv->layout.grid_view_y);
+	pxl_canvas_set_scissor(&cnv_grid, fv->layout.grid_view_x, fv->layout.grid_view_y, fv->layout.grid_view_w, fv->layout.grid_view_h);
 
-	pxl_canvas_t cnv_scrollbar;
-    pxl_canvas_set_subview(&cnv_scrollbar, cnv, fv->layout.scrollbar_x, fv->layout.scrollbar_y, fv->layout.scrollbar_w, fv->layout.scrollbar_h);
+	pxl_canvas_t cnv_scrollbar = *cnv;
+	pxl_canvas_set_offset(&cnv_scrollbar, cnv->offset_x + fv->layout.scrollbar_x, cnv->offset_y + fv->layout.scrollbar_y);
+	pxl_canvas_set_scissor(&cnv_scrollbar, fv->layout.scrollbar_x, fv->layout.scrollbar_y, fv->layout.scrollbar_w, fv->layout.scrollbar_h);
 
-	pxl_canvas_t cnv_glyph_zoom;
-	pxl_canvas_set_subview(&cnv_glyph_zoom, cnv, fv->layout.glyph_zoom_x, fv->layout.glyph_zoom_y, fv->layout.glyph_zoom_w, fv->layout.glyph_zoom_h);
+	pxl_canvas_t cnv_glyph_zoom = *cnv;
+	pxl_canvas_set_offset(&cnv_glyph_zoom, cnv->offset_x + fv->layout.glyph_zoom_x, cnv->offset_y + fv->layout.glyph_zoom_y);
+	pxl_canvas_set_scissor(&cnv_glyph_zoom, fv->layout.glyph_zoom_x, fv->layout.glyph_zoom_y, fv->layout.glyph_zoom_w, fv->layout.glyph_zoom_h);
 
-	pxl_canvas_t cnv_glyph;
-	pxl_canvas_set_subview(&cnv_glyph, cnv, fv->layout.glyph_x, fv->layout.glyph_y, fv->layout.glyph_w, fv->layout.glyph_h);
+	pxl_canvas_t cnv_glyph = *cnv;
+	pxl_canvas_set_offset(&cnv_glyph, cnv->offset_x + fv->layout.glyph_x, cnv->offset_y + fv->layout.glyph_y);
+	pxl_canvas_set_scissor(&cnv_glyph, fv->layout.glyph_x, fv->layout.glyph_y, fv->layout.glyph_w, fv->layout.glyph_h);
 
-	pxl_canvas_t cnv_text_preview;
-	pxl_canvas_set_subview(&cnv_text_preview, cnv, fv->layout.text_preview_x, fv->layout.text_preview_y, fv->layout.text_preview_w, fv->layout.text_preview_h);
+	pxl_canvas_t cnv_text_preview = *cnv;
+	pxl_canvas_set_offset(&cnv_text_preview, cnv->offset_x + fv->layout.text_preview_x, cnv->offset_y + fv->layout.text_preview_y);
+	pxl_canvas_set_scissor(&cnv_text_preview, fv->layout.text_preview_x, fv->layout.text_preview_y, fv->layout.text_preview_w, fv->layout.text_preview_h);
 
-	pxl_canvas_t cnv_footer;
-	pxl_canvas_set_subview(&cnv_footer, cnv, fv->layout.footer_x, fv->layout.footer_y, fv->layout.footer_w, fv->layout.footer_h);
+	pxl_canvas_t cnv_footer = *cnv;
+	pxl_canvas_set_offset(&cnv_footer, cnv->offset_x + fv->layout.footer_x, cnv->offset_y + fv->layout.footer_y);
+	pxl_canvas_set_scissor(&cnv_footer, fv->layout.footer_x, fv->layout.footer_y, fv->layout.footer_w, fv->layout.footer_h);
 
 	/* Draw title */
 	pxl_canvas_set_color(&cnv_title, TITLE_BG);
@@ -672,8 +679,9 @@ main(void) {
 				pxl_t fg = 0xFFFFFFFFU;
 				pxl_canvas_set_color(&cnv, fg);
 				/* Align to right/bottom with 10px margin */
-				int w = pxl_canvas_view_width(&cnv);
-				int h = pxl_canvas_view_height(&cnv);
+				const pxl_rect_t view = pxl_canvas_view(&cnv);
+				int w = view.w;
+				int h = view.h;
 				pxl_rect_t aligned = pxl_rect_align(fps_bounds, (pxl_rect_t){0, 0, w - 10, h - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
 				int fps_x = aligned.x;
 				int fps_y = aligned.y;

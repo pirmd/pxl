@@ -304,8 +304,9 @@ handle_input(pxl_app_t *app, ui_t *ui) {
 static void
 render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	assert(cnv != NULL && p != NULL && ui != NULL);
-	const int w = pxl_canvas_view_width(cnv);
-	const int h = pxl_canvas_view_height(cnv);
+	const pxl_rect_t view = pxl_canvas_view(cnv);
+	const int w = view.w;
+	const int h = view.h;
 
 	pxl_writer_t w_writer;
 	const pxl_font_t *fonts[] = {ui->font};
@@ -357,8 +358,9 @@ static void
 render_game(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	assert(cnv != NULL && p != NULL && ui != NULL);
 
-	const int w = pxl_canvas_view_width(cnv);
-	const int h = pxl_canvas_view_height(cnv);
+	const pxl_rect_t view = pxl_canvas_view(cnv);
+	const int w = view.w;
+	const int h = view.h;
 
 	/* Draw center line */
 	pxl_canvas_set_color(cnv, FG_COLOR);
@@ -455,8 +457,9 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 
 	int border = scale * 4;
 	int pad = scale * 6;
-	int w = pxl_canvas_view_width(cnv);
-	int h = pxl_canvas_view_height(cnv);
+	const pxl_rect_t view = pxl_canvas_view(cnv);
+	int w = view.w;
+	int h = view.h;
 	int box_w = max_width + 2 * pad + 2 * border;
 	int box_h = total_height + 2 * pad + 2 * border;
 	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, box_w, box_h}, (pxl_rect_t){0, 0, w, h}, PXL_H_CENTER | PXL_V_CENTER);
@@ -589,10 +592,10 @@ main(void) {
 			pxl_canvas_init(&cnv, &pb);
 
 			pxl_canvas_t cnv_score;
-			pxl_canvas_init_view(&cnv_score, &pb, 0, 0, pb.width, 50);
+			pxl_canvas_init_view(&cnv_score, &pb, (pxl_rect_t){0, 0, pb.width, 50});
 
 			pxl_canvas_t cnv_game;
-			pxl_canvas_init_view(&cnv_game, &pb, 0, 50, pb.width, pb.height - 50);
+			pxl_canvas_init_view(&cnv_game, &pb, (pxl_rect_t){0, 50, pb.width, pb.height - 50});
 
 			/* Clear */
 			pxl_canvas_set_color(&cnv, BG_COLOR);
@@ -620,8 +623,9 @@ main(void) {
 				pxl_writer_init(&fps_writer, fps_fonts, 1);
 				pxl_rect_t fps_bounds = pxl_text_bounds_transformed(&fps_writer, fps_str, 1, PXL_FLIP_NONE);
 				pxl_canvas_set_color(&cnv_game, FG_COLOR);
-				int w = pxl_canvas_view_width(&cnv_game);
-				int h = pxl_canvas_view_height(&cnv_game);
+				const pxl_rect_t game_view = pxl_canvas_view(&cnv_game);
+				int w = game_view.w;
+				int h = game_view.h;
 				/* Align to right/bottom with 10px margin */
 				pxl_rect_t aligned = pxl_rect_align(fps_bounds, (pxl_rect_t){0, 0, w - 10, h - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
 				int fps_x = aligned.x;
