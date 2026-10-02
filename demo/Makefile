@@ -14,17 +14,15 @@ CFLAGS  += $(PXL_CFLAGS)
 CFLAGS  += -I.
 
 LDFLAGS += $(PXL_LDLIBS)
-# -lm required for demo_fountain.c (uses cosf/sinf from math.h)
-LDFLAGS += -lm
 
 all: $(DEMO)
 
 .for d in $(DEMO)
 $(d): $(d).c $(PXL_DIR)/libpxl.a
-	$(CC) $(CFLAGS) $(d).c -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(d).c $(PXL_DIR)/libpxl.a -o $@ $(LDFLAGS)
 .endfor
 
-${DEMO}: demo_helpers.h $(PXL_HDR)
+${DEMO}: $(PXL_HDR)
 
 clean:
 	rm -f $(DEMO)

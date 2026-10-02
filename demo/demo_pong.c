@@ -1,88 +1,114 @@
 /*
- * PXL Demo: Pong Game
+ * PXL Demo: Pong Game (1P vs AI)
  *
- * This is a COMPLETE game demo showcasing PXL's core features:
- *   - Window and event loop (pxl_app_init/advance/deinit)
- *   - Fixed-timestep physics (stepper.h via pxl_app_advance_physics)
+ * Shows PXL core features:
+ *   - Window/event loop (pxl_app_init/advance/deinit)
+ *   - Fixed-timestep physics (via pxl_app_advance_physics)
  *   - Canvas-based rendering with scissor regions
- *   - Input handling (is_pressed vs was_pressed)
- *   - Time-based interpolation for smooth rendering at any framerate
- *
- * Architecture:
- *   Game state is updated in fixed timesteps (update_pong),
- *   then interpolated for rendering (interpolate_pong).
- *
- * To use as a boilerplate:
- *   1. Copy the main() structure
- *   2. Replace pong_t with your game state
- *   3. Keep pxl_* calls and stepper pattern
- *
- * Note: demo_helpers.h contains demo-specific utilities (NOT part of PXL core).
- *       font_9x15.h is a generated font (see tool/bdf2pxl).
+ *   - Input handling
+ *   - Time-based interpolation for smooth rendering
+ *   - Bitmap font writing
  */
 
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 
-#include "pxl.h"              /* Core PXL library (includes all public headers) */
-#include "demo_helpers.h"     /* Demo-specific: demo_rng(), demo_update_fps() */
-#include "font_9x15.h"        /* Auto-generated font header (see tool/bdf2pxl) */
+#include "pxl.h"
+#include "font_9x15.h"
 
+/* UI and LAYOUT */
 #define W 800
 #define H 600
-#define Wf 800.0f
-#define Hf 600.0f
-#define FPS 60.0f
 
-/* UI */
-#define SCORE_ZOOM  3
-#define PAUSE_ZOOM  4
+#define PAUSE_W    160
+#define PAUSE_H    120
 
-#define FG_COLOR 0xFFFFFFFF
-#define BG_COLOR 0xFF000080
+#define HELP_W     400 
+#define HELP_H     300
 
-typedef enum {
-	GAME_1P,
-	GAME_2P
-} game_mode_t;
+#define SCORE_H    50
 
+#define FONT_ZOOM  2
+
+/* Color */
+#define FG_COLOR  0xFFFFFFFFU
+#define BG_COLOR  0xFF0000FFU
+
+/* RNG --------------------------------------------------------------------- */
+static inline uint32_t *rng_state_ptr(void) {
+	static uint32_t state = 0;
+	return &state;
+}
+
+static inline void
+rng_seed(uint32_t seed) {
+	*rng_state_ptr() = seed ? seed : (uint32_t)time(NULL);
+}
+
+static inline uint32_t
+rng(void) {
+	uint32_t *state = rng_state_ptr();
+	*state = *state * 1664525u + 1013904223u;
+	return *state;
+}
+
+/* UI state ----------------------------------------------------------------- */
 typedef struct {
-	const pxl_font_t *font;
-	game_mode_t mode;
+	const pxl_font_t **fonts;
+	size_t font_count;
+	
+	int  font_scale;
 	bool show_pause;
 	bool show_help;
-
-	pxl_timer_t score_timer_left, score_timer_right;
 } ui_t;
 
-/* Geometric layout */
+static void
+ui_draw_text(const ui_t *ui, pxl_canvas_t *cnv, const char *txt, pxl_align_t align) {
+	assert(cnv && ui && txt);
+	
+	pxl_rect_t bbox = pxl_canvas_view(cnv);
+
+	pxl_writer_t w;
+	pxl_writer_init(&w, ui->fonts, ui->font_count);
+
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&w, txt, ui->font_scale, PXL_FLIP_NONE);
+	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, align);
+
+	pxl_writer_set_cursor(&w, aligned.x, aligned.y);
+	pxl_draw_text_transformed(cnv, &w, txt, ui->font_scale, PXL_FLIP_NONE);
+}
+
+/* Geometric layout -------------------------------------------------------- */
 typedef struct {
+	pxl_rect_t root;
 	pxl_rect_t score;
 	pxl_rect_t arena;
 	pxl_rect_t pause;
 	pxl_rect_t help;
-} pong_layout_t;
+} layout_t;
 
-static pong_layout_t
-compute_layout(pxl_rect_t root) {
-	pong_layout_t l;
-	l.score = (pxl_rect_t){root.x, root.y, root.w, SCORE_H};
-	l.arena = (pxl_rect_t){root.x, root.y + SCORE_H, root.w, root.h - SCORE_H};
-	l.pause = pxl_align_rect((pxl_rect_t){0, 0, PAUSE_W, PAUSE_H}, root, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
-	l.help  = pxl_align_rect((pxl_rect_t){0, 0, HELP_W, HELP_H}, root, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
+static layout_t
+compute_layout(void) {
+	layout_t l = {0};
+
+	pxl_backend_get_window_size(&l.root.w, &l.root.h);
+
+	l.arena = l.root;
+	l.score = pxl_split_rect(&l.arena, SCORE_H, PXL_SIDE_TOP);
+
+	l.pause = pxl_align_rect((pxl_rect_t){0, 0, PAUSE_W, PAUSE_H}, l.root, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
+	l.help  = pxl_align_rect((pxl_rect_t){0, 0, HELP_W, HELP_H}, l.root, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
+	
 	return l;
 }
 
-/* Pong game */
-
+/* Pong game --------------------------------------------------------------- */
 typedef struct {
-	int paddle_left_dir;
-	int paddle_right_dir;
-} pong_input_t;
+	pxl_rect_t arena;
 
-typedef struct {
 	struct {
 		float x, y;
 		float w, h;
@@ -99,32 +125,33 @@ typedef struct {
 
 	int score_left;
 	int score_right;
-	bool left_scored;
-	bool right_scored;
 } pong_t;
 
 static void
-reset_ball(pong_t *p) {
-	assert(p != NULL);
-	p->ball.x = W / 2.0f;
-	p->ball.y = H / 2.0f;
-	p->ball.vx = (demo_rng() % 2 == 0 ? 1.0f : -1.0f) * p->ball.speed;
-	p->ball.vy = ((float)(demo_rng() % 100) / 100.0f - 0.5f) * p->ball.speed * 1.5f;
+ball_reset(pong_t *p) {
+	assert(p);
+	p->ball.x = (float)p->arena.x + (float)p->arena.w / 2.0f;
+	p->ball.y = (float)p->arena.y + (float)p->arena.h / 2.0f;
+	p->ball.vx = (rng() % 2 == 0 ? 1.0f : -1.0f) * p->ball.speed;
+	p->ball.vy = ((float)(rng() % 100) / 100.0f - 0.5f) * p->ball.speed * 1.5f;
 }
 
 static void
-init_pong(pong_t *p) {
-	assert(p != NULL);
+init_pong(pong_t *p, pxl_rect_t arena) {
+	assert(p);
+	
+	p->arena = arena;
+
 	/* Paddles */
 	p->paddle_left.x = 20.0f;
-	p->paddle_left.y = (float)(H/2 - 50);
+	p->paddle_left.y = (float)p->arena.h/2.0f - 50.0f;
 	p->paddle_left.w = 15.0f;
 	p->paddle_left.h = 100.0f;
 	p->paddle_left.speed = 400.0f;
 	p->paddle_left.vy = 0.0f;
 
-	p->paddle_right.x = (float)(W - 20 - 15);
-	p->paddle_right.y = (float)(H/2 - 50);
+	p->paddle_right.x = (float)p->arena.w - 20.0f - 15.0f;
+	p->paddle_right.y = (float)p->arena.h/2.0f - 50.0f;
 	p->paddle_right.w = 15.0f;
 	p->paddle_right.h = 100.0f;
 	p->paddle_right.speed = 400.0f;
@@ -133,43 +160,22 @@ init_pong(pong_t *p) {
 	/* Ball */
 	p->ball.radius = 8.0f;
 	p->ball.speed = 300.0f;
-	reset_ball(p);
+	ball_reset(p);
 
 	/* Scores */
 	p->score_left = 0;
 	p->score_right = 0;
-	p->left_scored = false;
-	p->right_scored = false;
 }
 
-static void
-interpolate_pong(const pong_t *prev, const pong_t *cur, float alpha, pong_t *out) {
-	assert(out != NULL && prev != NULL && cur != NULL);
-	out->paddle_left.x = cur->paddle_left.x;
-	out->paddle_left.y = prev->paddle_left.y + (cur->paddle_left.y - prev->paddle_left.y) * alpha;
-	out->paddle_left.w = cur->paddle_left.w;
-	out->paddle_left.h = cur->paddle_left.h;
-
-	out->paddle_right.x = cur->paddle_right.x;
-	out->paddle_right.y = prev->paddle_right.y + (cur->paddle_right.y - prev->paddle_right.y) * alpha;
-	out->paddle_right.w = cur->paddle_right.w;
-	out->paddle_right.h = cur->paddle_right.h;
-
-	out->ball.x = prev->ball.x + (cur->ball.x - prev->ball.x) * alpha;
-	out->ball.y = prev->ball.y + (cur->ball.y - prev->ball.y) * alpha;
-	out->ball.radius = cur->ball.radius;
-	out->ball.speed = cur->ball.speed;
-
-	out->score_left = cur->score_left;
-	out->score_right = cur->score_right;
-	out->left_scored = cur->left_scored;
-	out->right_scored = cur->right_scored;
-}
+typedef struct {
+	int paddle_left_dir;
+	int paddle_right_dir;
+} pong_input_t;
 
 static void
-update_pong(const pong_t *current, float dt, pong_input_t input, pong_t *next) {
-	assert(next != NULL && current != NULL);
-	*next = *current;
+update_pong(const pong_t *cur, float dt, pong_input_t input, pong_t *next) {
+	assert(next && cur);
+	*next = *cur;
 
 	/* Apply input to velocities */
 	next->paddle_left.vy  = (float)input.paddle_left_dir * next->paddle_left.speed;
@@ -180,22 +186,25 @@ update_pong(const pong_t *current, float dt, pong_input_t input, pong_t *next) {
 	next->paddle_right.y += next->paddle_right.vy * dt;
 
 	/* Clamp paddles to screen */
-	if (next->paddle_left.y < 0.0f) next->paddle_left.y = 0.0f;
-	if (next->paddle_left.y + next->paddle_left.h > Hf) next->paddle_left.y = Hf - next->paddle_left.h;
-	if (next->paddle_right.y < 0.0f) next->paddle_right.y = 0.0f;
-	if (next->paddle_right.y + next->paddle_right.h > Hf) next->paddle_right.y = Hf - next->paddle_right.h;
+	if (next->paddle_left.y < (float)next->arena.y) next->paddle_left.y = (float)next->arena.y;
+	if (next->paddle_left.y + next->paddle_left.h > (float)(next->arena.y + next->arena.h)) 
+		next->paddle_left.y = (float)(next->arena.y + next->arena.h) - next->paddle_left.h;
+	
+	if (next->paddle_right.y < (float)next->arena.y) next->paddle_right.y = (float)next->arena.y;
+	if (next->paddle_right.y + next->paddle_right.h > (float)(next->arena.y + next->arena.h)) 
+		next->paddle_right.y = (float)(next->arena.y + next->arena.h) - next->paddle_right.h;
 
 	/* Update ball */
 	next->ball.x += next->ball.vx * dt;
 	next->ball.y += next->ball.vy * dt;
 
 	/* Ball collision with top and bottom */
-	if (next->ball.y - next->ball.radius < 0.0f) {
-		next->ball.y = next->ball.radius;
+	if (next->ball.y - next->ball.radius < (float)next->arena.y) {
+		next->ball.y = (float)next->arena.y + next->ball.radius;
 		next->ball.vy = -next->ball.vy;
 	}
-	if (next->ball.y + next->ball.radius > Hf) {
-		next->ball.y = Hf - next->ball.radius;
+	if (next->ball.y + next->ball.radius > (float)(next->arena.y + next->arena.h)) {
+		next->ball.y = (float)(next->arena.y + next->arena.h) - next->ball.radius;
 		next->ball.vy = -next->ball.vy;
 	}
 
@@ -222,92 +231,74 @@ update_pong(const pong_t *current, float dt, pong_input_t input, pong_t *next) {
 		next->ball.vy = hit_pos * next->ball.speed * 0.8f;
 	}
 
-	next->left_scored = false;
-	next->right_scored = false;
-
 	/* Ball out of bounds (score) */
-	if (next->ball.x - next->ball.radius < 0.0f) {
+	if (next->ball.x - next->ball.radius < (float)next->arena.x) {
 		next->score_right++;
-		next->right_scored = true;
-		next->left_scored = false;
-		reset_ball(next);
-	} else if (next->ball.x + next->ball.radius > Wf) {
+		ball_reset(next);
+	} else if (next->ball.x + next->ball.radius > (float)(next->arena.x + next->arena.w)) {
 		next->score_left++;
-		next->left_scored = true;
-		next->right_scored = false;
-		reset_ball(next);
+		ball_reset(next);
 	}
 }
 
-/* AI */
 static void
-ai_get_input(pong_input_t *input, const pong_t *p) {
-	assert(input != NULL && p != NULL);
+interpolate_pong(const pong_t *prev, const pong_t *cur, float alpha, pong_t *out) {
+	assert(out && prev && cur);
+	out->arena = cur->arena;
 
-	/* Simple AI: follow the ball with right paddle */
+	out->paddle_left.x = cur->paddle_left.x;
+	out->paddle_left.y = prev->paddle_left.y + (cur->paddle_left.y - prev->paddle_left.y) * alpha;
+	out->paddle_left.w = cur->paddle_left.w;
+	out->paddle_left.h = cur->paddle_left.h;
+
+	out->paddle_right.x = cur->paddle_right.x;
+	out->paddle_right.y = prev->paddle_right.y + (cur->paddle_right.y - prev->paddle_right.y) * alpha;
+	out->paddle_right.w = cur->paddle_right.w;
+	out->paddle_right.h = cur->paddle_right.h;
+
+	out->ball.x = prev->ball.x + (cur->ball.x - prev->ball.x) * alpha;
+	out->ball.y = prev->ball.y + (cur->ball.y - prev->ball.y) * alpha;
+	out->ball.radius = cur->ball.radius;
+	out->ball.speed = cur->ball.speed;
+
+	out->score_left = cur->score_left;
+	out->score_right = cur->score_right;
+}
+
+/* Input ------------------------------------------------------------------- */
+static void
+handle_ai_input(const pong_t *p, pong_input_t *input) {
+	assert(input && p);
+
 	float target_y = p->ball.y;
 	float error = target_y - (p->paddle_right.y + p->paddle_right.h / 2.0f);
 	input->paddle_right_dir = (fabsf(error) > 5.0f) ? (error < 0 ? -1 : 1) : 0;
 }
 
-/* Inputs */
 static void
-p1_get_input(pxl_app_t *app, pong_input_t *input) {
-	assert(app != NULL && input != NULL);
-	input->paddle_left_dir = 0;
+handle_player_input(pxl_app_t *app, pong_input_t *input) {
+	assert(app && input);
+
 	if (pxl_app_is_active(app, PXL_KEYB_K) || pxl_app_is_active(app, PXL_KEYB_UP))
 		input->paddle_left_dir = -1;
+
 	if (pxl_app_is_active(app, PXL_KEYB_J) || pxl_app_is_active(app, PXL_KEYB_DOWN))
 		input->paddle_left_dir = 1;
 }
 
 static void
-p2_get_input(pxl_app_t *app, pong_input_t *input) {
-	assert(app != NULL && input != NULL);
-	input->paddle_right_dir = 0;
-	if (pxl_app_is_active(app, PXL_KEYB_Z)) input->paddle_right_dir = -1;
-	if (pxl_app_is_active(app, PXL_KEYB_S)) input->paddle_right_dir = 1;
-}
-
-static void
-handle_pong_input(pxl_app_t *app, const ui_t *ui, const pong_t *pong, pong_input_t *input) {
-	assert(app != NULL && ui != NULL && pong != NULL && input != NULL);
-	*input = (pong_input_t){0};
-
-	if (ui->show_pause) return;
-
-	switch (ui->mode) {
-	case GAME_1P:
-		p1_get_input(app, input);
-		ai_get_input(input, pong);  /* AI controls right paddle */
-		break;
-	case GAME_2P:
-		p1_get_input(app, input);
-		p2_get_input(app, input);
-		break;
-	}
-}
-
-static void
-handle_input(pxl_app_t *app, ui_t *ui) {
-	/* Cycle through game modes: 1 player <-> 2 players */
-	if (pxl_app_was_triggered(app, PXL_KEYB_T)) {
-		ui->mode = (ui->mode == GAME_1P) ? GAME_2P : GAME_1P;
-	}
-
-	/* Focus-based pause: auto-pause on focus loss */
+handle_ui_input(pxl_app_t *app, ui_t *ui) {
+	/* Pause */
 	if (pxl_app_is_active(app, PXL_WM_FOCUS_LOST) ||
 	    pxl_app_is_active(app, PXL_WM_MOUSE_FOCUS_LOST)) {
 		ui->show_pause = true;
 	}
 
-	/* Manual unpause: movement keys clear pause */
 	if (pxl_app_is_active(app, PXL_KEYB_J) || pxl_app_is_active(app, PXL_KEYB_K) ||
-	    pxl_app_is_active(app, PXL_KEYB_Z) || pxl_app_is_active(app, PXL_KEYB_S)) {
+	    pxl_app_is_active(app, PXL_KEYB_UP) || pxl_app_is_active(app, PXL_KEYB_DOWN)) {
 		ui->show_pause = false;
 	}
 
-	/* Manual pause toggle */
 	if (pxl_app_was_triggered(app, PXL_KEYB_P)) {
 		ui->show_pause = !ui->show_pause;
 	}
@@ -318,200 +309,78 @@ handle_input(pxl_app_t *app, ui_t *ui) {
 	app->paused = ui->show_pause || ui->show_help;
 }
 
-/* Render */
+/* Render ------------------------------------------------------------------ */
 static void
-render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
-	assert(cnv != NULL && p != NULL && ui != NULL);
-	const pxl_rect_t view = pxl_canvas_view(cnv);
-	const int w = view.w;
-	const int h = view.h;
+render_game(pxl_canvas_t *cnv, const pong_t *p) {
+	assert(cnv && p);
 
-	pxl_writer_t w_writer;
-	const pxl_font_t *fonts[] = {ui->font};
-	pxl_writer_init(&w_writer, fonts, 1);
+	pxl_fill_rect(cnv, (int)(p->paddle_left.x - (float)p->arena.x), (int)(p->paddle_left.y - (float)p->arena.y),
+		(int)p->paddle_left.w, (int)p->paddle_left.h);
 
-	/* Left score */
-	int scale = SCORE_ZOOM;
-	pxl_t color = FG_COLOR;
+	pxl_fill_rect(cnv, (int)(p->paddle_right.x - (float)p->arena.x), (int)(p->paddle_right.y - (float)p->arena.y),
+		(int)p->paddle_right.w, (int)p->paddle_right.h);
 
-	if (!pxl_timer_finished(&ui->score_timer_left)) {
-		float progress = pxl_timer_progress(&ui->score_timer_left);
-		float ease_out = progress * progress;  /* Ease-out: starts fast, slows down */
-		float pulse = 1.0f + 0.5f * (1.0f - ease_out);  /* Pulse from 1.5x to 1.0x */
-		scale = (int)((float)scale * pulse);
-		color = 0xFF00FF00U;
-	}
-
-	char score_str[8];
-	snprintf(score_str, sizeof(score_str), "%d", p->score_left);
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, score_str, scale, PXL_FLIP_NONE);
-	pxl_canvas_set_color(cnv, color);
-	pxl_rect_t left_aligned = pxl_align_rect(bounds, (pxl_rect_t){0, 0, w / 2, h}, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
-	int center_y = left_aligned.y;
-	pxl_writer_set_cursor(&w_writer, left_aligned.x, center_y);
-	pxl_draw_text_transformed(cnv, &w_writer, score_str, scale, PXL_FLIP_NONE);
-
-	/* Right score */
-	scale = SCORE_ZOOM;
-	color = FG_COLOR;
-
-	if (!pxl_timer_finished(&ui->score_timer_right)) {
-		float progress = pxl_timer_progress(&ui->score_timer_right);
-		float ease_out = progress * progress;  /* Ease-out: starts fast, slows down */
-		float pulse = 1.0f + 1.0f * (1.0f - ease_out);  /* Pulse from 2.0x to 1.0x */
-		scale = (int)((float)scale * pulse);
-		color = 0xFF00FF00U;
-	}
-
-	snprintf(score_str, sizeof(score_str), "%d", p->score_right);
-	bounds = pxl_text_bounds_transformed(&w_writer, score_str, scale, PXL_FLIP_NONE);
-	pxl_canvas_set_color(cnv, color);
-	pxl_rect_t right_aligned = pxl_align_rect(bounds, (pxl_rect_t){w / 2, 0, w / 2, h}, PXL_ALIGN_H_CENTER | PXL_V_TOP);
-	int right_x = right_aligned.x;
-	pxl_writer_set_cursor(&w_writer, right_x, center_y);
-	pxl_draw_text_transformed(cnv, &w_writer, score_str, scale, PXL_FLIP_NONE);
+	pxl_fill_circle(cnv, (int)(p->ball.x - (float)p->arena.x), (int)(p->ball.y - (float)p->arena.y), (int)p->ball.radius);
 }
 
 static void
-render_game(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
-	assert(cnv != NULL && p != NULL && ui != NULL);
+render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
+	assert(cnv && ui && p);
+	
+	char txt[16];
+	snprintf(txt, sizeof(txt), "%d : %d", p->score_left, p->score_right);
 
-	const pxl_rect_t view = pxl_canvas_view(cnv);
-	const int w = view.w;
-	const int h = view.h;
-
-	/* Draw center line */
 	pxl_canvas_set_color(cnv, FG_COLOR);
-	pxl_rect_t aligned = pxl_align_rect((pxl_rect_t){0, 0, 4, h}, (pxl_rect_t){0, 0, w, h}, PXL_ALIGN_H_CENTER | PXL_V_TOP);
-	int center_line_x = aligned.x;
-	for (int y = 0; y < h; y += 30) {
-		pxl_fill_rect(cnv, center_line_x, y, 4, 20);
-	}
+	ui_draw_text(ui, cnv, txt, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
+}
 
-	/* Draw paddles (coordinates are already relative to viewport) */
-	pxl_fill_rect(cnv, (int)p->paddle_left.x, (int)p->paddle_left.y,
-		(int)p->paddle_left.w, (int)p->paddle_left.h);
-	pxl_fill_rect(cnv, (int)p->paddle_right.x, (int)p->paddle_right.y,
-		(int)p->paddle_right.w, (int)p->paddle_right.h);
-
-	/* Draw ball (coordinates are already relative to viewport) */
-	pxl_fill_circle(cnv, (int)p->ball.x, (int)p->ball.y, (int)p->ball.radius);
+static void
+outline_rect(pxl_canvas_t *cnv, pxl_rect_t r, int thick) {
+	pxl_fill_rect(cnv, r.x, r.y, r.w, thick);
+	pxl_fill_rect(cnv, r.x, r.y, thick, r.h);
+	pxl_fill_rect(cnv, r.x + r.w - thick, r.y, thick, r.h);
+	pxl_fill_rect(cnv, r.x, r.y + r.h - thick, r.w, thick);
 }
 
 static void
 render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
-	assert(cnv != NULL && ui != NULL);
-	int scale = PAUSE_ZOOM;
+	assert(cnv && ui);
 
 	const char *txt = "PAUSE";
-
-	pxl_rect_t bbox = pxl_canvas_view(cnv);
-
-	pxl_writer_t w;
-	const pxl_font_t *fonts[] = {ui->font};
-	pxl_writer_init(&w_writer, fonts, 1);
-
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&w, txt, ui->font_scale, PXL_FLIP_NONE);
-	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
-
-	int border = scale;
-	int pad = scale * 2;
-	int box_h = bounds.h + 2 * pad + 2 * border;
-	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, bounds.w, box_h}, (pxl_rect_t){cnv->scissor.x, cnv->scissor.y, cnv->scissor.w, cnv->scissor.h}, PXL_H_CENTER | PXL_V_CENTER);
-	int x = aligned.x;
-	int y = aligned.y;
-
-	pxl_t fg = FG_COLOR;
-	pxl_t bg = BG_COLOR;
-
-	/* Outer rectangle (fg color) */
-	pxl_canvas_set_color(cnv, fg);
-	pxl_fill_rect(cnv, x - pad - border, y - pad - border,
-		bounds.w + 2 * pad + 2 * border,
-		bounds.h + 2 * pad + 2 * border);
-
-	/* Inner rectangle (bg color) */
-	pxl_canvas_set_color(cnv, bg);
-	pxl_fill_rect(cnv, x - pad, y - pad,
-		bounds.w + 2 * pad,
-		bounds.h + 2 * pad);
-
-	/* Draw "PAUSE" */
-	pxl_canvas_set_color(cnv, fg);
-	pxl_writer_set_cursor(&w_writer, x, y);
-	pxl_draw_text_transformed(cnv, &w_writer, pause_str, scale, PXL_FLIP_NONE);
+	pxl_canvas_set_color(cnv, FG_COLOR);
+	ui_draw_text(ui, cnv, txt, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
+	outline_rect(cnv, pxl_canvas_view(cnv), 2 * ui->font_scale);
 }
 
 static void
 render_help(pxl_canvas_t *cnv, const ui_t *ui) {
-	assert(cnv != NULL && ui != NULL);
-	int scale = 2;
+	assert(cnv && ui);
 
 	const char *txt =
-		"~ CONTROLS ~\n"
+		"  ~ CONTROLS ~\n"
 		"\n"
 		"K/J: move paddle\n"
 		"P  : pause\n"
 		"H  : help\n"
 		"ESC: quit";
 
-	pxl_rect_t bbox = pxl_canvas_view(cnv);
-
-	pxl_writer_t w;
-	const pxl_font_t *fonts[] = {ui->font};
-	pxl_writer_init(&w_writer, fonts, 1);
-
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&w, txt, ui->font_scale, PXL_FLIP_NONE);
-	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
-
-	/* Calculate total bounds */
-	int max_width = 0;
-	int total_height = 0;
-	int line_leading = w_writer.leading ? w_writer.leading : w_writer.fonts[0]->leading;
-	for (int i = 0; i < line_count; i++) {
-		pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, help_lines[i], scale, PXL_FLIP_NONE);
-		if (bounds.w > max_width) max_width = bounds.w;
-		total_height += bounds.h;
-		if (i < line_count - 1) {
-			total_height += line_leading * scale;
-		}
-	}
-
-	int border = scale * 4;
-	int pad = scale * 6;
-	const pxl_rect_t view = pxl_canvas_view(cnv);
-	int w = view.w;
-	int h = view.h;
-	int box_w = max_width + 2 * pad + 2 * border;
-	int box_h = total_height + 2 * pad + 2 * border;
-	pxl_rect_t aligned = pxl_align_rect((pxl_rect_t){0, 0, box_w, box_h}, (pxl_rect_t){0, 0, w, h}, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
-	int x = aligned.x;
-	int y = aligned.y;
-
-	pxl_t fg = FG_COLOR;
-	pxl_t bg = BG_COLOR;
-
-	/* Outer rectangle (fg color) */
-	pxl_canvas_set_color(cnv, fg);
-	pxl_fill_rect(cnv, x, y,
-		max_width + 2 * pad + 2 * border,
-		total_height + 2 * pad + 2 * border);
-
-	pxl_rect_t bbox = pxl_canvas_view(cnv);
-
-	pxl_writer_t w;
-	const pxl_font_t *fonts[] = {ui->font};
-	pxl_writer_init(&w, fonts, 1);
-
-	pxl_rect_t bounds = pxl_text_bounds(&w, txt);
-	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, PXL_H_RIGHT | PXL_V_BOTTOM);
-
 	pxl_canvas_set_color(cnv, FG_COLOR);
-	pxl_writer_set_cursor(&w, aligned.x, aligned.y);
-	pxl_draw_text(cnv, &w, txt);
+	ui_draw_text(ui, cnv, txt, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
+	outline_rect(cnv, pxl_canvas_view(cnv), 2 * ui->font_scale);
 }
 
-/* FPS counter */
+static inline void
+render_fps(pxl_canvas_t *cnv, const ui_t *ui, int fps) {
+	assert(cnv);
+	assert(ui);
+
+	char txt[16];
+	snprintf(txt, sizeof(txt), "FPS: %d", fps);
+	pxl_canvas_set_color(cnv, FG_COLOR);
+	ui_draw_text(ui, cnv, txt, PXL_ALIGN_RIGHT|PXL_ALIGN_BOTTOM);
+}
+
+/* FPS counter ------------------------------------------------------------- */
 static inline void
 update_fps(double frame_dt, int *current_fps) {
 	assert(current_fps);
@@ -527,156 +396,90 @@ update_fps(double frame_dt, int *current_fps) {
 	}
 }
 
+/* Main -------------------------------------------------------------------- */
 int
 main(void) {
-	printf("Pong game.\n"
-		"Player 1: UP/DOWN or K/J=up/down. Player 2: Z/S=up/down.\n"
-		"T=toggle 1P/2P, P=pause, H=help, ESC=quit\n");
-
 	pxl_app_cfg_t cfg = {
 		.title = "PXL Pong",
-		.width = W,
-		.height = H,
-		.physics_dt = 1.0 / FPS,
+		.width = W, .height = H,
+		.physics_dt = 1.0 / 60.0,
 	};
-	pxl_app_t app;
 
-	if (pxl_app_init(&app, &cfg) != PXL_SUCCESS)
-		return 1;
+	pxl_app_t app;
+	if (pxl_app_init(&app, &cfg) != PXL_SUCCESS) return 1;
+
+	rng_seed(0);
 
 	ui_t ui = {
-		.font = &font_9x15_latin,
-		.mode = GAME_1P,
-		.score_timer_left = (pxl_timer_t){0},
-		.score_timer_right = (pxl_timer_t){0}
+		.fonts      = (const pxl_font_t *[]){ &font_9x15_latin },
+		.font_count = 1,
+		.font_scale = FONT_ZOOM
 	};
 
-	/* Two states:
-	 * - pong: current state (updated by physics)
-	 * - pong_prev: previous state (for interpolation)
-	 * This avoids "stuttering" when frame rate != physics rate.
-	 */
-	pong_t pong;
-	init_pong(&pong);
-	pong_t pong_prev = pong;
+	layout_t layout = compute_layout();
+
+	pong_t pong, pong_prev;
+	init_pong(&pong, layout.arena);
 
 	int fps = 0;
 
-	/* Main loop with fixed-timestep physics:
-	 *
-	 * pxl_app_advance()      - Advances frame timer, processes OS events
-	 * pxl_app_advance_physics()- Runs physics at fixed rate (FPS Hz)
-	 * app.physics_ts.dt      - Fixed delta time (1/FPS seconds)
-	 * app.physics_ts.alpha   - Blend factor for interpolation [0,1)
-	 * app.frame_dt          - Raw frame delta time (use for FPS capping)
-	 *
-	 * This ensures deterministic physics regardless of frame rate.
-	 *
-	 * To cap the frame rate (e.g., to 60 FPS for CPU efficiency):
-	 *   double target_fps = 60.0;
-	 *   double min_frame_time = 1.0 / target_fps;
-	 *   if (app.frame_dt < min_frame_time) {
-	 *       double sleep_ms = (min_frame_time - app.frame_dt) * 1000.0;
-	 *       #ifdef _WIN32
-	 *           Sleep((DWORD)sleep_ms);
-	 *       #else
-	 *           usleep((useconds_t)(sleep_ms * 1000.0));  // usleep takes microseconds
-	 *       #endif
-	 *   }
-	 */
 	while (pxl_app_advance(&app)) {
 		if (pxl_app_was_triggered(&app, PXL_KEYB_ESCAPE)) {
 			break;
 		}
 
-		handle_input(&app, &ui);
+		handle_ui_input(&app, &ui);
 
-		pong_input_t pong_input;
-		handle_pong_input(&app, &ui, &pong, &pong_input);
+		pong_input_t pong_input = {0};
+		handle_player_input(&app, &pong_input);
+		handle_ai_input(&pong, &pong_input);
 
 		while (pxl_app_advance_physics(&app)) {
 			pong_prev = pong;
 			update_pong(&pong_prev, (float)app.physics_ts.dt, pong_input, &pong);
 		}
 
-		/* Handle score animations */
-		if (pong.left_scored) {
-			pxl_timer_start(&ui.score_timer_left, 0.4);
-			pong.left_scored = false;
-		}
-		if (pong.right_scored) {
-			pxl_timer_start(&ui.score_timer_right, 0.4);
-			pong.right_scored = false;
-		}
-
-		/* Advance score timers */
-		pxl_timer_advance(&ui.score_timer_left, app.frame_dt);
-		pxl_timer_advance(&ui.score_timer_right, app.frame_dt);
-
 		pxl_buf_t pb;
 		if (pxl_backend_begin_frame(&pb) == PXL_SUCCESS) {
-
-			/* Setup viewports for each area */
-			pxl_canvas_t cnv;
+			/* Setup view for each area.*/
+			pxl_canvas_t cnv, cnv_score, cnv_arena, cnv_pause, cnv_help;			
 			pxl_canvas_init(&cnv, &pb);
-
-			pxl_canvas_t cnv_score;
-			pxl_canvas_init_view(&cnv_score, &pb, (pxl_rect_t){0, 0, pb.width, 50});
-
-			pxl_canvas_t cnv_game;
-			pxl_canvas_init_view(&cnv_game, &pb, (pxl_rect_t){0, 50, pb.width, pb.height - 50});
+			pxl_canvas_init_view(&cnv_score, &pb, layout.score);
+			pxl_canvas_init_view(&cnv_arena, &pb, layout.arena);
+			pxl_canvas_init_view(&cnv_pause, &pb, layout.pause);
+			pxl_canvas_init_view(&cnv_help,  &pb, layout.help);
 
 			/* Clear */
 			pxl_canvas_set_color(&cnv, BG_COLOR);
 			pxl_canvas_clear(&cnv);
 
-			/* Smooth rendering via interpolation:
-			 * Blends pong_prev and pong using alpha.
-			 * At 60 FPS with 60 physics steps: alpha = 0 (no blend).
-			 * At 120 FPS with 60 physics steps: alpha = 0.5 (midpoint).
-			 */
+			/* Smooth rendering of game arena */
 			pong_t pong_interpolated;
 			interpolate_pong(&pong_prev, &pong, app.physics_ts.alpha, &pong_interpolated);
-
-			/* Draw score and game areas */
-			render_score(&cnv_score, &pong_interpolated, &ui);
-			render_game(&cnv_game, &pong_interpolated, &ui);
-
-			/* Draw FPS in bottom right corner */
-			if (fps > 0) {
-				char fps_str[16];
-				snprintf(fps_str, sizeof(fps_str), "FPS: %d", fps);
-
-				pxl_writer_t fps_writer;
-				const pxl_font_t *fps_fonts[] = {ui.font};
-				pxl_writer_init(&fps_writer, fps_fonts, 1);
-				pxl_rect_t fps_bounds = pxl_text_bounds_transformed(&fps_writer, fps_str, 1, PXL_FLIP_NONE);
-				pxl_canvas_set_color(&cnv_game, FG_COLOR);
-				const pxl_rect_t game_view = pxl_canvas_view(&cnv_game);
-				int w = game_view.w;
-				int h = game_view.h;
-				/* Align to right/bottom with 10px margin */
-				pxl_rect_t aligned = pxl_align_rect(fps_bounds, (pxl_rect_t){0, 0, w - 10, h - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
-				int fps_x = aligned.x;
-				int fps_y = aligned.y;
-				pxl_writer_set_cursor(&fps_writer, fps_x, fps_y);
-				pxl_draw_text_transformed(&cnv_game, &fps_writer, fps_str, 1, PXL_FLIP_NONE);
-			}
+			render_game(&cnv_arena, &pong_interpolated);
+			
+			/* Draw score and fps */
+			render_score(&cnv_score, &pong, &ui);
+			render_fps(&cnv, &ui, fps);
 
 			/* Draw pause overlay */
 			if (ui.show_pause) {
-				render_pause(&cnv, &ui);
+				pxl_canvas_set_color(&cnv_pause, BG_COLOR);
+				pxl_canvas_clear(&cnv_pause);
+				render_pause(&cnv_pause, &ui);
 			}
 
 			/* Draw help overlay */
 			if (ui.show_help) {
-				render_help(&cnv, &ui);
+				pxl_canvas_set_color(&cnv_help, BG_COLOR);
+				pxl_canvas_clear(&cnv_help);
+				render_help(&cnv_help, &ui);
 			}
 
 			(void)pxl_backend_end_frame();
 		}
 
-		 demo_update_fps(app.frame_dt, &fps);
+		update_fps(app.frame_dt, &fps);
 	}
 
 	pxl_app_deinit(&app);
