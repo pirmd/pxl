@@ -22,7 +22,11 @@
 /* Text */
 #include "text.h"
 
-/* Tileset */
+/* Framework */
+#include "app.h"
+#include "camera.h"
+#include "layout.h"
+#include "stepper.h"
 #include "tileset.h"
 
 /* Input and time */

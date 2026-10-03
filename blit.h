@@ -21,16 +21,17 @@ void pxl_blit_rect(pxl_canvas_t *cnv, const pxl_buf_t *pb,
 void pxl_draw_bitmask(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 		pxl_rect_t bm_r, int cnv_x, int cnv_y);
 
+/* Flip flags for transformations. */
+typedef enum {
+	PXL_FLIP_NONE = 0,        /* No flip */
+	PXL_FLIP_H    = (1 << 0), /* Flip horizontally */
+	PXL_FLIP_V    = (1 << 1), /* Flip vertically */
+} pxl_flip_t;
+
 /* Draw a bitmask region with optional scaling and flipping.
  * scale must be >= 1.
  * If scale=1 and flip=PXL_FLIP_NONE, behaves like pxl_draw_bitmask().
  * Uses nearest-neighbor scaling. Respects canvas offset and scissor.
- *
- * Example:
- *   // Draw a bitmask at 2x scale
- *   pxl_draw_bitmask_transformed(cnv, &bm, (pxl_rect_t){0,0,8,8}, 10, 10, 2, PXL_FLIP_NONE);
- *   // Draw a bitmask flipped horizontally
- *   pxl_draw_bitmask_transformed(cnv, &bm, (pxl_rect_t){0,0,8,8}, 10, 10, 1, PXL_FLIP_H);
  */
 void pxl_draw_bitmask_transformed(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 		pxl_rect_t bm_r, int x, int y, int scale, pxl_flip_t flip);
@@ -39,10 +40,6 @@ void pxl_draw_bitmask_transformed(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
  * scale must be >= 1.
  * If scale=1 and flip=PXL_FLIP_NONE, behaves like pxl_blit_rect().
  * Respects canvas offset and scissor.
- *
- * Example:
- *   // Blit a pixel buffer at 2x scale
- *   pxl_blit_transformed(cnv, &pb, (pxl_rect_t){0,0,8,8}, 10, 10, 2, PXL_FLIP_NONE);
  */
 void pxl_blit_transformed(pxl_canvas_t *cnv, const pxl_buf_t *pb,
 		pxl_rect_t pb_r, int x, int y, int scale, pxl_flip_t flip);

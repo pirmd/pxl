@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "blit.h"
 #include "bitmask.h"
 #include "canvas.h"
 #include "geom.h"
@@ -104,16 +105,11 @@ pxl_draw_text_n(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, size_t max_
 void
 pxl_draw_textline(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
 
-/* Returns pointer after first \n or \r in txt (or txt if none, never NULL).
- * Handles \r\n as a single line break.
- *
- * Example:
- *   const char *p = text;
- *   while (*p) {
- *       pxl_draw_textline(&cnv, &w, p);
- *       pxl_writer_set_cursor(&w, 0, w.y);
- *       p = pxl_next_textline(p);
- *   }
+/* Returns pointer after first of text (up to \n or \r or \r\n)
+ * or txt unchanged if none.
+ * Example: const char *p = text; while (*p) {
+ *   pxl_draw_textline(&cnv, &w, p); p = pxl_next_textline(p);
+ * }
  */
 static inline const char *
 pxl_next_textline(const char *txt) {

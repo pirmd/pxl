@@ -57,6 +57,24 @@ typedef struct {
 	pxl_timer_t score_timer_left, score_timer_right;
 } ui_t;
 
+/* Geometric layout */
+typedef struct {
+	pxl_rect_t score;
+	pxl_rect_t arena;
+	pxl_rect_t pause;
+	pxl_rect_t help;
+} pong_layout_t;
+
+static pong_layout_t
+compute_layout(pxl_rect_t root) {
+	pong_layout_t l;
+	l.score = (pxl_rect_t){root.x, root.y, root.w, SCORE_H};
+	l.arena = (pxl_rect_t){root.x, root.y + SCORE_H, root.w, root.h - SCORE_H};
+	l.pause = pxl_align_rect((pxl_rect_t){0, 0, PAUSE_W, PAUSE_H}, root, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
+	l.help  = pxl_align_rect((pxl_rect_t){0, 0, HELP_W, HELP_H}, root, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
+	return l;
+}
+
 /* Pong game */
 
 typedef struct {
@@ -328,7 +346,7 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	snprintf(score_str, sizeof(score_str), "%d", p->score_left);
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, score_str, scale, PXL_FLIP_NONE);
 	pxl_canvas_set_color(cnv, color);
-	pxl_rect_t left_aligned = pxl_rect_align(bounds, (pxl_rect_t){0, 0, w / 2, h}, PXL_H_CENTER | PXL_V_CENTER);
+	pxl_rect_t left_aligned = pxl_align_rect(bounds, (pxl_rect_t){0, 0, w / 2, h}, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
 	int center_y = left_aligned.y;
 	pxl_writer_set_cursor(&w_writer, left_aligned.x, center_y);
 	pxl_draw_text_transformed(cnv, &w_writer, score_str, scale, PXL_FLIP_NONE);
@@ -348,7 +366,7 @@ render_score(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 	snprintf(score_str, sizeof(score_str), "%d", p->score_right);
 	bounds = pxl_text_bounds_transformed(&w_writer, score_str, scale, PXL_FLIP_NONE);
 	pxl_canvas_set_color(cnv, color);
-	pxl_rect_t right_aligned = pxl_rect_align(bounds, (pxl_rect_t){w / 2, 0, w / 2, h}, PXL_H_CENTER | PXL_V_TOP);
+	pxl_rect_t right_aligned = pxl_align_rect(bounds, (pxl_rect_t){w / 2, 0, w / 2, h}, PXL_ALIGN_H_CENTER | PXL_V_TOP);
 	int right_x = right_aligned.x;
 	pxl_writer_set_cursor(&w_writer, right_x, center_y);
 	pxl_draw_text_transformed(cnv, &w_writer, score_str, scale, PXL_FLIP_NONE);
@@ -364,7 +382,7 @@ render_game(pxl_canvas_t *cnv, const pong_t *p, const ui_t *ui) {
 
 	/* Draw center line */
 	pxl_canvas_set_color(cnv, FG_COLOR);
-	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, 4, h}, (pxl_rect_t){0, 0, w, h}, PXL_H_CENTER | PXL_V_TOP);
+	pxl_rect_t aligned = pxl_align_rect((pxl_rect_t){0, 0, 4, h}, (pxl_rect_t){0, 0, w, h}, PXL_ALIGN_H_CENTER | PXL_V_TOP);
 	int center_line_x = aligned.x;
 	for (int y = 0; y < h; y += 30) {
 		pxl_fill_rect(cnv, center_line_x, y, 4, 20);
@@ -385,12 +403,16 @@ render_pause(pxl_canvas_t *cnv, const ui_t *ui) {
 	assert(cnv != NULL && ui != NULL);
 	int scale = PAUSE_ZOOM;
 
-	pxl_writer_t w_writer;
+	const char *txt = "PAUSE";
+
+	pxl_rect_t bbox = pxl_canvas_view(cnv);
+
+	pxl_writer_t w;
 	const pxl_font_t *fonts[] = {ui->font};
 	pxl_writer_init(&w_writer, fonts, 1);
 
-	const char pause_str[] = "PAUSE";
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, pause_str, scale, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&w, txt, ui->font_scale, PXL_FLIP_NONE);
+	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
 
 	int border = scale;
 	int pad = scale * 2;
@@ -425,22 +447,22 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	assert(cnv != NULL && ui != NULL);
 	int scale = 2;
 
-	pxl_writer_t w_writer;
+	const char *txt =
+		"~ CONTROLS ~\n"
+		"\n"
+		"K/J: move paddle\n"
+		"P  : pause\n"
+		"H  : help\n"
+		"ESC: quit";
+
+	pxl_rect_t bbox = pxl_canvas_view(cnv);
+
+	pxl_writer_t w;
 	const pxl_font_t *fonts[] = {ui->font};
 	pxl_writer_init(&w_writer, fonts, 1);
 
-	const char *help_lines[] = {
-		"CONTROLS:",
-		"",
-		"P1: K/Up, J/Down",
-		"P2: Z, S",
-		"",
-		"T: toggle 1P/2P",
-		"P: pause",
-		"H: help",
-		"ESC: quit"
-	};
-	int line_count = sizeof(help_lines) / sizeof(help_lines[0]);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&w, txt, ui->font_scale, PXL_FLIP_NONE);
+	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
 
 	/* Calculate total bounds */
 	int max_width = 0;
@@ -462,7 +484,7 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	int h = view.h;
 	int box_w = max_width + 2 * pad + 2 * border;
 	int box_h = total_height + 2 * pad + 2 * border;
-	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, box_w, box_h}, (pxl_rect_t){0, 0, w, h}, PXL_H_CENTER | PXL_V_CENTER);
+	pxl_rect_t aligned = pxl_align_rect((pxl_rect_t){0, 0, box_w, box_h}, (pxl_rect_t){0, 0, w, h}, PXL_ALIGN_H_CENTER | PXL_ALIGN_V_CENTER);
 	int x = aligned.x;
 	int y = aligned.y;
 
@@ -475,26 +497,33 @@ render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 		max_width + 2 * pad + 2 * border,
 		total_height + 2 * pad + 2 * border);
 
-	/* Inner rectangle (bg color) */
-	pxl_canvas_set_color(cnv, bg);
-	pxl_fill_rect(cnv, x + border, y + border,
-		max_width + 2 * pad,
-		total_height + 2 * pad);
+	pxl_rect_t bbox = pxl_canvas_view(cnv);
 
-	/* Draw help lines */
-	pxl_canvas_set_color(cnv, fg);
-	int current_y = y + border + pad;
-	int text_area_x = x + border + pad;
-	for (int i = 0; i < line_count; i++) {
-		pxl_rect_t bounds = pxl_text_bounds_transformed(&w_writer, help_lines[i], scale, PXL_FLIP_NONE);
-		pxl_rect_t line_aligned = pxl_rect_align(bounds, (pxl_rect_t){text_area_x, 0, max_width, bounds.h}, PXL_H_CENTER | PXL_V_TOP);
-		int line_x = line_aligned.x;
-		pxl_writer_set_cursor(&w_writer, line_x, current_y);
-		pxl_draw_text_transformed(cnv, &w_writer, help_lines[i], scale, PXL_FLIP_NONE);
-		current_y += bounds.h;
-		if (i < line_count - 1) {
-			current_y += line_leading * scale;
-		}
+	pxl_writer_t w;
+	const pxl_font_t *fonts[] = {ui->font};
+	pxl_writer_init(&w, fonts, 1);
+
+	pxl_rect_t bounds = pxl_text_bounds(&w, txt);
+	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, PXL_H_RIGHT | PXL_V_BOTTOM);
+
+	pxl_canvas_set_color(cnv, FG_COLOR);
+	pxl_writer_set_cursor(&w, aligned.x, aligned.y);
+	pxl_draw_text(cnv, &w, txt);
+}
+
+/* FPS counter */
+static inline void
+update_fps(double frame_dt, int *current_fps) {
+	assert(current_fps);
+
+	static double accumulator = 0;
+	static int frame_count = 0;
+	accumulator += frame_dt;
+	frame_count++;
+	if (accumulator >= 1.0) {
+		*current_fps = (int)((float)frame_count / accumulator);
+		frame_count = 0;
+		accumulator = 0;
 	}
 }
 
@@ -627,7 +656,7 @@ main(void) {
 				int w = game_view.w;
 				int h = game_view.h;
 				/* Align to right/bottom with 10px margin */
-				pxl_rect_t aligned = pxl_rect_align(fps_bounds, (pxl_rect_t){0, 0, w - 10, h - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
+				pxl_rect_t aligned = pxl_align_rect(fps_bounds, (pxl_rect_t){0, 0, w - 10, h - 10}, PXL_H_RIGHT | PXL_V_BOTTOM);
 				int fps_x = aligned.x;
 				int fps_y = aligned.y;
 				pxl_writer_set_cursor(&fps_writer, fps_x, fps_y);

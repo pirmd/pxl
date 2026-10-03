@@ -433,11 +433,17 @@ render_title(pxl_canvas_t *cnv, const font_view_t *fv) {
 	snprintf(title_text, sizeof(title_text), "PXL Font Viewer - %s", fv->font_family_name);
 	pxl_rect_t title_bounds = pxl_str_bounds(title_text);
 
-	pxl_canvas_set_color(cnv, TITLE_FG);
-	pxl_rect_t aligned = pxl_rect_align(title_bounds, (pxl_rect_t){0, 0, fv->layout.title_w, fv->layout.title_h}, PXL_H_CENTER | PXL_V_CENTER);
-	int title_x = aligned.x;
-	int title_y = aligned.y;
-	pxl_draw_str(cnv, title_x, title_y, title_text);
+	char txt[128];
+	snprintf(txt, sizeof(txt), "PXL Font Viewer - %s", fv->font_name);
+
+	pxl_rect_t title = pxl_align_rect(
+            pxl_str_bounds(txt),
+            pxl_canvas_subview(cnv),
+            PXL_H_CENTER | PXL_V_CENTER
+    );
+
+	pxl_canvas_set_color(cnv, FONTVIEW_FG);
+	pxl_draw_str(cnv, title.x, title.y, txt);
 }
 
 static void
@@ -467,7 +473,13 @@ render_font_view(pxl_canvas_t *cnv, const font_view_t *fv) {
 		int x = aligned.x;
 		int y = aligned.y;
 
-		pxl_writer_set_cursor(&w, x, y);
+		pxl_rect_t aligned = pxl_align_rect(
+                (pxl_rect_t){0, 0, glyph.width, glyph.height},
+                (pxl_rect_t){col * GRID_CELL_W, row * GRID_CELL_H, GRID_CELL_W, GRID_CELL_H},
+                PXL_H_CENTER | PXL_V_CENTER
+        );
+
+		pxl_writer_set_cursor(&w, aligned.x, aligned.y);
 		pxl_draw_rune(cnv, &w, glyph.codepoint);
 	}
 }
@@ -481,9 +493,11 @@ render_glyph_zoom(pxl_canvas_t *cnv, const font_view_t *fv) {
 		return;
 	}
 
-	pxl_rect_t aligned = pxl_rect_align((pxl_rect_t){0, 0, glyph.width * GLYPH_ZOOM_FACTOR, glyph.height * GLYPH_ZOOM_FACTOR}, (pxl_rect_t){0, 0, fv->layout.glyph_zoom_w, fv->layout.glyph_zoom_h}, PXL_H_CENTER | PXL_V_CENTER);
-	int zoom_x = aligned.x;
-	int zoom_y = aligned.y;
+	pxl_rect_t aligned = pxl_align_rect(
+            (pxl_rect_t){0, 0, glyph.width * GLYPH_ZOOM_FACTOR, glyph.height * GLYPH_ZOOM_FACTOR},
+            pxl_canvas_subview(cnv),
+            PXL_H_CENTER | PXL_V_CENTER
+    );
 
 	pxl_canvas_set_color(cnv, GLYPH_ZOOM_FG);
 	pxl_draw_bitmask_transformed(cnv, glyph.bitmask, glyph.bitmask_r, zoom_x, zoom_y, GLYPH_ZOOM_FACTOR, PXL_FLIP_NONE);
@@ -505,11 +519,14 @@ render_glyph_characteristics(pxl_canvas_t *cnv, const font_view_t *fv) {
 	
 	pxl_canvas_set_color(cnv, GLYPH_FG);
 
-	pxl_rect_t text_bounds = pxl_str_bounds(text);
-	int text_x = (fv->layout.glyph_w - text_bounds.w) / 16;
-	pxl_rect_t aligned = pxl_rect_align(text_bounds, (pxl_rect_t){0, 0, fv->layout.glyph_w, fv->layout.glyph_h}, PXL_H_LEFT | PXL_V_CENTER);
-	int text_y = aligned.y;
-	pxl_draw_str(cnv, text_x, text_y, text);
+	pxl_rect_t aligned = pxl_align_rect(
+            pxl_str_bounds(txt),
+            pxl_canvas_subview(cnv),
+            PXL_H_LEFT | PXL_V_CENTER
+    );
+
+	pxl_canvas_set_color(cnv, FONTVIEW_HI);
+	pxl_draw_str(cnv, aligned.x, aligned.y, text);
 }
 
 static void
@@ -562,7 +579,42 @@ render_text_preview(pxl_canvas_t *cnv, const font_view_t *fv) {
 }
 
 static void
-render(pxl_canvas_t *cnv, const font_view_t *fv) {
+render_footer(pxl_canvas_t *cnv, const fontview_t *fv) {
+    assert(cnv);
+    assert(fv);
+
+	char txt[256];
+	snprintf(txt, sizeof(txt),
+            "Family: %d/%zu | %s (%d glyphs)",
+			fv->family_idx + 1, NUM_FONT_FAMILIES,
+		   	fv->font_name,
+			fv->font_glyph_count
+    );
+
+	pxl_rect_t aligned = pxl_align_rect(
+            pxl_str_bounds(txt),
+            pxl_canvas_subview(cnv),
+            PXL_H_CENTER | PXL_V_CENTER
+    );
+
+	pxl_canvas_set_color(cnv, FONTVIEW_FG);
+	pxl_draw_str(cnv, aligned.x, aligned.y, txt);
+}
+
+static inline void
+render_scrollbar(pxl_canvas_t *cnv, const fontview_t *fv) {
+	assert(cnv);
+    assert(fv);
+
+    pxl_rect_t bar = pxl_canvas_subview(cnv);
+    int scale_h = bar.h / fv->font_glyph_count;
+
+	pxl_canvas_set_color(cnv, FONTVIEW_FG);
+	pxl_fill_rect(cnv, bar.x, bar.y + (fv->glyph_idx * scale_h), bar.w, scale_h < 8 ? 8 : scale_h);
+}
+
+static void
+render(pxl_canvas_t *cnv, const fontview_t *fv) {
 	/* Clear background */
 	pxl_canvas_set_color(cnv, BG);
 	pxl_canvas_clear(cnv);
@@ -631,6 +683,28 @@ render(pxl_canvas_t *cnv, const font_view_t *fv) {
 	pxl_canvas_clear(&cnv_footer);
 	render_footer(&cnv_footer, fv);
 }
+
+static void
+render_help(pxl_canvas_t *cnv) {
+	const char txt[] = 
+        "PXL Font Viewer - Controls:\n"
+		"\n"
+		"H/J: prev glyph  K/L: next glyph\n"
+		"N: next font\n"
+		"H: help  F: fullscreen\n"
+		"ESC: quit";
+
+	pxl_rect_t aligned = pxl_align_rect(
+            pxl_str_bounds(txt),
+            pxl_canvas_subview(cnv),
+            PXL_H_CENTER | PXL_V_CENTER
+    );
+
+	pxl_canvas_set_color(cnv, FONTVIEW_FG);
+	pxl_draw_str(cnv, aligned.x, aligned.y, txt);
+}
+
+>>>>>>> 1e5ce22 (feat: add a set of helpers to ease layout definition)
 
 int
 main(void) {

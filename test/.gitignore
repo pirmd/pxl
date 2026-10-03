@@ -12,3 +12,4 @@ test_tileset
 test_app
 test_camera
 test_timer
+test_layout
