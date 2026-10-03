@@ -88,21 +88,39 @@ pxl_draw_bitmask(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 			bit_offset += (size_t)bits_to_do;
 		}
 
-		/* Process full bytes (8 pixels at a time) for performance:
-		 * - 0x00: Skip 8 pixels (fastest, no work).
-		 * - 0xFF: Fill 8 pixels at once (single memcpy-like loop).
-		 * - Other: Check each bit individually (fallback).
-		 * This "gather" approach avoids per-pixel clipping and minimizes branches. */
+		/* Process full bytes in chunks of 4 (32 pixels at a time) for performance.
+		 * Uses memcpy for 0xFF bytes to minimize writes and improve cache locality. */
+		pxl_t color8[8] = {color, color, color, color, color, color, color, color};
+		for (; i + 32 <= dst_rect.w; i += 32) {
+			const uint8_t *m = m_row + (bit_offset >> 3);
+			bit_offset += 32;
+
+			/* Process 4 bytes (32 pixels) as a group */
+			for (int k = 0; k < 4; ++k) {
+				uint8_t byte = m[k];
+				if (byte == 0x00) {
+					continue;
+				} else if (byte == 0xFF) {
+					memcpy(dst + i + k * 8, color8, 8 * sizeof(pxl_t));
+				} else {
+					for (int bit = 0; bit < 8; ++bit) {
+						if (byte & (1U << bit)) {
+							dst[i + k * 8 + bit] = color;
+						}
+					}
+				}
+			}
+		}
+
+		/* Process remaining full bytes (8 pixels at a time) */
 		for (; i + 8 <= dst_rect.w; i += 8) {
 			uint8_t m = m_row[bit_offset >> 3];
 			bit_offset += 8;
 
 			if (m == 0x00) {
-				continue;  /* Skip 8 pixels */
+				continue;
 			} else if (m == 0xFF) {
-				for (int bit = 0; bit < 8; ++bit) {
-					dst[i + bit] = color;
-				}
+				memcpy(dst + i, color8, 8 * sizeof(pxl_t));
 			} else {
 				for (int bit = 0; bit < 8; ++bit) {
 					if (m & (1U << bit)) {
