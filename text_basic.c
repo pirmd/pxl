@@ -163,7 +163,7 @@ pxl_draw_char(pxl_canvas_t *cnv, int x, int y, unsigned char c) {
 	if (c < 32)  c = ' ';
 	if (c > 127) c = '?';
 
-	pxl_rect_t char_rect = {0, (int)c * ASCII_CHAR_H, ASCII_CHAR_W, ASCII_CHAR_H};
+	pxl_rect_t char_rect = {0, c * ASCII_CHAR_H, ASCII_CHAR_W, ASCII_CHAR_H};
 	pxl_draw_bitmask(cnv, &ascii_font, char_rect, x, y);
 }
 

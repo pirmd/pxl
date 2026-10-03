@@ -74,13 +74,13 @@ pxl_draw_bitmask(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 
 		/* Leading partial byte (if not byte-aligned) */
 		if (bit_offset & 0x7) {
-			unsigned leading_bit_off = bit_offset & 0x7;
+			int leading_bit_off = bit_offset & 0x7;
 			uint8_t m = m_row[bit_offset >> 3];
-			int bits_to_do = (8 - (int)leading_bit_off < dst_rect.w - i) ?
-			                 8 - (int)leading_bit_off : dst_rect.w - i;
+			int bits_to_do = (8 - leading_bit_off < dst_rect.w - i) ?
+			                 8 - leading_bit_off : dst_rect.w - i;
 
 			for (int bit = 0; bit < bits_to_do; ++bit) {
-				if (m & (1U << (leading_bit_off + (unsigned)bit))) {
+				if (m & (1U << (leading_bit_off + bit))) {
 					dst[i + bit] = color;
 				}
 			}
