@@ -15,7 +15,7 @@
  */
 
 typedef struct {
-	pxl_buf_t      *pb;                 /* Target                */
+	const pxl_buf_t *pb;              /* Target (read-only)    */
 	int             offset_x, offset_y; /* Translation offset     */
 	pxl_rect_t      scissor;            /* Drawing clipping area */
 	pxl_t           color;              /* Drawing color         */
@@ -24,7 +24,7 @@ typedef struct {
 
 /* Initialization ---------------------------------------------------------- */
 static inline void
-pxl_canvas_init(pxl_canvas_t *cnv, pxl_buf_t *pb) {
+pxl_canvas_init(pxl_canvas_t *cnv, const pxl_buf_t *pb) {
 	assert(cnv);
 	assert(pb && pb->data);
 
@@ -81,7 +81,7 @@ pxl_canvas_reset_offset(pxl_canvas_t *cnv) {
  * Equivalent to pxl_canvas_init() followed by pxl_canvas_set_offset() and pxl_canvas_set_scissor().
  */
 static inline void
-pxl_canvas_init_view(pxl_canvas_t *cnv, pxl_buf_t *pb, pxl_rect_t view) {
+pxl_canvas_init_view(pxl_canvas_t *cnv, const pxl_buf_t *pb, pxl_rect_t view) {
 	pxl_canvas_init(cnv, pb);
 	pxl_canvas_set_offset(cnv, view.x, view.y);
 	pxl_canvas_set_scissor(cnv, view.x, view.y, view.w, view.h);
@@ -102,7 +102,7 @@ pxl_canvas_clear(pxl_canvas_t *cnv) {
 	assert(cnv && cnv->pb);
 	
 	pxl_rect_t sc = cnv->scissor;
-	pxl_buf_t *pb = cnv->pb;
+	const pxl_buf_t *pb = cnv->pb;
 	
 	/* Fast path: scissor covers entire buffer (implies sc.x==0 && sc.y==0 due to clipping) */
 	if (sc.w == pb->width && sc.h == pb->height) {
