@@ -15,6 +15,8 @@ static struct {
     int width;
     int height;
     char text_buffer[PXL_BACKEND_TEXT_BUFFER_SIZE];
+    int text_buffer_head;
+    int text_buffer_tail;
     int text_buffer_len;
 } g_sdl;
 
@@ -157,6 +159,8 @@ pxl_backend_deinit(void) {
 	g_sdl.width = 0;
 	g_sdl.height = 0;
 	g_sdl.text_buffer_len = 0;
+	g_sdl.text_buffer_head = 0;
+	g_sdl.text_buffer_tail = 0;
 	memset(g_sdl.text_buffer, 0, sizeof(g_sdl.text_buffer));
 }
 
@@ -396,17 +400,30 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
             break;
 
         case SDL_TEXTINPUT:
-            {
-                int len = strlen(event->text.text);
-                if (g_sdl.text_buffer_len + len > (int)PXL_BACKEND_TEXT_BUFFER_SIZE) {
-                    int excess = (g_sdl.text_buffer_len + len) - (int)PXL_BACKEND_TEXT_BUFFER_SIZE;
-                    memmove(g_sdl.text_buffer, g_sdl.text_buffer + excess, g_sdl.text_buffer_len - excess);
-                    g_sdl.text_buffer_len -= excess;
-                }
-                memcpy(g_sdl.text_buffer + g_sdl.text_buffer_len, event->text.text, len);
-                g_sdl.text_buffer_len += len;
-            }
-            break;
+			{
+				int len = strlen(event->text.text);
+				int free_space = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_len;
+
+				if (len > free_space) {
+					/* Buffer full: drop oldest characters to make room */
+					int excess = len - free_space;
+					g_sdl.text_buffer_tail = (g_sdl.text_buffer_tail + excess) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+					g_sdl.text_buffer_len = PXL_BACKEND_TEXT_BUFFER_SIZE;
+				}
+
+				/* Copy new text, handling wrap-around */
+				int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_head;
+				if (len <= first_chunk) {
+					memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, len);
+				} else {
+					memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, first_chunk);
+					memcpy(g_sdl.text_buffer, event->text.text + first_chunk, len - first_chunk);
+				}
+
+				g_sdl.text_buffer_head = (g_sdl.text_buffer_head + len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+				g_sdl.text_buffer_len += len;
+			}
+			break;
     }
 }
 
@@ -438,30 +455,38 @@ pxl_backend_has_typed_text(void) {
 
 int
 pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
-    assert(out_text);
-    assert(out_text_max_len > 0);
+	assert(out_text);
+	assert(out_text_max_len > 0);
 
-    if (g_sdl.text_buffer_len == 0) {
-        out_text[0] = '\0';
-        return 0;
-    }
+	if (g_sdl.text_buffer_len == 0) {
+		out_text[0] = '\0';
+		return 0;
+	}
 
-    int copy_len = (g_sdl.text_buffer_len < out_text_max_len)
-        ? g_sdl.text_buffer_len
-        : out_text_max_len - 1;
+	int copy_len = (g_sdl.text_buffer_len < out_text_max_len)
+		? g_sdl.text_buffer_len
+		: out_text_max_len - 1;
 
-    if (copy_len <= 0) {
-        out_text[0] = '\0';
-        return 0;
-    }
+	if (copy_len <= 0) {
+		out_text[0] = '\0';
+		return 0;
+	}
 
-    memcpy(out_text, g_sdl.text_buffer, copy_len);
-    out_text[copy_len] = '\0';
+	/* Read from circular buffer, handling wrap-around */
+	if (g_sdl.text_buffer_tail + copy_len <= PXL_BACKEND_TEXT_BUFFER_SIZE) {
+		memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, copy_len);
+	} else {
+		int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_tail;
+		memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, first_chunk);
+		memcpy(out_text + first_chunk, g_sdl.text_buffer, copy_len - first_chunk);
+	}
 
-    g_sdl.text_buffer_len -= copy_len;
-    memmove(g_sdl.text_buffer, g_sdl.text_buffer + copy_len, g_sdl.text_buffer_len);
+	out_text[copy_len] = '\0';
 
-    return copy_len;
+	g_sdl.text_buffer_tail = (g_sdl.text_buffer_tail + copy_len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+	g_sdl.text_buffer_len -= copy_len;
+
+	return copy_len;
 }
 
 void
