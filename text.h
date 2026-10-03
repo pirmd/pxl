@@ -30,10 +30,9 @@ typedef struct {
 	const int8_t  *glyph_offsets_y; /* Per-glyph Y offsets (NULL = 0) */
 } pxl_font_t;
 
-/* Writer: cursor, fonts, and spacing for text rendering.
- * Control chars: \n (newline: y += leading), \r (return: x=0), \t (tab).
- * Note: User must keep cursor within bounds; draw functions respect scissor.
- */
+/* Writer ------------------------------------------------------------------ */
+
+/* Writer: cursor, fonts, and spacing for text rendering. */
 typedef struct {
 	const pxl_font_t **fonts;      /* Array of fonts to try in order */
 	size_t           font_count;    /* Number of fonts in array */
@@ -44,10 +43,11 @@ typedef struct {
 	int              line_start_x; /* (private) X position at start of current line (for \n, \r) */
 } pxl_writer_t;
 
-/* Initialization */
+/* Initialise writer */
 void
 pxl_writer_init(pxl_writer_t *w, const pxl_font_t **fonts, size_t font_count);
 
+/* Move writer cursor */
 static inline void
 pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
 	assert(w);
@@ -62,12 +62,15 @@ pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
 int
 pxl_utf8_decode(const char *text, uint32_t *out_codepoint);
 
-/* Measurement */
-pxl_rect_t
-pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune); /* Returns bounds for a single rune */
+/* Measurement ------------------------------------------------------------- */
 
+ /* Returns bounds for a single rune */
 pxl_rect_t
-pxl_text_bounds(const pxl_writer_t *w, const char *txt); /* Returns bounds for a text string */
+pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune);
+
+/* Returns bounds for a text string */
+pxl_rect_t
+pxl_text_bounds(const pxl_writer_t *w, const char *txt);
 
 /* Returns bounds for text truncated to `max_bytes` bytes.
  * Caller must ensure `max_bytes` does not split a UTF-8 rune.
@@ -75,14 +78,9 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt); /* Returns bounds for a
 pxl_rect_t
 pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes);
 
-/* Returns bounds for the first line (up to \n or \r).
- * Handles \r\n as a single line break.
- * Use pxl_next_textline() to get the next line start.
- */
-pxl_rect_t
-pxl_textline_bounds(const pxl_writer_t *w, const char *txt);
 
-/* Drawing */
+/* Drawing ----------------------------------------------------------------- */
+
 /* Draw a single rune at current writer cursor. Handles \n, \r, \t. */
 void
 pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune);
@@ -97,19 +95,27 @@ pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
 void
 pxl_draw_text_n(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, size_t max_bytes);
 
-/* Draws the first line (up to \n or \r).
- * Advances writer cursor: on \n, moves to next line (y += leading);
- * on \r, resets x to line_start_x (no y change).
- * Handles \r\n as \n.
+/* Helpers for manipulating text line per line ----------------------------- */
+
+/* Returns bounds for the first line of text (up to \n or \r or \r\n).
+ */
+pxl_rect_t
+pxl_textline_bounds(const pxl_writer_t *w, const char *txt);
+
+/* Draws the first line of text (up to \n or \r or \r\n).
+ * Advances writer cursor to next line if end-of-line is encoutered.
  */
 void
 pxl_draw_textline(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
 
 /* Returns pointer after first of text (up to \n or \r or \r\n)
  * or txt unchanged if none.
- * Example: const char *p = text; while (*p) {
- *   pxl_draw_textline(&cnv, &w, p); p = pxl_next_textline(p);
- * }
+ * Example:
+ *   const char *p = text;
+ *   while (*p) {
+ *       pxl_draw_textline(&cnv, &w, p);
+ *       p = pxl_next_textline(p);
+ *   }
  */
 static inline const char *
 pxl_next_textline(const char *txt) {
@@ -126,13 +132,10 @@ pxl_next_textline(const char *txt) {
 	return txt; /* Points to '\0' at end of string */
 }
 
+/* Text with scale and/or flip --------------------------------------------- */
+
 /* Text bounds and drawing with scaling and flipping.
  * scale must be >= 1. flip is applied to destination coordinates.
- *
- * Example:
- *   // Get bounds and draw scaled text
- *   pxl_rect_t bounds = pxl_text_bounds_transformed(&writer, "Hello", 2, PXL_FLIP_NONE);
- *   pxl_draw_text_transformed(&cnv, &writer, "Hello", 2, PXL_FLIP_NONE);
  */
 pxl_rect_t
 pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);

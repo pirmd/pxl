@@ -57,10 +57,6 @@ pxl_font_glyph_metrics(const pxl_font_t *font, int idx,
 	if (offset_y) *offset_y = (font->glyph_offsets_y) ? font->glyph_offsets_y[idx] : 0;
 }
 
-/* UTF-8 decoder: returns bytes consumed (1-4), outputs Unicode codepoint.
- * On invalid sequences, returns 1 and outputs U+FFFD (REPLACEMENT CHARACTER).
- * Validates: continuation bytes, overlong sequences, surrogates, and codepoint range.
- */
 int
 pxl_utf8_decode(const char *text, uint32_t *out_codepoint) {
 	assert(text && out_codepoint);
@@ -265,6 +261,7 @@ pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune) {
 	return (pxl_rect_t){0, 0, glyph_w, glyph_h};
 }
 
+
 /* --- Truncated text helpers --- */
 
 pxl_rect_t
@@ -332,6 +329,26 @@ pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes) {
 	return b;
 }
 
+void
+pxl_draw_text_n(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, size_t max_bytes) {
+	assert(cnv && w && w->font_count > 0);
+	assert(txt);
+
+	size_t bytes_consumed = 0;
+	uint32_t codepoint;
+
+	while (*txt && bytes_consumed < max_bytes) {
+		size_t byte_len = (size_t)pxl_utf8_decode(txt, &codepoint);
+		if (bytes_consumed + byte_len > max_bytes) {
+			break; /* Stop before partial rune */
+		}
+		txt += (int)byte_len;
+		bytes_consumed += byte_len;
+
+		pxl_draw_rune(cnv, w, codepoint);
+	}
+}
+
 /* --- Line-based helpers --- */
 
 pxl_rect_t
@@ -397,26 +414,6 @@ pxl_textline_bounds(const pxl_writer_t *w, const char *txt) {
 	b.h = glyph_height;
 
 	return b;
-}
-
-void
-pxl_draw_text_n(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, size_t max_bytes) {
-	assert(cnv && w && w->font_count > 0);
-	assert(txt);
-
-	size_t bytes_consumed = 0;
-	uint32_t codepoint;
-
-	while (*txt && bytes_consumed < max_bytes) {
-		size_t byte_len = (size_t)pxl_utf8_decode(txt, &codepoint);
-		if (bytes_consumed + byte_len > max_bytes) {
-			break; /* Stop before partial rune */
-		}
-		txt += (int)byte_len;
-		bytes_consumed += byte_len;
-
-		pxl_draw_rune(cnv, w, codepoint);
-	}
 }
 
 void

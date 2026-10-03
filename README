@@ -78,10 +78,13 @@ Architecture:
 
   Framework:
     app.h          - App management: frame management, input, poll/wait event modes
-    camera.h       - Offset-based camera management helpers
     stepper.h      - Time-stepped physics loop helper (fixed timestep, interpolation)
-    tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite)
     timer.h        - Timer helpers for animations and delays
+
+  Deprecated (will be removed in next version):
+    camera.h       - Offset-based camera management helpers (use canvas offset directly)
+    tileset.h/c    - Tile rendering: grid atlas (tileset) + animation frames (sprite) (use pxl_blit_rect directly)
+    timer.h        - Countdown timer helpers (use a double variable directly)
 
 
   pxl.h - umbrella header that includes all public headers. For finer

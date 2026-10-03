@@ -98,9 +98,9 @@ pxl_app_deinit(pxl_app_t *app) {
 	pxl_backend_deinit();
 }
 
-/* Internal: updates frame state */
+/* Internal: updates frame state. Not part of public API. */
 static inline void
-app_update_state(pxl_app_t *app, double frame_dt, double now) {
+update_state(pxl_app_t *app, double frame_dt, double now) {
 	app->prev = app->curr;
 	app->curr.mouse_wheel_x = 0;
 	app->curr.mouse_wheel_y = 0;
@@ -122,7 +122,7 @@ pxl_app_advance(pxl_app_t *app) {
 		frame_dt = PXL_APP_MAX_FRAME_TIME;
 	}
 
-	app_update_state(app, frame_dt, now);
+	update_state(app, frame_dt, now);
 
 	pxl_backend_poll_events(&app->curr);
 
@@ -142,7 +142,7 @@ pxl_app_advance_wait(pxl_app_t *app) {
 		frame_dt = PXL_APP_MAX_FRAME_TIME;
 	}
 
-	app_update_state(app, frame_dt, now);
+	update_state(app, frame_dt, now);
 
 	pxl_backend_wait_events(&app->curr);
 

@@ -5,7 +5,7 @@
 #include "buf.h"
 #include "input.h"
 
-#define PXL_BACKEND_TEXT_BUFFER_SIZE  1024  /* UTF-8 text input buffer size */
+#define PXL_BACKEND_TEXT_BUFFER_SIZE  512  /* UTF-8 text input buffer size */
 
 /*
  * When adding a new backend, ensure that:
@@ -15,11 +15,10 @@
  *       - Little-endian: [B, G, R, A] (byte 0 = B, byte 1 = G, byte 2 = R, byte 3 = A)
  *       - Big-endian:   [A, R, G, B] (byte 0 = A, byte 1 = R, byte 2 = G, byte 3 = B)
  *     Use pxl_argb/pxl_a/pxl_r/pxl_g/pxl_b from color.h to ensure portability.
+ *
  *   . All backends must return pixel-aligned stride in out_pb->stride
  *     (i.e., out_pb->stride * sizeof(pxl_t) must be a valid memory offset)
  *     This has to be enforced by checks in backend implementations.
- *   . X11 backend: Uses XShm for performance, falls back to heap-allocated XImage
- *     if XShm is unavailable (e.g., size too large, SHM limits).
  */
 
 /* Backend initialization flags.
@@ -68,7 +67,8 @@ pxl_backend_end_frame(void);
 double
 pxl_backend_get_time(void);
 
-/* Get current window size in logical coordinates */
+/* Get logical size of the rendering buffer (in pixels).
+ * This matches the dimensions of the buffer returned by pxl_backend_begin_frame(). */
 void
 pxl_backend_get_window_size(int *out_w, int *out_h);
 
@@ -91,26 +91,12 @@ pxl_backend_poll_events(pxl_input_t *in);
 
 /* Wait for events - blocks until at least one event is available, then updates input state.
  *
- * Similar to SDL_WaitEvent or glfwWaitEvents.
- * Use this for passive applications (viewers, editors) to minimize CPU usage.
- *
  * The pxl_input_t struct passed as argument MUST be zero-initialized before first use.
  */
 void
 pxl_backend_wait_events(pxl_input_t *in);
 
-/* Check if typed text is available for reading (non-destructive check).
- *
- * Returns true if text is pending, false otherwise. Useful for checking
- * input before reading, without consuming it.
- *
- * Example usage:
- *   if (pxl_backend_has_typed_text()) {
- *       char utf8_buf[32];
- *       int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
- *       // len is always > 0 here
- *   }
- */
+/* Check if typed text is available for reading (non-destructive check). */
 bool
 pxl_backend_has_typed_text(void);
 
@@ -128,8 +114,6 @@ pxl_backend_has_typed_text(void);
  *
  * Note: Special keys (ENTER, TAB, BACKSPACE, arrows, etc.) do NOT generate text input.
  *       Use pxl_input_state() with PXL_KEYB_* codes to detect these keys.
- * For UTF-8 to Unicode codepoint conversion, use pxl_utf8_decode() from text.h
- * or your own decoder.
  *
  * Example usage:
  *   if (pxl_backend_has_typed_text()) {

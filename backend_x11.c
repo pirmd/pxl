@@ -1,10 +1,15 @@
+ /* X11 backend implementation
+  *   . Uses XShm for performance, falls back to heap-allocated XImage
+  *     if XShm is unavailable (e.g., size too large, SHM limits).
+  */
+
 #include <assert.h>
 #include <limits.h>
-#include <stdbool.h>  /* for bool, false, true */
-#include <stdlib.h>   /* for malloc, free */
+#include <stdbool.h>
+#include <stdlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <X11/X.h>       /* for Atom, None, ClientMessage, KeySym */
+#include <X11/X.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XShm.h>
 #include <X11/XKBlib.h>
@@ -45,7 +50,8 @@ static struct {
 
 /* X11 error handler for XShmAttach: captures X11 errors during SHM attachment.
  * Returns 0 to ignore the error; we check the result via XShmAttach return value. */
-static int xshm_error_handler(Display *d, XErrorEvent *e) {
+static int
+xshm_error_handler(Display *d, XErrorEvent *e) {
 	(void)d; (void)e;
 	return 0;
 }

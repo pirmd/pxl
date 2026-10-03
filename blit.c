@@ -88,7 +88,11 @@ pxl_draw_bitmask(pxl_canvas_t *cnv, const pxl_bitmask_t *bm,
 			bit_offset += (size_t)bits_to_do;
 		}
 
-		/* Full bytes (fast path for 0x00 and 0xFF) */
+		/* Process full bytes (8 pixels at a time) for performance:
+		 * - 0x00: Skip 8 pixels (fastest, no work).
+		 * - 0xFF: Fill 8 pixels at once (single memcpy-like loop).
+		 * - Other: Check each bit individually (fallback).
+		 * This "gather" approach avoids per-pixel clipping and minimizes branches. */
 		for (; i + 8 <= dst_rect.w; i += 8) {
 			uint8_t m = m_row[bit_offset >> 3];
 			bit_offset += 8;

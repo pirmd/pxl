@@ -1,3 +1,5 @@
+/* SDL2 backend implementation */
+
 #include "backend.h"
 #include "input.h"
 #include "buf.h"
@@ -155,7 +157,7 @@ pxl_backend_deinit(void) {
 	deinit_window();
 	deinit_display();
 
-	// Reset global state
+	/* Reset global state */
 	g_sdl.width = 0;
 	g_sdl.height = 0;
 	g_sdl.text_buffer_len = 0;

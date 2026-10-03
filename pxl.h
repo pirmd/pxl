@@ -7,14 +7,15 @@
  */
 
 /* Core types and error handling */
+#include "buf.h"
 #include "err.h"
 #include "geom.h"
-#include "color.h"
-#include "buf.h"
+#include "backend.h"
+#include "input.h"
 
 /* Drawing */
+#include "color.h"
 #include "canvas.h"
-#include "camera.h"
 #include "shape.h"
 #include "blit.h"
 #include "text_basic.h"
@@ -28,16 +29,7 @@
 #include "layout.h"
 #include "stepper.h"
 #include "tileset.h"
-
-/* Input and time */
-#include "input.h"
-#include "stepper.h"
 #include "timer.h"
 
-/* Backend (platform-specific) */
-#include "backend.h"
-
-/* App layer */
-#include "app.h"
 
 #endif /* PXL_H */

@@ -1,8 +1,8 @@
 #include <assert.h>
-#include <limits.h>  /* for INT_MAX */
+#include <limits.h>
 
 #include "blit.h"
-#include "geom.h"  /* for pxl_rect_t */
+#include "geom.h"
 #include "tileset.h"
 
 /* Draw a tile from a tileset to canvas at (x, y).
@@ -22,7 +22,7 @@ pxl_draw_tile(pxl_canvas_t *cnv, const pxl_tileset_t *ts, int tile_idx, int x, i
 	assert(ts->tile_h * ts->rows <= ts->atlas->height);
 	assert(tile_idx >= 0 && tile_idx < ts->cols * ts->rows);
 
-	// Map linear tile index to grid coordinates: column = idx % cols, row = idx / cols
+	/* Map linear tile index to grid coordinates: column = idx % cols, row = idx / cols */
 	int col = tile_idx % ts->cols;
 	int row = tile_idx / ts->cols;
 
