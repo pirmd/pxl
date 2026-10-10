@@ -1,8 +1,11 @@
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include "buf.h"
 #include "canvas.h"
+#include "geom.h"
 #include "tileset.h"
-#include "test.h"
 
 /* Constants --------------------------------------------------------------- */
 
@@ -94,12 +97,12 @@ test_pxl_draw_tile_basic(void) {
 	pxl_draw_tile(&g_cnv, &g_ts, 0, 5, 5);
 
 	/* Verify pixels were drawn in expected area */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){5, 5, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){5, 5, 8, 8}));
 
 	/* Verify no pixels outside the tile area were drawn */
-	ASSERT(!has_pixels_in_rect((pxl_rect_t){0, 0, 5, 32}));
-	ASSERT(!has_pixels_in_rect((pxl_rect_t){0, 0, 32, 5}));
-	ASSERT(!has_pixels_in_rect((pxl_rect_t){13, 0, 19, 32}));
+	assert(!has_pixels_in_rect((pxl_rect_t){0, 0, 5, 32}));
+	assert(!has_pixels_in_rect((pxl_rect_t){0, 0, 32, 5}));
+	assert(!has_pixels_in_rect((pxl_rect_t){13, 0, 19, 32}));
 }
 
 static void
@@ -112,9 +115,9 @@ test_pxl_draw_tile_multiple(void) {
 	pxl_draw_tile(&g_cnv, &g_ts, 4, 0, 10);
 
 	/* Verify all tiles were drawn */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
-	ASSERT(has_pixels_in_rect((pxl_rect_t){10, 0, 8, 8}));
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 10, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){10, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 10, 8, 8}));
 }
 
 static void
@@ -128,10 +131,10 @@ test_pxl_draw_tile_with_offset(void) {
 	pxl_draw_tile(&g_cnv, &g_ts, 0, 0, 0);
 
 	/* Verify tile was drawn at offset position */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){5, 5, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){5, 5, 8, 8}));
 
 	/* Verify no pixels at (0,0) */
-	ASSERT(!has_pixels_in_rect((pxl_rect_t){0, 0, 5, 5}));
+	assert(!has_pixels_in_rect((pxl_rect_t){0, 0, 5, 5}));
 
 	pxl_canvas_reset_offset(&g_cnv);
 }
@@ -147,11 +150,11 @@ test_pxl_draw_tile_with_scissor(void) {
 	pxl_draw_tile(&g_cnv, &g_ts, 0, 5, 5);
 
 	/* Verify pixels inside scissor were drawn */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){8, 8, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){8, 8, 8, 8}));
 
 	/* Verify pixels outside scissor were NOT drawn */
-	ASSERT(!has_pixels_in_rect((pxl_rect_t){5, 5, 3, 3}));
-	ASSERT(!has_pixels_in_rect((pxl_rect_t){13, 13, 8, 8}));
+	assert(!has_pixels_in_rect((pxl_rect_t){5, 5, 3, 3}));
+	assert(!has_pixels_in_rect((pxl_rect_t){13, 13, 8, 8}));
 
 	pxl_canvas_reset_scissor(&g_cnv);
 }
@@ -165,25 +168,25 @@ test_pxl_draw_sprite_sequential(void) {
 
 	/* Draw frame 0 (tile 0) */
 	pxl_draw_sprite(&g_cnv, &g_ts, &sprite, 0, 0, 0);
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
 	pxl_t color0 = *pxl_buf_ptr(&g_pb, 0, 0);
 
 	/* Draw frame 1 (tile 1) */
 	fixture_reset();
 	pxl_draw_sprite(&g_cnv, &g_ts, &sprite, 1, 0, 0);
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
 	pxl_t color1 = *pxl_buf_ptr(&g_pb, 0, 0);
 
 	/* Draw frame 2 (tile 2) */
 	fixture_reset();
 	pxl_draw_sprite(&g_cnv, &g_ts, &sprite, 2, 0, 0);
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
 	pxl_t color2 = *pxl_buf_ptr(&g_pb, 0, 0);
 
 	/* Verify all frames have different colors */
-	ASSERT(color0 != color1);
-	ASSERT(color0 != color2);
-	ASSERT(color1 != color2);
+	assert(color0 != color1);
+	assert(color0 != color2);
+	assert(color1 != color2);
 }
 
 static void
@@ -196,25 +199,25 @@ test_pxl_draw_sprite_custom_frames(void) {
 
 	/* Draw frame 0 (tile 0) */
 	pxl_draw_sprite(&g_cnv, &g_ts, &sprite, 0, 0, 0);
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
 	pxl_t color0 = *pxl_buf_ptr(&g_pb, 0, 0);
 
 	/* Draw frame 1 (tile 4) */
 	fixture_reset();
 	pxl_draw_sprite(&g_cnv, &g_ts, &sprite, 1, 0, 0);
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
 	pxl_t color1 = *pxl_buf_ptr(&g_pb, 0, 0);
 
 	/* Draw frame 2 (tile 8) */
 	fixture_reset();
 	pxl_draw_sprite(&g_cnv, &g_ts, &sprite, 2, 0, 0);
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
 	pxl_t color2 = *pxl_buf_ptr(&g_pb, 0, 0);
 
 	/* Verify all frames have different colors */
-	ASSERT(color0 != color1);
-	ASSERT(color0 != color2);
-	ASSERT(color1 != color2);
+	assert(color0 != color1);
+	assert(color0 != color2);
+	assert(color1 != color2);
 }
 
 static void
@@ -228,7 +231,7 @@ test_pxl_draw_tile_last_tile(void) {
 	pxl_draw_tile(&g_cnv, &g_ts, last_tile_idx, 0, 0);
 
 	/* Verify last tile was drawn at expected position */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 8, 8}));
 
 	/* Verify it has the expected color (tile 15's color from the atlas) */
 	pxl_t color = *pxl_buf_ptr(&g_pb, 0, 0);
@@ -236,7 +239,7 @@ test_pxl_draw_tile_last_tile(void) {
 	uint8_t expected_g = (uint8_t)((15 * 31) % 256);
 	uint8_t expected_b = (uint8_t)((15 * 59) % 256);
 	pxl_t expected_color = (pxl_t)(0xFF000000U | ((unsigned int)expected_r << 16) | ((unsigned int)expected_g << 8) | (unsigned int)expected_b);
-	ASSERT(color == expected_color);
+	assert(color == expected_color);
 }
 
 static void
@@ -255,10 +258,10 @@ test_pxl_draw_tile_with_offset_and_scissor(void) {
 	pxl_draw_sprite(&g_cnv, &g_ts, &sprite, 0, 0, 0);
 
 	/* Verify pixels at offset+scissor intersection were drawn */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){4, 4, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){4, 4, 8, 8}));
 
 	/* Verify pixels before offset+scissor were NOT drawn */
-	ASSERT(!has_pixels_in_rect((pxl_rect_t){2, 2, 2, 2}));
+	assert(!has_pixels_in_rect((pxl_rect_t){2, 2, 2, 2}));
 
 	pxl_canvas_reset_offset(&g_cnv);
 	pxl_canvas_reset_scissor(&g_cnv);

@@ -1,9 +1,11 @@
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
-#include "test.h"
 #include "bitmask.h"
-#include "canvas.h"
-#include "buf.h"
 #include "blit.h"
+#include "buf.h"
+#include "canvas.h"
 #include "geom.h"
 
 /* Test fixture for transformed functions */
@@ -196,7 +198,7 @@ test_pxl_blit_rect_basic(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_blit ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -221,7 +223,7 @@ test_pxl_blit_rect_with_scissor(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_blit ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -244,7 +246,7 @@ test_pxl_blit_rect_fully_clipped(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_blit ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -269,7 +271,7 @@ test_pxl_blit_rect_with_offset(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_blit ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -292,7 +294,7 @@ test_pxl_blit_rect_partially_clipped(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_blit ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -317,7 +319,7 @@ test_pxl_draw_bitmask_basic(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_bitmask ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -340,7 +342,7 @@ test_pxl_draw_bitmask_all_bits_set(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_bitmask ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -365,7 +367,7 @@ test_pxl_draw_bitmask_clipped(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_bitmask ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -390,7 +392,7 @@ test_pxl_draw_bitmask_with_offset(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_bitmask ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -418,7 +420,7 @@ test_pxl_draw_bitmask_transformed_scale2(void) {
 			int px = x + dx;
 			int py = y + dy;
 			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
-			ASSERT(got == color);
+			assert(got == color);
 		}
 	}
 }
@@ -440,9 +442,9 @@ test_pxl_draw_bitmask_transformed_flip_h(void) {
 
 	/* With flip H, bit 0 (leftmost source) appears at rightmost destination */
 	pxl_t got = *pxl_buf_ptr(&g_transform_buf, 5 + 3, 5);
-	ASSERT(got == color); /* Rightmost pixel should be on (source bit 0) */
+	assert(got == color); /* Rightmost pixel should be on (source bit 0) */
 	got = *pxl_buf_ptr(&g_transform_buf, 5, 5);
-	ASSERT(got == 0); /* Leftmost pixel should be off */
+	assert(got == 0); /* Leftmost pixel should be off */
 }
 
 static void
@@ -462,9 +464,9 @@ test_pxl_draw_bitmask_transformed_flip_v(void) {
 
 	/* With flip V, the top source bit appears at bottom destination */
 	pxl_t got = *pxl_buf_ptr(&g_transform_buf, 5, 5 + 1);
-	ASSERT(got == color); /* Bottom pixel should be on (source top bit) */
+	assert(got == color); /* Bottom pixel should be on (source top bit) */
 	got = *pxl_buf_ptr(&g_transform_buf, 5, 5);
-	ASSERT(got == 0); /* Top pixel should be off (source bottom bit was off) */
+	assert(got == 0); /* Top pixel should be off (source bottom bit was off) */
 }
 
 static void
@@ -485,7 +487,7 @@ test_pxl_blit_transformed_scale2(void) {
 			int px = x + dx;
 			int py = y + dy;
 			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
-			ASSERT(got == color);
+			assert(got == color);
 		}
 	}
 }
@@ -514,7 +516,7 @@ test_pxl_blit_transformed_flip_h(void) {
 			int py = y + src_y;
 			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
 			pxl_t expected = (pxl_t)(src_x * 100); /* source[src_x] */
-			ASSERT(got == expected);
+			assert(got == expected);
 		}
 	}
 }
@@ -542,7 +544,7 @@ test_pxl_blit_transformed_flip_v(void) {
 			int py = y + (7 - src_y); /* flipped destination position */
 			pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
 			pxl_t expected = (pxl_t)(src_y * 100); /* source[src_y] */
-			ASSERT(got == expected);
+			assert(got == expected);
 		}
 	}
 }
@@ -574,7 +576,7 @@ test_pxl_blit_transformed_scale_and_flip(void) {
 					int px = x + (3 - sx) * 2 + dx; /* Flipped destination position */
 					int py = y + sy * 2 + dy;
 					pxl_t got = *pxl_buf_ptr(&g_transform_buf, px, py);
-					ASSERT(got == expected);
+					assert(got == expected);
 				}
 			}
 		}
@@ -598,8 +600,8 @@ test_example_pxl_draw_bitmask_transformed(void) {
 	pxl_draw_bitmask_transformed(&cnv, &bm, (pxl_rect_t){0, 0, 8, 1}, 0, 0, 2, PXL_FLIP_NONE);
 
 	/* Verify: 16x2 rectangle should be drawn */
-	ASSERT(*pxl_buf_ptr(&pb, 0, 0) == 0xFFFFFFFF);
-	ASSERT(*pxl_buf_ptr(&pb, 15, 1) == 0xFFFFFFFF);
+	assert(*pxl_buf_ptr(&pb, 0, 0) == 0xFFFFFFFF);
+	assert(*pxl_buf_ptr(&pb, 15, 1) == 0xFFFFFFFF);
 }
 
 static void
@@ -621,8 +623,8 @@ test_example_pxl_blit_transformed(void) {
 	pxl_blit_transformed(&cnv, &src, (pxl_rect_t){0, 0, 4, 4}, 0, 0, 2, PXL_FLIP_NONE);
 
 	/* Verify: 8x8 rectangle should be drawn with scaled pixels */
-	ASSERT(*pxl_buf_ptr(&pb, 0, 0) == 0xFF000000);
-	ASSERT(*pxl_buf_ptr(&pb, 7, 7) == (0xFF000000 | (3 * 64 + 3 * 16)));
+	assert(*pxl_buf_ptr(&pb, 0, 0) == 0xFF000000);
+	assert(*pxl_buf_ptr(&pb, 7, 7) == (0xFF000000 | (3 * 64 + 3 * 16)));
 }
 
 /* Main ----------------------------------------------------------------------- */

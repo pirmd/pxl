@@ -25,7 +25,7 @@ test: $(TST)
 		done
 
 .for t in $(TST)
-$(t): $(t).c test.h $(PXL_DIR)/libpxl.a
+$(t): $(t).c $(PXL_DIR)/libpxl.a
 	$(CC) $(CFLAGS) $(t).c -o $@ $(LDFLAGS)
 .endfor
 

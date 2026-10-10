@@ -1,6 +1,8 @@
-#include <string.h>
+#include <assert.h>
 #include <limits.h>
-#include "test.h"
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include "canvas.h"
 #include "buf.h"
 #include "shape.h"
@@ -132,7 +134,7 @@ test_pxl_draw_line_single_pixel(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_line ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -154,7 +156,7 @@ test_pxl_draw_line_horizontal(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_line ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -176,7 +178,7 @@ test_pxl_draw_line_vertical(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_line ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -198,7 +200,7 @@ test_pxl_draw_line_diagonal(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_line ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -222,7 +224,7 @@ test_pxl_draw_line_outside_scissor(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_line ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -245,7 +247,7 @@ test_pxl_draw_line_with_offset(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_line ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -269,7 +271,7 @@ test_pxl_draw_line_with_negative_offset(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_line ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -293,7 +295,7 @@ test_pxl_draw_rect_basic(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -317,7 +319,7 @@ test_pxl_draw_rect_outside_scissor(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -341,7 +343,7 @@ test_pxl_draw_rect_clip_left_no_false_border(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -365,7 +367,7 @@ test_pxl_draw_rect_clip_both_sides(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -388,7 +390,7 @@ test_pxl_draw_rect_with_offset(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && on_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -412,7 +414,7 @@ test_pxl_fill_rect_basic(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -436,7 +438,7 @@ test_pxl_fill_rect_with_scissor(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -460,7 +462,7 @@ test_pxl_fill_rect_fast_path(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -483,7 +485,7 @@ test_pxl_fill_rect_with_offset(void) {
 			
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_s && in_rect ? color : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -543,13 +545,13 @@ test_draw_circle_basic(void) {
 	pxl_draw_circle(&g_cnv_extra, 50, 50, 10);
 
 	/* Check that something was drawn */
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 
 	/* Check top, bottom, left, right cardinal points */
-	ASSERT(buf_get_extra(50, 40) == 0xFFFF0000);  /* top */
-	ASSERT(buf_get_extra(50, 60) == 0xFFFF0000);  /* bottom */
-	ASSERT(buf_get_extra(40, 50) == 0xFFFF0000);  /* left */
-	ASSERT(buf_get_extra(60, 50) == 0xFFFF0000);  /* right */
+	assert(buf_get_extra(50, 40) == 0xFFFF0000);  /* top */
+	assert(buf_get_extra(50, 60) == 0xFFFF0000);  /* bottom */
+	assert(buf_get_extra(40, 50) == 0xFFFF0000);  /* left */
+	assert(buf_get_extra(60, 50) == 0xFFFF0000);  /* right */
 }
 
 static void
@@ -559,12 +561,12 @@ test_draw_circle_min_radius(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFF00FF00);
 	pxl_draw_circle(&g_cnv_extra, 50, 50, 1);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* With r=1, only 4 points around center + center cross */
-	ASSERT(buf_get_extra(50, 49) == 0xFF00FF00);
-	ASSERT(buf_get_extra(50, 51) == 0xFF00FF00);
-	ASSERT(buf_get_extra(49, 50) == 0xFF00FF00);
-	ASSERT(buf_get_extra(51, 50) == 0xFF00FF00);
+	assert(buf_get_extra(50, 49) == 0xFF00FF00);
+	assert(buf_get_extra(50, 51) == 0xFF00FF00);
+	assert(buf_get_extra(49, 50) == 0xFF00FF00);
+	assert(buf_get_extra(51, 50) == 0xFF00FF00);
 }
 
 static void
@@ -576,7 +578,7 @@ test_draw_circle_outside_scissor(void) {
 	pxl_draw_circle(&g_cnv_extra, 100, 100, 10);
 
 	/* Buffer should remain empty */
-	ASSERT(buf_is_empty_extra());
+	assert(buf_is_empty_extra());
 }
 
 static void
@@ -589,12 +591,12 @@ test_draw_circle_with_offset(void) {
 	/* Draw at (0,0) with offset becomes (20,20) */
 	pxl_draw_circle(&g_cnv_extra, 0, 0, 5);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Check cardinal points with offset: center is at (20,20) with r=5 */
-	ASSERT(buf_get_extra(20, 15) == 0xFF0000FF);  /* top: (20,20-5) */
-	ASSERT(buf_get_extra(20, 25) == 0xFF0000FF);  /* bottom: (20,20+5) */
-	ASSERT(buf_get_extra(15, 20) == 0xFF0000FF);  /* left: (20-5,20) */
-	ASSERT(buf_get_extra(25, 20) == 0xFF0000FF);  /* right: (20+5,20) */
+	assert(buf_get_extra(20, 15) == 0xFF0000FF);  /* top: (20,20-5) */
+	assert(buf_get_extra(20, 25) == 0xFF0000FF);  /* bottom: (20,20+5) */
+	assert(buf_get_extra(15, 20) == 0xFF0000FF);  /* left: (20-5,20) */
+	assert(buf_get_extra(25, 20) == 0xFF0000FF);  /* right: (20+5,20) */
 }
 
 /* Tests - Fill Circle --------------------------------------------------------- */
@@ -606,15 +608,15 @@ test_fill_circle_basic(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFF00FF00);
 	pxl_fill_circle(&g_cnv_extra, 50, 50, 10);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 
 	/* Check center */
-	ASSERT(buf_get_extra(50, 50) == 0xFF00FF00);
+	assert(buf_get_extra(50, 50) == 0xFF00FF00);
 	/* Check cardinal points on edge */
-	ASSERT(buf_get_extra(50, 40) == 0xFF00FF00);  /* top */
-	ASSERT(buf_get_extra(50, 60) == 0xFF00FF00);  /* bottom */
-	ASSERT(buf_get_extra(40, 50) == 0xFF00FF00);  /* left */
-	ASSERT(buf_get_extra(60, 50) == 0xFF00FF00);  /* right */
+	assert(buf_get_extra(50, 40) == 0xFF00FF00);  /* top */
+	assert(buf_get_extra(50, 60) == 0xFF00FF00);  /* bottom */
+	assert(buf_get_extra(40, 50) == 0xFF00FF00);  /* left */
+	assert(buf_get_extra(60, 50) == 0xFF00FF00);  /* right */
 }
 
 static void
@@ -624,14 +626,14 @@ test_fill_circle_min_radius(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFFFFFF00);
 	pxl_fill_circle(&g_cnv_extra, 50, 50, 1);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Center should be filled */
-	ASSERT(buf_get_extra(50, 50) == 0xFFFFFF00);
+	assert(buf_get_extra(50, 50) == 0xFFFFFF00);
 	/* Edge points */
-	ASSERT(buf_get_extra(50, 49) == 0xFFFFFF00);
-	ASSERT(buf_get_extra(50, 51) == 0xFFFFFF00);
-	ASSERT(buf_get_extra(49, 50) == 0xFFFFFF00);
-	ASSERT(buf_get_extra(51, 50) == 0xFFFFFF00);
+	assert(buf_get_extra(50, 49) == 0xFFFFFF00);
+	assert(buf_get_extra(50, 51) == 0xFFFFFF00);
+	assert(buf_get_extra(49, 50) == 0xFFFFFF00);
+	assert(buf_get_extra(51, 50) == 0xFFFFFF00);
 }
 
 static void
@@ -641,7 +643,7 @@ test_fill_circle_outside_scissor(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFF00FF00);
 	pxl_fill_circle(&g_cnv_extra, 100, 100, 10);
 
-	ASSERT(buf_is_empty_extra());
+	assert(buf_is_empty_extra());
 }
 
 static void
@@ -653,14 +655,14 @@ test_fill_circle_with_offset(void) {
 
 	pxl_fill_circle(&g_cnv_extra, 0, 0, 8);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Center with offset */
-	ASSERT(buf_get_extra(10, 10) == 0xFF00FF00);
+	assert(buf_get_extra(10, 10) == 0xFF00FF00);
 	/* Edge with offset */
-	ASSERT(buf_get_extra(10, 2) == 0xFF00FF00);   /* top */
-	ASSERT(buf_get_extra(10, 18) == 0xFF00FF00);  /* bottom */
-	ASSERT(buf_get_extra(2, 10) == 0xFF00FF00);   /* left */
-	ASSERT(buf_get_extra(18, 10) == 0xFF00FF00);  /* right */
+	assert(buf_get_extra(10, 2) == 0xFF00FF00);   /* top */
+	assert(buf_get_extra(10, 18) == 0xFF00FF00);  /* bottom */
+	assert(buf_get_extra(2, 10) == 0xFF00FF00);   /* left */
+	assert(buf_get_extra(18, 10) == 0xFF00FF00);  /* right */
 }
 
 /* Tests - Triangle ------------------------------------------------------------- */
@@ -672,12 +674,12 @@ test_draw_triangle_basic(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFFFF0000);
 	pxl_draw_triangle(&g_cnv_extra, 30, 30, 50, 30, 40, 50);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 
 	/* Check the three vertices */
-	ASSERT(buf_get_extra(30, 30) == 0xFFFF0000);
-	ASSERT(buf_get_extra(50, 30) == 0xFFFF0000);
-	ASSERT(buf_get_extra(40, 50) == 0xFFFF0000);
+	assert(buf_get_extra(30, 30) == 0xFFFF0000);
+	assert(buf_get_extra(50, 30) == 0xFFFF0000);
+	assert(buf_get_extra(40, 50) == 0xFFFF0000);
 }
 
 static void
@@ -687,7 +689,7 @@ test_draw_triangle_outside_scissor(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFFFF0000);
 	pxl_draw_triangle(&g_cnv_extra, 100, 100, 120, 100, 110, 120);
 
-	ASSERT(buf_is_empty_extra());
+	assert(buf_is_empty_extra());
 }
 
 static void
@@ -699,11 +701,11 @@ test_draw_triangle_with_offset(void) {
 
 	pxl_draw_triangle(&g_cnv_extra, 0, 0, 20, 0, 10, 20);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Vertices with offset */
-	ASSERT(buf_get_extra(10, 10) == 0xFF0000FF);
-	ASSERT(buf_get_extra(30, 10) == 0xFF0000FF);
-	ASSERT(buf_get_extra(20, 30) == 0xFF0000FF);
+	assert(buf_get_extra(10, 10) == 0xFF0000FF);
+	assert(buf_get_extra(30, 10) == 0xFF0000FF);
+	assert(buf_get_extra(20, 30) == 0xFF0000FF);
 }
 
 /* Tests - Fill Triangle -------------------------------------------------------- */
@@ -715,14 +717,14 @@ test_fill_triangle_basic(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFF00FF00);
 	pxl_fill_triangle(&g_cnv_extra, 30, 30, 50, 30, 40, 50);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 
 	/* Check vertices are filled */
-	ASSERT(buf_get_extra(30, 30) == 0xFF00FF00);
-	ASSERT(buf_get_extra(50, 30) == 0xFF00FF00);
-	ASSERT(buf_get_extra(40, 50) == 0xFF00FF00);
+	assert(buf_get_extra(30, 30) == 0xFF00FF00);
+	assert(buf_get_extra(50, 30) == 0xFF00FF00);
+	assert(buf_get_extra(40, 50) == 0xFF00FF00);
 	/* Check center-ish point is filled */
-	ASSERT(buf_get_extra(40, 40) == 0xFF00FF00);
+	assert(buf_get_extra(40, 40) == 0xFF00FF00);
 }
 
 static void
@@ -732,7 +734,7 @@ test_fill_triangle_outside_scissor(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFF00FF00);
 	pxl_fill_triangle(&g_cnv_extra, 100, 100, 120, 100, 110, 120);
 
-	ASSERT(buf_is_empty_extra());
+	assert(buf_is_empty_extra());
 }
 
 static void
@@ -744,13 +746,13 @@ test_fill_triangle_with_offset(void) {
 
 	pxl_fill_triangle(&g_cnv_extra, 0, 0, 10, 0, 5, 10);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Vertices with offset */
-	ASSERT(buf_get_extra(5, 5) == 0xFFFFFF00);
-	ASSERT(buf_get_extra(15, 5) == 0xFFFFFF00);
-	ASSERT(buf_get_extra(10, 15) == 0xFFFFFF00);
+	assert(buf_get_extra(5, 5) == 0xFFFFFF00);
+	assert(buf_get_extra(15, 5) == 0xFFFFFF00);
+	assert(buf_get_extra(10, 15) == 0xFFFFFF00);
 	/* Center with offset */
-	ASSERT(buf_get_extra(10, 10) == 0xFFFFFF00);
+	assert(buf_get_extra(10, 10) == 0xFFFFFF00);
 }
 
 /* Tests - Edge Cases ----------------------------------------------------------- */
@@ -765,13 +767,13 @@ test_circle_partial_scissor(void) {
 	pxl_draw_circle(&g_cnv_extra, 30, 30, 15);
 
 	/* Should have some pixels drawn (the part inside scissor) */
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Top-left of circle should be clipped */
-	ASSERT(buf_get_extra(15, 15) == 0x00000000);  /* outside scissor */
+	assert(buf_get_extra(15, 15) == 0x00000000);  /* outside scissor */
 	/* Right edge of circle at (45,30) should be drawn and inside scissor */
-	ASSERT(buf_get_extra(45, 30) == 0xFFFF0000);  /* on circle edge, inside scissor */
+	assert(buf_get_extra(45, 30) == 0xFFFF0000);  /* on circle edge, inside scissor */
 	/* Bottom edge of circle at (30,45) should be drawn and inside scissor */
-	ASSERT(buf_get_extra(30, 45) == 0xFFFF0000);  /* on circle edge, inside scissor */
+	assert(buf_get_extra(30, 45) == 0xFFFF0000);  /* on circle edge, inside scissor */
 }
 
 static void
@@ -781,11 +783,11 @@ test_fill_circle_partial_scissor(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFF00FF00);
 	pxl_fill_circle(&g_cnv_extra, 40, 40, 15);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Part inside scissor should be filled */
-	ASSERT(buf_get_extra(35, 35) == 0xFF00FF00);
+	assert(buf_get_extra(35, 35) == 0xFF00FF00);
 	/* Part outside scissor should be empty */
-	ASSERT(buf_get_extra(20, 20) == 0x00000000);
+	assert(buf_get_extra(20, 20) == 0x00000000);
 }
 
 static void
@@ -796,11 +798,11 @@ test_fill_triangle_partial_scissor(void) {
 	/* Triangle partially overlapping scissor */
 	pxl_fill_triangle(&g_cnv_extra, 20, 20, 50, 20, 35, 50);
 
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 	/* Part inside scissor should be filled */
-	ASSERT(buf_get_extra(30, 30) == 0xFFFFFF00);
+	assert(buf_get_extra(30, 30) == 0xFFFFFF00);
 	/* Part outside scissor should be empty */
-	ASSERT(buf_get_extra(20, 20) == 0x00000000);
+	assert(buf_get_extra(20, 20) == 0x00000000);
 }
 
 /* Tests - Assertion coverage ---------------------------------------------------- */
@@ -809,14 +811,14 @@ static void
 test_draw_circle_max_safe_radius(void) {
 	/* Verify the overflow protection constant */
 	int max_safe_r = (INT_MAX - 1) / 2;
-	ASSERT(max_safe_r > 0);
-	ASSERT(max_safe_r <= (INT_MAX - 1) / 2);
+	assert(max_safe_r > 0);
+	assert(max_safe_r <= (INT_MAX - 1) / 2);
 	
 	/* Test with a large but safe radius */
 	fixture_reset_extra();
 	pxl_canvas_set_color(&g_cnv_extra, 0xFFFF0000);
 	pxl_draw_circle(&g_cnv_extra, 50, 50, 40);
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 }
 
 static void
@@ -826,7 +828,7 @@ test_fill_triangle_large_coords(void) {
 	pxl_canvas_set_color(&g_cnv_extra, 0xFF00FF00);
 	/* Use coordinates that are large but won't cause overflow in bounding box */
 	pxl_fill_triangle(&g_cnv_extra, 10, 10, 50, 10, 30, 50);
-	ASSERT(buf_is_not_empty_extra());
+	assert(buf_is_not_empty_extra());
 }
 
 /* Main ----------------------------------------------------------------------- */

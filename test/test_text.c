@@ -1,6 +1,9 @@
+#include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
-
-#include "test.h"
+#include "bitmask.h"
+#include "blit.h"
 #include "buf.h"
 #include "canvas.h"
 #include "geom.h"
@@ -153,112 +156,112 @@ static void
 test_pxl_utf8_decode_ascii(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("A", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 'A');
+	assert(len == 1);
+	assert(codepoint == 'A');
 }
 
 static void
 test_pxl_utf8_decode_2byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xC2\xA9", &codepoint);
-	ASSERT(len == 2);
-	ASSERT(codepoint == 0xA9);
+	assert(len == 2);
+	assert(codepoint == 0xA9);
 }
 
 static void
 test_pxl_utf8_decode_3byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xE2\x82\xAC", &codepoint);
-	ASSERT(len == 3);
-	ASSERT(codepoint == 0x20AC);
+	assert(len == 3);
+	assert(codepoint == 0x20AC);
 }
 
 static void
 test_pxl_utf8_decode_4byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xF0\x9F\x98\x80", &codepoint);
-	ASSERT(len == 4);
-	ASSERT(codepoint == 0x1F600);
+	assert(len == 4);
+	assert(codepoint == 0x1F600);
 }
 
 static void
 test_pxl_utf8_decode_invalid_byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xFF", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_continuation_as_first(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\x80", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_incomplete_2byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xC0", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_incomplete_3byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xE2\x82", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_incomplete_4byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xF0\x9F\x98", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_invalid_continuation_byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xC0\x22", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_overlong_2byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xC0\x80", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_overlong_3byte(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xE0\x80\x81", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_surrogate(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xED\xA0\x80", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 static void
 test_pxl_utf8_decode_above_10ffff(void) {
 	uint32_t codepoint;
 	int len = pxl_utf8_decode("\xF4\x90\x80\x80", &codepoint);
-	ASSERT(len == 1);
-	ASSERT(codepoint == 0xFFFD);
+	assert(len == 1);
+	assert(codepoint == 0xFFFD);
 }
 
 /* Tests for pxl_rune_bounds */
@@ -267,21 +270,21 @@ static void
 test_pxl_rune_bounds_basic(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > 0);
+	assert(bounds.w > 0);
+	assert(bounds.h > 0);
 }
 
 static void
 test_pxl_rune_bounds_control_chars(void) {
 	setup_fixture();
 	pxl_rect_t bounds_nl = pxl_rune_bounds(&g_w, '\n');
-	ASSERT(bounds_nl.w == 0 && bounds_nl.h == 0);
+	assert(bounds_nl.w == 0 && bounds_nl.h == 0);
 
 	pxl_rect_t bounds_tab = pxl_rune_bounds(&g_w, '\t');
-	ASSERT(bounds_tab.w == 0 && bounds_tab.h == 0);
+	assert(bounds_tab.w == 0 && bounds_tab.h == 0);
 
 	pxl_rect_t bounds_cr = pxl_rune_bounds(&g_w, '\r');
-	ASSERT(bounds_cr.w == 0 && bounds_cr.h == 0);
+	assert(bounds_cr.w == 0 && bounds_cr.h == 0);
 }
 
 static void
@@ -289,7 +292,7 @@ test_pxl_rune_bounds_fallback(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 200);
 	pxl_rect_t fallback_bounds = pxl_rune_bounds(&g_w, 68);
-	ASSERT(bounds.w == fallback_bounds.w && bounds.h == fallback_bounds.h);
+	assert(bounds.w == fallback_bounds.w && bounds.h == fallback_bounds.h);
 }
 
 static void
@@ -303,7 +306,7 @@ test_pxl_rune_bounds_no_fallback(void) {
 	pxl_writer_init(&ctx, fonts, 1);
 
 	pxl_rect_t bounds = pxl_rune_bounds(&ctx, 200);
-	ASSERT(bounds.w == font_no_fallback.bitmask.width &&
+	assert(bounds.w == font_no_fallback.bitmask.width &&
 	       bounds.h == font_no_fallback.glyph_height);
 }
 
@@ -320,7 +323,7 @@ test_pxl_draw_rune_basic(void) {
 
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -334,7 +337,7 @@ test_pxl_draw_rune_fallback(void) {
 
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 68);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -352,8 +355,8 @@ test_pxl_draw_rune_no_fallback(void) {
 	int x_before = g_w.x;
 	pxl_draw_rune(&g_cnv, &g_w, 200);
 
-	ASSERT(buf_is_empty());
-	ASSERT(g_w.x > x_before); /* Cursor must advance even for missing rune */
+	assert(buf_is_empty());
+	assert(g_w.x > x_before); /* Cursor must advance even for missing rune */
 }
 
 static void
@@ -366,7 +369,7 @@ test_pxl_draw_rune_with_scissor(void) {
 	pxl_writer_set_cursor(&g_w, x, y);
 	pxl_draw_rune(&g_cnv, &g_w, 'A');
 
-	ASSERT(has_pixels_in_rect((pxl_rect_t){8, 5, 8, 8}));
+	assert(has_pixels_in_rect((pxl_rect_t){8, 5, 8, 8}));
 }
 
 static void
@@ -381,7 +384,7 @@ test_pxl_draw_rune_with_offset(void) {
 
 	pxl_rect_t bounds = pxl_rune_bounds(&g_w, 'A');
 	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 /* Tests for pxl_draw_text */
@@ -398,7 +401,7 @@ test_pxl_draw_text_basic(void) {
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -410,7 +413,7 @@ test_pxl_draw_text_empty(void) {
 	pxl_writer_set_cursor(&g_w, x, y);
 	pxl_draw_text(&g_cnv, &g_w, "");
 
-	ASSERT(buf_is_empty());
+	assert(buf_is_empty());
 }
 
 static void
@@ -425,7 +428,7 @@ test_pxl_draw_text_with_newline(void) {
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -442,13 +445,13 @@ test_pxl_draw_text_with_tab(void) {
 	/* Verify cursor advanced by exact amount */
 	/* A = 5+1 = 6px, tab = 4*(5+1) = 24px, B = 5+1 = 6px */
 	/* Total advance = 6 + 24 + 6 = 36px */
-	ASSERT(g_w.x == start_x + 36);
+	assert(g_w.x == start_x + 36);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 	/* Bounds width must match actual cursor advance */
-	ASSERT(bounds.w == 36);
+	assert(bounds.w == 36);
 }
 
 /* Tests for multi-line consistency */
@@ -458,8 +461,8 @@ test_pxl_text_bounds_carriage_return_only(void) {
 	setup_fixture();
 	/* \r alone should NOT create a new line (height = 1 line) */
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\rB");
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == g_w.fonts[0]->glyph_height); /* Single line */
+	assert(bounds.w > 0);
+	assert(bounds.h == g_w.fonts[0]->glyph_height); /* Single line */
 }
 
 static void
@@ -467,8 +470,8 @@ test_pxl_text_bounds_crlf(void) {
 	setup_fixture();
 	/* \r\n should be treated as a single line break (2 lines total) */
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\r\nB");
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == g_w.fonts[0]->glyph_height + g_test_font.leading);
+	assert(bounds.w > 0);
+	assert(bounds.h == g_w.fonts[0]->glyph_height + g_test_font.leading);
 }
 
 static void
@@ -476,8 +479,8 @@ test_pxl_text_bounds_double_newline(void) {
 	setup_fixture();
 	/* \n\n should create an empty line (3 lines total: A, empty, B) */
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\n\nB");
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == g_w.fonts[0]->glyph_height + 2 * g_test_font.leading);
+	assert(bounds.w > 0);
+	assert(bounds.h == g_w.fonts[0]->glyph_height + 2 * g_test_font.leading);
 }
 
 static void
@@ -491,7 +494,7 @@ test_pxl_draw_text_with_carriage_return(void) {
 	pxl_draw_text(&g_cnv, &g_w, text);
 
 	/* After \r, y should be unchanged (no line break), B overwrites A at start of line */
-	ASSERT(g_w.y == y);
+	assert(g_w.y == y);
 }
 
 /* Test the example from pxl_next_textline() documentation */
@@ -514,7 +517,7 @@ test_pxl_next_textline_example(void) {
 	}
 
 	/* Verify that something was drawn */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){0, 0, 10, 10}));
+	assert(has_pixels_in_rect((pxl_rect_t){0, 0, 10, 10}));
 }
 
 static void
@@ -542,18 +545,18 @@ test_pxl_text_draw_consistency(void) {
 	int leading = g_test_font.leading;
 	int newline_count = 2; /* "A\nB\r\nC" has 2 newlines */
 	int expected_height = glyph_height + newline_count * leading;
-	ASSERT(bounds.h == expected_height);
+	assert(bounds.h == expected_height);
 
 	/* Verify drawn y position: each \n advances by leading */
 	int drawn_height = g_w.y - start_y;
-	ASSERT(drawn_height == newline_count * leading);
+	assert(drawn_height == newline_count * leading);
 
 	/* The real cross-check: bounds.h must match where the last line
 	 * actually lands. drawn_height covers the advance to the top of the
 	 * last line; add that line's own glyph_height to get the full extent.
 	 * This is the assertion that would have caught draw/bounds drifting
 	 * apart, regardless of which side had the wrong formula. */
-	ASSERT(bounds.h == drawn_height + glyph_height);
+	assert(bounds.h == drawn_height + glyph_height);
 }
 
 static void
@@ -567,7 +570,7 @@ test_pxl_draw_text_with_scissor(void) {
 	pxl_writer_set_cursor(&g_w, x, y);
 	pxl_draw_text(&g_cnv, &g_w, text);
 
-	ASSERT(has_pixels_in_rect((pxl_rect_t){10, 5, 20, 10}));
+	assert(has_pixels_in_rect((pxl_rect_t){10, 5, 20, 10}));
 }
 
 static void
@@ -583,7 +586,7 @@ test_pxl_draw_text_with_offset(void) {
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -635,7 +638,7 @@ test_pxl_draw_text_proportional(void) {
 
 	pxl_rect_t bounds = pxl_text_bounds(&prop_ctx, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 /* Tests for pxl_text_bounds */
@@ -644,16 +647,16 @@ static void
 test_pxl_text_bounds_basic(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "Hello");
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > 0);
+	assert(bounds.w > 0);
+	assert(bounds.h > 0);
 }
 
 static void
 test_pxl_text_bounds_empty(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "");
-	ASSERT(bounds.w == 0);
-	ASSERT(bounds.h == 0);
+	assert(bounds.w == 0);
+	assert(bounds.h == 0);
 }
 
 static void
@@ -663,38 +666,38 @@ test_pxl_text_bounds_height(void) {
 	const int ld = g_w.fonts[0]->leading;
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A");
-	ASSERT(bounds.h == gh);
+	assert(bounds.h == gh);
 
 	bounds = pxl_text_bounds(&g_w, "");
-	ASSERT(bounds.h == 0);
+	assert(bounds.h == 0);
 
 	/* \n creates 2 lines: first line (empty), second line (empty).
 	 * leading is the full line-to-line advance (see pxl_draw_rune), so
 	 * only the last line contributes a full glyph_height. */
 	bounds = pxl_text_bounds(&g_w, "\n");
-	ASSERT(bounds.h == gh + ld);
+	assert(bounds.h == gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\n");
-	ASSERT(bounds.h == gh + ld);
+	assert(bounds.h == gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\nB");
-	ASSERT(bounds.h == gh + ld);
+	assert(bounds.h == gh + ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\nB\nC");
-	ASSERT(bounds.h == gh + 2 * ld);
+	assert(bounds.h == gh + 2 * ld);
 
 	/* Empty lines: consecutive newlines create visual empty lines */
 	bounds = pxl_text_bounds(&g_w, "\n\n");
-	ASSERT(bounds.h == gh + 2 * ld);
+	assert(bounds.h == gh + 2 * ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\n\nB");
-	ASSERT(bounds.h == gh + 2 * ld);
+	assert(bounds.h == gh + 2 * ld);
 
 	bounds = pxl_text_bounds(&g_w, "A\n\n");
-	ASSERT(bounds.h == gh + 2 * ld);
+	assert(bounds.h == gh + 2 * ld);
 
 	bounds = pxl_text_bounds(&g_w, "\nA");
-	ASSERT(bounds.h == gh + ld);
+	assert(bounds.h == gh + ld);
 }
 
 static void
@@ -703,12 +706,12 @@ test_pxl_text_bounds_with_tab(void) {
 	/* Tab should advance by tab_width * (glyph_width + tracking) */
 	int char_width = g_test_font.bitmask.width + g_test_font.tracking;
 	int tab_advance = g_w.tab_width * char_width;
-	ASSERT(tab_advance == 24); /* 4 * (5 + 1) */
+	assert(tab_advance == 24); /* 4 * (5 + 1) */
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\tB");
 	/* Width of "A\tB" = width(A) + tab_advance + width(B) */
 	/* width(A) = char_width = 6, tab_advance = 24, width(B) = 6 */
 	/* Total = 6 + 24 + 6 = 36 */
-	ASSERT(bounds.w == 36);
+	assert(bounds.w == 36);
 }
 
 static void
@@ -717,17 +720,17 @@ test_pxl_text_bounds_tab_exact_width(void) {
 	/* Single tab: should be tab_width * (glyph_width + tracking) */
 	int expected_tab_width = g_w.tab_width * (g_test_font.bitmask.width + g_test_font.tracking);
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "\t");
-	ASSERT(bounds.w == expected_tab_width);
-	ASSERT(bounds.h == 0); /* No glyph height for control char alone */
+	assert(bounds.w == expected_tab_width);
+	assert(bounds.h == 0); /* No glyph height for control char alone */
 
 	/* Tab with character: "A\t" */
 	/* = width(A) + tab_advance = (5+1) + 24 = 30 */
 	bounds = pxl_text_bounds(&g_w, "A\t");
-	ASSERT(bounds.w == 30);
+	assert(bounds.w == 30);
 
 	/* Multiple tabs: "\t\t" */
 	bounds = pxl_text_bounds(&g_w, "\t\t");
-	ASSERT(bounds.w == expected_tab_width * 2);
+	assert(bounds.w == expected_tab_width * 2);
 }
 
 static void
@@ -741,8 +744,8 @@ test_pxl_text_bounds_zero_tracking(void) {
 	pxl_rect_t bounds_abc = pxl_text_bounds(&g_w, "ABC");
 	pxl_rect_t bounds_a = pxl_text_bounds(&g_w, "A");
 
-	ASSERT(bounds_abc.w > bounds_a.w);
-	ASSERT(bounds_abc.w < bounds_a.w * 5);
+	assert(bounds_abc.w > bounds_a.w);
+	assert(bounds_abc.w < bounds_a.w * 5);
 }
 
 static void
@@ -756,7 +759,7 @@ test_pxl_text_bounds_zero_leading(void) {
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\nB");
 
 	const int gh = g_w.fonts[0]->glyph_height;
-	ASSERT(bounds.h == gh);
+	assert(bounds.h == gh);
 }
 
 /* Tests for font cascade */
@@ -774,7 +777,7 @@ test_pxl_draw_rune_cascade_basic(void) {
 
 	pxl_rect_t bounds = pxl_rune_bounds(&cascade_w, 'A');
 	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -790,8 +793,8 @@ test_pxl_draw_rune_cascade_missing_rune(void) {
 
 	/* Should not draw anything but cursor should advance */
 	int x_before = 5;
-	ASSERT(cascade_w.x > x_before);
-	ASSERT(buf_is_empty());
+	assert(cascade_w.x > x_before);
+	assert(buf_is_empty());
 }
 
 static void
@@ -807,7 +810,7 @@ test_pxl_draw_rune_cascade_lowercase(void) {
 
 	pxl_rect_t bounds = pxl_rune_bounds(&cascade_w, 'a');
 	pxl_rect_t expected = {5, 5, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -818,8 +821,8 @@ test_pxl_text_bounds_cascade(void) {
 	pxl_writer_init(&cascade_w, fonts, 3);
 
 	pxl_rect_t bounds = pxl_text_bounds(&cascade_w, "AaC");
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == g_font_a.glyph_height);
+	assert(bounds.w > 0);
+	assert(bounds.h == g_font_a.glyph_height);
 }
 
 /* Tests for truncated text helpers */
@@ -828,16 +831,16 @@ static void
 test_pxl_text_bounds_n_basic(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "ABC", 10);
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > 0);
+	assert(bounds.w > 0);
+	assert(bounds.h > 0);
 }
 
 static void
 test_pxl_text_bounds_n_empty(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "ABC", 0);
-	ASSERT(bounds.w == 0);
-	ASSERT(bounds.h == 0);
+	assert(bounds.w == 0);
+	assert(bounds.h == 0);
 }
 
 static void
@@ -845,8 +848,8 @@ test_pxl_text_bounds_n_partial(void) {
 	setup_fixture();
 	pxl_rect_t full_bounds = pxl_text_bounds(&g_w, "ABC");
 	pxl_rect_t partial_bounds = pxl_text_bounds_n(&g_w, "ABC", 2);
-	ASSERT(partial_bounds.w <= full_bounds.w);
-	ASSERT(partial_bounds.h == full_bounds.h);
+	assert(partial_bounds.w <= full_bounds.w);
+	assert(partial_bounds.h == full_bounds.h);
 }
 
 static void
@@ -858,8 +861,8 @@ test_pxl_text_bounds_n_with_newline(void) {
 	size_t first_line_bytes = (size_t)(newline - first_line);
 
 	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, first_line_bytes);
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == g_w.fonts[0]->glyph_height);
+	assert(bounds.w > 0);
+	assert(bounds.h == g_w.fonts[0]->glyph_height);
 }
 
 static void
@@ -874,7 +877,7 @@ test_pxl_draw_text_n_basic(void) {
 
 	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, 10);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -886,7 +889,7 @@ test_pxl_draw_text_n_empty(void) {
 	pxl_writer_set_cursor(&g_w, x, y);
 	pxl_draw_text_n(&g_cnv, &g_w, "ABC", 0);
 
-	ASSERT(buf_is_empty());
+	assert(buf_is_empty());
 }
 
 static void
@@ -901,7 +904,7 @@ test_pxl_draw_text_n_partial(void) {
 
 	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, text, 2);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 /* Additional edge case tests for truncated text helpers */
@@ -912,26 +915,26 @@ test_pxl_text_bounds_n_with_tab(void) {
 	/* Verify tab width calculation is consistent with pxl_text_bounds */
 	pxl_rect_t bounds_full = pxl_text_bounds(&g_w, "A\tB");
 	pxl_rect_t bounds_n = pxl_text_bounds_n(&g_w, "A\tB", 10);
-	ASSERT(bounds_n.w == bounds_full.w);
-	ASSERT(bounds_n.h == bounds_full.h);
+	assert(bounds_n.w == bounds_full.w);
+	assert(bounds_n.h == bounds_full.h);
 	/* Both should be 36px wide (A=6, tab=24, B=6) */
-	ASSERT(bounds_n.w == 36);
+	assert(bounds_n.w == 36);
 }
 
 static void
 test_pxl_text_bounds_n_with_carriage_return(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "A\rB", 10);
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > 0);
+	assert(bounds.w > 0);
+	assert(bounds.h > 0);
 }
 
 static void
 test_pxl_text_bounds_n_multiline(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "A\nB\nC", 10);
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > g_w.fonts[0]->glyph_height); /* Multiple lines */
+	assert(bounds.w > 0);
+	assert(bounds.h > g_w.fonts[0]->glyph_height); /* Multiple lines */
 }
 
 static void
@@ -944,7 +947,7 @@ test_pxl_draw_text_n_with_newline(void) {
 	pxl_draw_text_n(&g_cnv, &g_w, "A\nB", 3); /* Only first line + newline */
 
 	/* Should have drawn 'A' and newline moved cursor down */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
+	assert(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
 }
 
 static void
@@ -959,16 +962,16 @@ test_pxl_tab_consistency_across_functions(void) {
 	pxl_rect_t bounds_n = pxl_text_bounds_n(&g_w, text, strlen(text));
 	pxl_rect_t line_bounds = pxl_textline_bounds(&g_w, text);
 
-	ASSERT(bounds.w == expected_width);
-	ASSERT(bounds_n.w == expected_width);
-	ASSERT(line_bounds.w == expected_width);
+	assert(bounds.w == expected_width);
+	assert(bounds_n.w == expected_width);
+	assert(line_bounds.w == expected_width);
 
 	/* Verify draw functions advance cursor by same amount */
 	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
 	pxl_writer_set_cursor(&g_w, 0, 0);
 	int start_x = g_w.x;
 	pxl_draw_text(&g_cnv, &g_w, text);
-	ASSERT(g_w.x == start_x + expected_width);
+	assert(g_w.x == start_x + expected_width);
 }
 
 /* Tests for line-based helpers */
@@ -977,28 +980,28 @@ static void
 test_pxl_textline_bounds_basic(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "ABC");
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == g_w.fonts[0]->glyph_height);
+	assert(bounds.w > 0);
+	assert(bounds.h == g_w.fonts[0]->glyph_height);
 }
 
 static void
 test_pxl_textline_bounds_with_newline(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "AB\nCD");
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h == g_test_font.glyph_height);
+	assert(bounds.w > 0);
+	assert(bounds.h == g_test_font.glyph_height);
 	/* Use pxl_next_textline to get offset */
 	const char *text = "AB\nCD";
 	const char *next = pxl_next_textline(text);
-	ASSERT(next == text + 3); /* "AB\n" = 3 bytes */
+	assert(next == text + 3); /* "AB\n" = 3 bytes */
 }
 
 static void
 test_pxl_textline_bounds_empty(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "");
-	ASSERT(bounds.w == 0);
-	ASSERT(bounds.h == 0);
+	assert(bounds.w == 0);
+	assert(bounds.h == 0);
 }
 
 static void
@@ -1006,13 +1009,13 @@ test_pxl_textline_bounds_with_tab(void) {
 	setup_fixture();
 	/* Tab in a single line: "A\tB" should be 36px wide */
 	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "A\tB");
-	ASSERT(bounds.w == 36);
-	ASSERT(bounds.h == g_w.fonts[0]->glyph_height);
+	assert(bounds.w == 36);
+	assert(bounds.h == g_w.fonts[0]->glyph_height);
 
 	/* Tab at start: "\tA" */
 	/* tab_advance = 4*(5+1) = 24, A = 5+1 = 6, total = 30 */
 	bounds = pxl_textline_bounds(&g_w, "\tA");
-	ASSERT(bounds.w == 30);
+	assert(bounds.w == 30);
 }
 
 static void
@@ -1026,7 +1029,7 @@ test_pxl_draw_textline_basic(void) {
 
 	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "ABC");
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 /* Tests for pxl_next_textline */
@@ -1037,8 +1040,8 @@ static void
 test_pxl_text_bounds_transformed_basic(void) {
 	setup_fixture();
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABC", 1);
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > 0);
+	assert(bounds.w > 0);
+	assert(bounds.h > 0);
 }
 
 static void
@@ -1046,8 +1049,8 @@ test_pxl_text_bounds_transformed_scale2(void) {
 	setup_fixture();
 	pxl_rect_t bounds1 = pxl_text_bounds_transformed(&g_w, "ABC", 1);
 	pxl_rect_t bounds2 = pxl_text_bounds_transformed(&g_w, "ABC", 2);
-	ASSERT(bounds2.w == bounds1.w * 2);
-	ASSERT(bounds2.h == bounds1.h * 2);
+	assert(bounds2.w == bounds1.w * 2);
+	assert(bounds2.h == bounds1.h * 2);
 }
 
 static void
@@ -1062,7 +1065,7 @@ test_pxl_draw_text_transformed_basic(void) {
 
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -1076,7 +1079,7 @@ test_pxl_draw_text_transformed_scale2(void) {
 	pxl_draw_text_transformed(&g_cnv, &g_w, text, 2, PXL_FLIP_NONE);
 
 	/* With scale 2, the character should be twice as wide and tall */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
+	assert(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
 }
 
 static void
@@ -1092,7 +1095,7 @@ test_pxl_draw_text_transformed_with_flip(void) {
 	pxl_draw_text_transformed(&g_cnv, &g_w, text, 1, PXL_FLIP_H);
 
 	/* Just verify it draws something without crashing */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
+	assert(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
 }
 
 /* Tests for pxl_draw_rune_transformed with flip cursor behavior */
@@ -1109,7 +1112,7 @@ test_pxl_draw_rune_transformed_flip_h_cursor_moves_left(void) {
 	pxl_draw_rune_transformed(&g_cnv, &g_w, 'A', 1, PXL_FLIP_H);
 
 	/* Cursor should move left (negative direction) */
-	ASSERT(g_w.x < start_x);
+	assert(g_w.x < start_x);
 }
 
 static void
@@ -1125,14 +1128,14 @@ test_pxl_draw_rune_transformed_flip_v_cursor_moves_up(void) {
 	pxl_draw_rune_transformed(&g_cnv, &g_w, 'A', 1, PXL_FLIP_V);
 
 	/* With PXL_FLIP_V only, x advances normally (dx=1), y stays same (no \n) */
-	ASSERT(g_w.x > start_x); /* x advances normally */
-	ASSERT(g_w.y == start_y); /* y unchanged for single char */
+	assert(g_w.x > start_x); /* x advances normally */
+	assert(g_w.y == start_y); /* y unchanged for single char */
 
 	/* Now test newline with flip_v */
 	pxl_writer_set_cursor(&g_w, x, y);
 	start_y = g_w.y;
 	pxl_draw_rune_transformed(&g_cnv, &g_w, '\n', 1, PXL_FLIP_V);
-	ASSERT(g_w.y < start_y); /* y moves up with flip_v */
+	assert(g_w.y < start_y); /* y moves up with flip_v */
 }
 
 static void
@@ -1146,8 +1149,8 @@ test_pxl_draw_rune_transformed_flip_h_newline_resets_to_left(void) {
 	pxl_draw_rune_transformed(&g_cnv, &g_w, '\n', 1, PXL_FLIP_H);
 
 	/* After newline with flip_h, cursor should be at line_start_x (right side) */
-	ASSERT(g_w.x == g_w.line_start_x);
-	ASSERT(g_w.y > y); /* y advances normally (dy not applied to \n y-movement) */
+	assert(g_w.x == g_w.line_start_x);
+	assert(g_w.y > y); /* y advances normally (dy not applied to \n y-movement) */
 }
 
 static void
@@ -1162,13 +1165,13 @@ test_pxl_draw_rune_transformed_flip_h_newline_preserves_x(void) {
 	/* Draw a character to move cursor left */
 	pxl_draw_rune_transformed(&g_cnv, &g_w, 'A', 1, PXL_FLIP_H);
 	int x_after_A = g_w.x;
-	ASSERT(x_after_A < x); /* Cursor moved left */
+	assert(x_after_A < x); /* Cursor moved left */
 	
 	/* Newline should preserve current X as line_start_x */
 	pxl_draw_rune_transformed(&g_cnv, &g_w, '\n', 1, PXL_FLIP_H);
-	ASSERT(g_w.x == x_after_A); /* X unchanged by \n in flip_h mode */
-	ASSERT(g_w.y > y); /* Y advanced */
-	ASSERT(g_w.line_start_x == x_after_A); /* line_start_x updated to preserved X */
+	assert(g_w.x == x_after_A); /* X unchanged by \n in flip_h mode */
+	assert(g_w.y > y); /* Y advanced */
+	assert(g_w.line_start_x == x_after_A); /* line_start_x updated to preserved X */
 }
 
 static void
@@ -1184,10 +1187,10 @@ test_pxl_draw_text_transformed_flip_h_reversed_order(void) {
 
 	/* Text should be drawn right-to-left, final cursor position should be at start */
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1);
-	ASSERT(g_w.x == start_x); /* Cursor ended up at original start position */
-	ASSERT(g_w.y == start_y);
+	assert(g_w.x == start_x); /* Cursor ended up at original start position */
+	assert(g_w.y == start_y);
 	/* Pixels should be drawn from start_x to start_x + bounds.w */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
+	assert(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
 }
 
 static void
@@ -1207,11 +1210,11 @@ test_pxl_draw_text_transformed_flip_v_reversed_lines(void) {
 	 * final y should be start_y + bounds.h - leading (after \n) - advance_B */
 	/* But x resets to line_start_x after \n, then advances for B */
 	int expected_y = start_y + bounds.h - g_test_font.leading;
-	ASSERT(g_w.y == expected_y);
+	assert(g_w.y == expected_y);
 	/* x should be at line_start_x + advance_B + tracking */
-	ASSERT(g_w.x > start_x);
+	assert(g_w.x > start_x);
 	/* Pixels should be drawn from start_y to start_y + bounds.h */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
+	assert(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
 }
 
 static void
@@ -1226,7 +1229,7 @@ test_pxl_draw_text_transformed_flip_hv_combined(void) {
 	pxl_draw_text_transformed(&g_cnv, &g_w, text, 1, PXL_FLIP_H | PXL_FLIP_V);
 
 	/* Should draw something without crashing */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){x - 10, y - 10, 20, 20}));
+	assert(has_pixels_in_rect((pxl_rect_t){x - 10, y - 10, 20, 20}));
 }
 
 static void
@@ -1243,10 +1246,10 @@ test_pxl_draw_text_transformed_flip_h_tab_advance_left(void) {
 	/* With flip_h, text starts at start_x + bounds.w, then moves left.
 	 * After \t and A, cursor should be back at start_x */
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1);
-	ASSERT(g_w.x == start_x);
-	ASSERT(g_w.y == start_y);
+	assert(g_w.x == start_x);
+	assert(g_w.y == start_y);
 	/* Pixels should be drawn from start_x to start_x + bounds.w */
-	ASSERT(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
+	assert(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
 }
 
 /* Regression tests for w/h swap bug */
@@ -1259,8 +1262,8 @@ test_pxl_text_bounds_transformed_exact_single_char(void) {
 	setup_fixture();
 
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A", 1);
-	ASSERT(bounds.w == 6);  /* 5px glyph + 1px tracking */
-	ASSERT(bounds.h == 5);  /* glyph height */
+	assert(bounds.w == 6);  /* 5px glyph + 1px tracking */
+	assert(bounds.h == 5);  /* glyph height */
 }
 
 static void
@@ -1270,8 +1273,8 @@ test_pxl_text_bounds_transformed_exact_multichar(void) {
 	setup_fixture();
 
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABC", 1);
-	ASSERT(bounds.w == 18);  /* 3 chars * (5px + 1px tracking) */
-	ASSERT(bounds.h == 5);   /* glyph height */
+	assert(bounds.w == 18);  /* 3 chars * (5px + 1px tracking) */
+	assert(bounds.h == 5);   /* glyph height */
 }
 
 static void
@@ -1285,8 +1288,8 @@ test_pxl_text_bounds_transformed_multiline_max_width(void) {
 	setup_fixture();
 
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A\nABC", 1);
-	ASSERT(bounds.w == 18);  /* Max line width */
-	ASSERT(bounds.h == 11);  /* glyph_height + 1*leading */
+	assert(bounds.w == 18);  /* Max line width */
+	assert(bounds.h == 11);  /* glyph_height + 1*leading */
 }
 
 static void
@@ -1298,14 +1301,14 @@ test_pxl_text_bounds_transformed_w_h_independence(void) {
 	/* Wide text (width > height) */
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABCDE", 1);
 	/* 5 chars * (5px + 1px tracking) = 30px width */
-	ASSERT(bounds.w == 30);
-	ASSERT(bounds.h == 5);
+	assert(bounds.w == 30);
+	assert(bounds.h == 5);
 
 	/* With scale, both dimensions scale independently */
 	bounds = pxl_text_bounds_transformed(&g_w, "A", 3);
 	/* 'A' = (5px + 1px) * 3 = 18px width, 5px * 3 = 15px height */
-	ASSERT(bounds.w == 18);
-	ASSERT(bounds.h == 15);
+	assert(bounds.w == 18);
+	assert(bounds.h == 15);
 }
 
 static void
@@ -1333,11 +1336,11 @@ test_pxl_draw_text_transformed_bounds_consistency(void) {
 	int newline_count = 2;
 
 	int drawn_height = g_w.y - start_y;
-	ASSERT(drawn_height == newline_count * leading * scale);
+	assert(drawn_height == newline_count * leading * scale);
 
 	/* Cross-check: the bbox must exactly cover the drawn extent, same
 	 * invariant as test_pxl_text_draw_consistency but at scale > 1. */
-	ASSERT(bounds.h == drawn_height + glyph_height * scale);
+	assert(bounds.h == drawn_height + glyph_height * scale);
 }
 
 /* Example tests */
@@ -1348,8 +1351,8 @@ test_example_pxl_text_bounds_transformed(void) {
 	setup_fixture();
 	const char *text = "Hello";
 	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 2);
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > 0);
+	assert(bounds.w > 0);
+	assert(bounds.h > 0);
 }
 
 static void
@@ -1362,7 +1365,7 @@ test_example_pxl_draw_text_transformed(void) {
 	pxl_writer_set_cursor(&g_w, 5, 5);
 	pxl_draw_text_transformed(&g_cnv, &g_w, text, 2, PXL_FLIP_NONE);
 
-	ASSERT(has_pixels_in_rect((pxl_rect_t){5, 5, 20, 20}));
+	assert(has_pixels_in_rect((pxl_rect_t){5, 5, 20, 20}));
 }
 
 /* Tests for pxl_next_textline */
@@ -1371,8 +1374,8 @@ static void
 test_pxl_next_textline_empty(void) {
 	const char *txt = "";
 	const char *next = pxl_next_textline(txt);
-	ASSERT(next == txt); /* Returns txt when empty */
-	ASSERT(*next == '\0');
+	assert(next == txt); /* Returns txt when empty */
+	assert(*next == '\0');
 }
 
 static void
@@ -1380,40 +1383,40 @@ test_pxl_next_textline_no_break(void) {
 	const char *txt = "ABC";
 	const char *next = pxl_next_textline(txt);
 	/* Never returns NULL: returns pointer to '\0' at end of string */
-	ASSERT(next == txt + 3);
-	ASSERT(*next == '\0');
+	assert(next == txt + 3);
+	assert(*next == '\0');
 }
 
 static void
 test_pxl_next_textline_with_newline(void) {
 	const char *text = "AB\nCD";
 	const char *next = pxl_next_textline(text);
-	ASSERT(next == text + 3); /* Points to 'C' after '\n' */
-	ASSERT(*next == 'C');
+	assert(next == text + 3); /* Points to 'C' after '\n' */
+	assert(*next == 'C');
 }
 
 static void
 test_pxl_next_textline_with_carriage_return(void) {
 	const char *text = "AB\rCD";
 	const char *next = pxl_next_textline(text);
-	ASSERT(next == text + 3); /* Points to 'C' after '\r' */
-	ASSERT(*next == 'C');
+	assert(next == text + 3); /* Points to 'C' after '\r' */
+	assert(*next == 'C');
 }
 
 static void
 test_pxl_next_textline_with_crlf(void) {
 	const char *text = "AB\r\nCD";
 	const char *next = pxl_next_textline(text);
-	ASSERT(next == text + 4); /* Points to 'C' after '\r\n' */
-	ASSERT(*next == 'C');
+	assert(next == text + 4); /* Points to 'C' after '\r\n' */
+	assert(*next == 'C');
 }
 
 static void
 test_pxl_next_textline_at_end(void) {
 	const char *text = "ABC\n";
 	const char *next = pxl_next_textline(text);
-	ASSERT(next == text + 4); /* Points to '\0' after '\n' */
-	ASSERT(*next == '\0');
+	assert(next == text + 4); /* Points to '\0' after '\n' */
+	assert(*next == '\0');
 }
 
 /* Main */

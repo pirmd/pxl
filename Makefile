@@ -29,7 +29,7 @@ ${OBJ}: $(PXL_HDR)
 
 lint:
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(SRC) $(HDR)
-	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) test/*.c test/*.h
+	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) test/*.c
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) demo/*.c
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) tool/*.c
 

@@ -1,6 +1,9 @@
-#include "test.h"
-#include "canvas.h"
+#include <assert.h>
+#include <stdbool.h>
+#include <string.h>
 #include "buf.h"
+#include "canvas.h"
+#include "geom.h"
 #include "text_basic.h"
 
 #define COLOR_WHITE 0xFFFFFFFFU
@@ -46,7 +49,7 @@ test_pxl_draw_char_basic(void) {
 	expected.x += x;
 	expected.y += y;
 
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -58,7 +61,7 @@ test_pxl_draw_char_with_scissor(void) {
 	int x = 5, y = 5;
 	pxl_draw_char(&g_cnv, x, y, 'X');
 
-	ASSERT(has_pixels_in_rect((pxl_rect_t){8, 8, 6, 6}));
+	assert(has_pixels_in_rect((pxl_rect_t){8, 8, 6, 6}));
 }
 
 static void
@@ -73,7 +76,7 @@ test_pxl_draw_char_non_printable(void) {
 	expected.x += x;
 	expected.y += y;
 
-	ASSERT(!has_pixels_in_rect(expected));
+	assert(!has_pixels_in_rect(expected));
 }
 
 static void
@@ -88,7 +91,7 @@ test_pxl_draw_char_out_of_range(void) {
 	expected.x += x;
 	expected.y += y;
 
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 /* Tests for pxl_draw_str */
@@ -104,7 +107,7 @@ test_pxl_draw_str_basic(void) {
 	expected.x += x;
 	expected.y += y;
 
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -116,7 +119,7 @@ test_pxl_draw_str_empty(void) {
 
 	for (int y = 0; y < FIXTURE_H; y++) {
 		for (int x = 0; x < FIXTURE_W; x++) {
-			ASSERT(g_buf_data[y][x] == 0);
+			assert(g_buf_data[y][x] == 0);
 		}
 	}
 }
@@ -133,7 +136,7 @@ test_pxl_draw_str_with_newline(void) {
 	expected.x += x;
 	expected.y += y;
 
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -149,7 +152,7 @@ test_pxl_draw_str_with_offset(void) {
 	expected.x += 5;
 	expected.y += 3;
 
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -164,7 +167,7 @@ test_pxl_draw_str_with_tab(void) {
 	expected.x += x;
 	expected.y += y;
 
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 static void
@@ -181,45 +184,45 @@ test_pxl_draw_str_with_trailing_tab(void) {
 	expected.x += x;
 	expected.y += y;
 
-	ASSERT(has_pixels_in_rect(expected));
+	assert(has_pixels_in_rect(expected));
 }
 
 /* Tests for pxl_char_bounds */
 static void
 test_pxl_char_bounds_basic(void) {
 	pxl_rect_t bounds = pxl_char_bounds('A');
-	ASSERT(bounds.w == 8 && bounds.h == 8);
+	assert(bounds.w == 8 && bounds.h == 8);
 }
 
 static void
 test_pxl_char_bounds_special(void) {
 	pxl_rect_t tab_bounds = pxl_char_bounds('\t');
-	ASSERT(tab_bounds.w == 36 && tab_bounds.h == 8);
+	assert(tab_bounds.w == 36 && tab_bounds.h == 8);
 
 	pxl_rect_t space_bounds = pxl_char_bounds(' ');
-	ASSERT(space_bounds.w == 8 && space_bounds.h == 8);
+	assert(space_bounds.w == 8 && space_bounds.h == 8);
 
 	pxl_rect_t question_bounds = pxl_char_bounds(128);
-	ASSERT(question_bounds.w == 8 && question_bounds.h == 8);
+	assert(question_bounds.w == 8 && question_bounds.h == 8);
 }
 
 /* Tests for pxl_str_bounds */
 static void
 test_pxl_str_bounds_basic(void) {
 	pxl_rect_t bounds = pxl_str_bounds("HI");
-	ASSERT(bounds.w == 18 && bounds.h == 8);
+	assert(bounds.w == 18 && bounds.h == 8);
 }
 
 static void
 test_pxl_str_bounds_empty(void) {
 	pxl_rect_t bounds = pxl_str_bounds("");
-	ASSERT(bounds.w == 0 && bounds.h == 0);
+	assert(bounds.w == 0 && bounds.h == 0);
 }
 
 static void
 test_pxl_str_bounds_with_newline(void) {
 	pxl_rect_t bounds = pxl_str_bounds("A\nB");
-	ASSERT(bounds.w == 9 && bounds.h == 18);
+	assert(bounds.w == 9 && bounds.h == 18);
 }
 
 static void
@@ -227,16 +230,16 @@ test_pxl_str_bounds_trailing_tab(void) {
 	/* Regression test: a tab as the last char must still extend max_x.
 	 * 'A' reaches x=9, then \t snaps forward to the next 36px tab stop. */
 	pxl_rect_t bounds = pxl_str_bounds("A\t");
-	ASSERT(bounds.w == 36);
-	ASSERT(bounds.h == 8);
+	assert(bounds.w == 36);
+	assert(bounds.h == 8);
 }
 
 static void
 test_pxl_str_bounds_only_tab(void) {
 	/* Regression test: a line made of only a tab must not report w == 0. */
 	pxl_rect_t bounds = pxl_str_bounds("\t");
-	ASSERT(bounds.w == 36);
-	ASSERT(bounds.h == 8);
+	assert(bounds.w == 36);
+	assert(bounds.h == 8);
 }
 
 int

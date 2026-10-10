@@ -1,7 +1,8 @@
+#include <assert.h>
 #include <string.h>
-#include "test.h"
-#include "camera.h"
 #include "buf.h"
+#include "camera.h"
+#include "canvas.h"
 
 /* Fixture ----------------------------------------------------------------- */
 #define FIXTURE_W 100
@@ -29,7 +30,7 @@ test_camera_move_from_origin(void) {
 	pxl_canvas_init(&cnv, &g_buf);
 	
 	pxl_canvas_move_camera(&cnv, 10, 20);
-	ASSERT(cnv.offset_x == 10 && cnv.offset_y == 20);
+	assert(cnv.offset_x == 10 && cnv.offset_y == 20);
 }
 
 static void
@@ -38,7 +39,7 @@ test_camera_move_negative(void) {
 	pxl_canvas_init(&cnv, &g_buf);
 	
 	pxl_canvas_move_camera(&cnv, -10, -20);
-	ASSERT(cnv.offset_x == -10 && cnv.offset_y == -20);
+	assert(cnv.offset_x == -10 && cnv.offset_y == -20);
 }
 
 static void
@@ -48,7 +49,7 @@ test_camera_move_cumulative(void) {
 	
 	pxl_canvas_move_camera(&cnv, 10, 20);
 	pxl_canvas_move_camera(&cnv, 5, 10);
-	ASSERT(cnv.offset_x == 15 && cnv.offset_y == 30);
+	assert(cnv.offset_x == 15 && cnv.offset_y == 30);
 }
 
 /* Tests for pxl_canvas_set_camera ---------------------------------------- */
@@ -59,7 +60,7 @@ test_camera_set_absolute(void) {
 	pxl_canvas_init(&cnv, &g_buf);
 	
 	pxl_canvas_set_camera(&cnv, 100, 50);
-	ASSERT(cnv.offset_x == 100 && cnv.offset_y == 50);
+	assert(cnv.offset_x == 100 && cnv.offset_y == 50);
 }
 
 static void
@@ -69,7 +70,7 @@ test_camera_set_origin(void) {
 	pxl_canvas_set_camera(&cnv, 100, 50);
 	
 	pxl_canvas_set_camera(&cnv, 0, 0);
-	ASSERT(cnv.offset_x == 0 && cnv.offset_y == 0);
+	assert(cnv.offset_x == 0 && cnv.offset_y == 0);
 }
 
 static void
@@ -78,7 +79,7 @@ test_camera_set_negative(void) {
 	pxl_canvas_init(&cnv, &g_buf);
 	
 	pxl_canvas_set_camera(&cnv, -10, -20);
-	ASSERT(cnv.offset_x == -10 && cnv.offset_y == -20);
+	assert(cnv.offset_x == -10 && cnv.offset_y == -20);
 }
 
 /* Tests for pxl_canvas_reset_camera --------------------------------------- */
@@ -89,10 +90,10 @@ test_camera_reset(void) {
 	pxl_canvas_init(&cnv, &g_buf);
 	
 	pxl_canvas_set_camera(&cnv, 100, 50);
-	ASSERT(cnv.offset_x == 100 && cnv.offset_y == 50);
+	assert(cnv.offset_x == 100 && cnv.offset_y == 50);
 	
 	pxl_canvas_reset_camera(&cnv);
-	ASSERT(cnv.offset_x == 0 && cnv.offset_y == 0);
+	assert(cnv.offset_x == 0 && cnv.offset_y == 0);
 }
 
 static void
@@ -102,10 +103,10 @@ test_camera_reset_after_move(void) {
 	
 	pxl_canvas_move_camera(&cnv, 10, 20);
 	pxl_canvas_move_camera(&cnv, 5, 10);
-	ASSERT(cnv.offset_x == 15 && cnv.offset_y == 30);
+	assert(cnv.offset_x == 15 && cnv.offset_y == 30);
 	
 	pxl_canvas_reset_camera(&cnv);
-	ASSERT(cnv.offset_x == 0 && cnv.offset_y == 0);
+	assert(cnv.offset_x == 0 && cnv.offset_y == 0);
 }
 
 /* Main ------------------------------------------------------------------- */

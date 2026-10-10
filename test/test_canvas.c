@@ -1,7 +1,9 @@
+#include <assert.h>
+#include <stdbool.h>
 #include <string.h>
-#include "test.h"
-#include "canvas.h"
 #include "buf.h"
+#include "canvas.h"
+#include "geom.h"
 
 /* Fixture ----------------------------------------------------------------- */
 #define FIXTURE_W 101
@@ -53,18 +55,18 @@ test_canvas_view(void) {
 	/* Test with full view */
 	pxl_canvas_init(&cnv, &g_buf);
     pxl_rect_t vp = pxl_canvas_view(&cnv);
-	ASSERT(vp.x == 0);
-	ASSERT(vp.y == 0);
-	ASSERT(vp.w == FIXTURE_W);
-	ASSERT(vp.h == FIXTURE_H);
+	assert(vp.x == 0);
+	assert(vp.y == 0);
+	assert(vp.w == FIXTURE_W);
+	assert(vp.h == FIXTURE_H);
 	
 	/* Test with custom scissor */
 	pxl_canvas_set_scissor(&cnv, 10, 20, 80, 60);
     vp = pxl_canvas_view(&cnv);
-	ASSERT(vp.x == 0);
-	ASSERT(vp.y == 0);
-	ASSERT(vp.w == 80);
-	ASSERT(vp.h == 60);
+	assert(vp.x == 0);
+	assert(vp.y == 0);
+	assert(vp.w == 80);
+	assert(vp.h == 60);
 }
 
 static void
@@ -73,11 +75,11 @@ test_canvas_init_view_basic(void) {
 	
 	pxl_canvas_init_view(&cnv, &g_buf, (pxl_rect_t){10, 20, 80, 60});
 	
-	ASSERT(cnv.pb == &g_buf);
-	ASSERT(cnv.offset_x == 10 && cnv.offset_y == 20);
-	ASSERT(cnv.scissor.x == 10 && cnv.scissor.y == 20);
-	ASSERT(cnv.scissor.w == 80 && cnv.scissor.h == 60);
-	ASSERT(cnv.color == 0xFFFFFFFF);
+	assert(cnv.pb == &g_buf);
+	assert(cnv.offset_x == 10 && cnv.offset_y == 20);
+	assert(cnv.scissor.x == 10 && cnv.scissor.y == 20);
+	assert(cnv.scissor.w == 80 && cnv.scissor.h == 60);
+	assert(cnv.color == 0xFFFFFFFF);
 }
 
 static void
@@ -86,9 +88,9 @@ test_canvas_init_view_at_origin(void) {
 	
 	pxl_canvas_init_view(&cnv, &g_buf, (pxl_rect_t){0, 0, FIXTURE_W, FIXTURE_H});
 	
-	ASSERT(cnv.offset_x == 0 && cnv.offset_y == 0);
-	ASSERT(cnv.scissor.x == 0 && cnv.scissor.y == 0);
-	ASSERT(cnv.scissor.w == FIXTURE_W && cnv.scissor.h == FIXTURE_H);
+	assert(cnv.offset_x == 0 && cnv.offset_y == 0);
+	assert(cnv.scissor.x == 0 && cnv.scissor.y == 0);
+	assert(cnv.scissor.w == FIXTURE_W && cnv.scissor.h == FIXTURE_H);
 }
 
 static void
@@ -97,9 +99,9 @@ test_canvas_init_view_clipped(void) {
 	
 	pxl_canvas_init_view(&cnv, &g_buf, (pxl_rect_t){50, 50, 200, 200});
 	
-	ASSERT(cnv.offset_x == 50 && cnv.offset_y == 50);
-	ASSERT(cnv.scissor.x == 50 && cnv.scissor.y == 50);
-	ASSERT(cnv.scissor.w == 51 && cnv.scissor.h == 78);
+	assert(cnv.offset_x == 50 && cnv.offset_y == 50);
+	assert(cnv.scissor.x == 50 && cnv.scissor.y == 50);
+	assert(cnv.scissor.w == 51 && cnv.scissor.h == 78);
 }
 
 
@@ -109,11 +111,11 @@ static void
 test_canvas_init(void) {
 	fixture_reset();
 	
-	ASSERT(g_cnv.pb == &g_buf);
-	ASSERT(g_cnv.color == 0xFFFFFFFF);
-	ASSERT(g_cnv.scissor.x == 0 && g_cnv.scissor.y == 0);
-	ASSERT(g_cnv.scissor.w == FIXTURE_W && g_cnv.scissor.h == FIXTURE_H);
-	ASSERT(g_cnv.offset_x == 0 && g_cnv.offset_y == 0);
+	assert(g_cnv.pb == &g_buf);
+	assert(g_cnv.color == 0xFFFFFFFF);
+	assert(g_cnv.scissor.x == 0 && g_cnv.scissor.y == 0);
+	assert(g_cnv.scissor.w == FIXTURE_W && g_cnv.scissor.h == FIXTURE_H);
+	assert(g_cnv.offset_x == 0 && g_cnv.offset_y == 0);
 }
 
 static void
@@ -121,7 +123,7 @@ test_canvas_set_color(void) {
 	fixture_reset();
 	
 	pxl_canvas_set_color(&g_cnv, 0xFF00FF00);
-	ASSERT(g_cnv.color == 0xFF00FF00);
+	assert(g_cnv.color == 0xFF00FF00);
 }
 
 static void
@@ -129,8 +131,8 @@ test_canvas_set_scissor(void) {
 	fixture_reset();
 	
 	pxl_canvas_set_scissor(&g_cnv, 10, 20, 30, 40);
-	ASSERT(g_cnv.scissor.x == 10 && g_cnv.scissor.y == 20);
-	ASSERT(g_cnv.scissor.w == 30 && g_cnv.scissor.h == 40);
+	assert(g_cnv.scissor.x == 10 && g_cnv.scissor.y == 20);
+	assert(g_cnv.scissor.w == 30 && g_cnv.scissor.h == 40);
 }
 
 static void
@@ -138,8 +140,8 @@ test_canvas_set_scissor_clipped(void) {
 	fixture_reset();
 	
 	pxl_canvas_set_scissor(&g_cnv, -10, -10, 200, 200);
-	ASSERT(g_cnv.scissor.x == 0 && g_cnv.scissor.y == 0);
-	ASSERT(g_cnv.scissor.w == FIXTURE_W && g_cnv.scissor.h == FIXTURE_H);
+	assert(g_cnv.scissor.x == 0 && g_cnv.scissor.y == 0);
+	assert(g_cnv.scissor.w == FIXTURE_W && g_cnv.scissor.h == FIXTURE_H);
 }
 
 static void
@@ -148,14 +150,14 @@ test_canvas_set_scissor_zero(void) {
 	
 	/* Zero width and height are valid (w >= 0, h >= 0) */
 	pxl_canvas_set_scissor(&g_cnv, 0, 0, 0, 0);
-	ASSERT(g_cnv.scissor.w == 0 && g_cnv.scissor.h == 0);
+	assert(g_cnv.scissor.w == 0 && g_cnv.scissor.h == 0);
 	
 	/* clear() with empty scissor must do nothing */
 	buf_fill(0xFF0000FF);
 	pxl_canvas_set_color(&g_cnv, 0xFFFFFFFF);
 	pxl_canvas_clear(&g_cnv);
 	/* Buffer unchanged */
-	ASSERT(*pxl_buf_ptr(&g_buf, 0, 0) == 0xFF0000FF);
+	assert(*pxl_buf_ptr(&g_buf, 0, 0) == 0xFF0000FF);
 }
 
 static void
@@ -163,11 +165,11 @@ test_canvas_reset_scissor(void) {
 	fixture_reset();
 	
 	pxl_canvas_set_scissor(&g_cnv, 10, 10, 20, 20);
-	ASSERT(g_cnv.scissor.x == 10);
+	assert(g_cnv.scissor.x == 10);
 	
 	pxl_canvas_reset_scissor(&g_cnv);
-	ASSERT(g_cnv.scissor.x == 0 && g_cnv.scissor.y == 0);
-	ASSERT(g_cnv.scissor.w == FIXTURE_W && g_cnv.scissor.h == FIXTURE_H);
+	assert(g_cnv.scissor.x == 0 && g_cnv.scissor.y == 0);
+	assert(g_cnv.scissor.w == FIXTURE_W && g_cnv.scissor.h == FIXTURE_H);
 }
 
 static void
@@ -175,10 +177,10 @@ test_canvas_set_offset(void) {
 	fixture_reset();
 	
 	pxl_canvas_set_offset(&g_cnv, 10, 20);
-	ASSERT(g_cnv.offset_x == 10 && g_cnv.offset_y == 20);
+	assert(g_cnv.offset_x == 10 && g_cnv.offset_y == 20);
 	
 	pxl_canvas_set_offset(&g_cnv, -5, -3);
-	ASSERT(g_cnv.offset_x == -5 && g_cnv.offset_y == -3);
+	assert(g_cnv.offset_x == -5 && g_cnv.offset_y == -3);
 }
 
 static void
@@ -186,10 +188,10 @@ test_canvas_reset_offset(void) {
 	fixture_reset();
 	
 	pxl_canvas_set_offset(&g_cnv, 15, 25);
-	ASSERT(g_cnv.offset_x == 15 && g_cnv.offset_y == 25);
+	assert(g_cnv.offset_x == 15 && g_cnv.offset_y == 25);
 	
 	pxl_canvas_reset_offset(&g_cnv);
-	ASSERT(g_cnv.offset_x == 0 && g_cnv.offset_y == 0);
+	assert(g_cnv.offset_x == 0 && g_cnv.offset_y == 0);
 }
 
 static void
@@ -200,7 +202,7 @@ test_canvas_clear_full(void) {
 	
 	for (int y = 0; y < g_buf.height; ++y) {
 		for (int x = 0; x < g_buf.width; ++x) {
-			ASSERT(*pxl_buf_ptr(&g_buf, x, y) == 0xFFFFFFFF);
+			assert(*pxl_buf_ptr(&g_buf, x, y) == 0xFFFFFFFF);
 		}
 	}
 }
@@ -217,7 +219,7 @@ test_canvas_clear_with_scissor(void) {
 		for (int x = 0; x < g_buf.width; ++x) {
 			pxl_t got = *pxl_buf_ptr(&g_buf, x, y);
 			pxl_t want = in_scissor(x, y) ? 0xFF00FF00 : 0x00;
-			ASSERT(got == want);
+			assert(got == want);
 		}
 	}
 }
@@ -232,7 +234,7 @@ test_canvas_clear_fast_path_black(void) {
 	
 	for (int y = 0; y < g_buf.height; ++y) {
 		for (int x = 0; x < g_buf.width; ++x) {
-			ASSERT(*pxl_buf_ptr(&g_buf, x, y) == 0x00);
+			assert(*pxl_buf_ptr(&g_buf, x, y) == 0x00);
 		}
 	}
 }
@@ -247,7 +249,7 @@ test_canvas_clear_fast_path_white(void) {
 	
 	for (int y = 0; y < g_buf.height; ++y) {
 		for (int x = 0; x < g_buf.width; ++x) {
-			ASSERT(*pxl_buf_ptr(&g_buf, x, y) == 0xFFFFFFFF);
+			assert(*pxl_buf_ptr(&g_buf, x, y) == 0xFFFFFFFF);
 		}
 	}
 }

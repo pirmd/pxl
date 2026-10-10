@@ -1,6 +1,7 @@
-#include "timer.h"
-#include "test.h"
+#include <assert.h>
 #include <math.h>
+#include <stdbool.h>
+#include "timer.h"
 
 #define EPSILON 0.0001
 
@@ -11,8 +12,8 @@ test_pxl_timer_start(void) {
 	pxl_timer_t timer;
 	pxl_timer_start(&timer, 2.0);
 
-	ASSERT(timer.remaining == 2.0);
-	ASSERT(timer.initial == 2.0);
+	assert(timer.remaining == 2.0);
+	assert(timer.initial == 2.0);
 }
 
 static void
@@ -20,11 +21,11 @@ test_pxl_timer_finished(void) {
 	pxl_timer_t timer;
 	pxl_timer_start(&timer, 2.0);
 
-	ASSERT(pxl_timer_finished(&timer) == false);
+	assert(pxl_timer_finished(&timer) == false);
 
 	/* Advance to completion */
 	pxl_timer_advance(&timer, 2.0);
-	ASSERT(pxl_timer_finished(&timer) == true);
+	assert(pxl_timer_finished(&timer) == true);
 }
 
 static void
@@ -34,9 +35,9 @@ test_pxl_timer_advance_partial(void) {
 
 	/* Advance halfway */
 	bool finished = pxl_timer_advance(&timer, 1.0);
-	ASSERT(finished == false);
-	ASSERT(timer.remaining == 1.0);
-	ASSERT(timer.initial == 2.0);
+	assert(finished == false);
+	assert(timer.remaining == 1.0);
+	assert(timer.initial == 2.0);
 }
 
 static void
@@ -46,8 +47,8 @@ test_pxl_timer_advance_complete(void) {
 
 	/* Advance past completion */
 	bool finished = pxl_timer_advance(&timer, 3.0);
-	ASSERT(finished == true);
-	ASSERT(timer.remaining <= 0.0);
+	assert(finished == true);
+	assert(timer.remaining <= 0.0);
 }
 
 static void
@@ -57,12 +58,12 @@ test_pxl_timer_advance_already_finished(void) {
 	
 	/* Finish the timer */
 	pxl_timer_advance(&timer, 1.0);
-	ASSERT(pxl_timer_finished(&timer) == true);
+	assert(pxl_timer_finished(&timer) == true);
 	
 	/* Advancing a finished timer does nothing */
 	bool finished = pxl_timer_advance(&timer, 1.0);
-	ASSERT(finished == false);
-	ASSERT(timer.remaining <= 0.0);
+	assert(finished == false);
+	assert(timer.remaining <= 0.0);
 }
 
 static void
@@ -70,13 +71,13 @@ test_pxl_timer_progress(void) {
 	pxl_timer_t timer;
 	pxl_timer_start(&timer, 2.0);
 
-	ASSERT(fabs(pxl_timer_progress(&timer) - 0.0) < EPSILON);
+	assert(fabs(pxl_timer_progress(&timer) - 0.0) < EPSILON);
 
 	pxl_timer_advance(&timer, 1.0);
-	ASSERT(fabs(pxl_timer_progress(&timer) - 0.5) < EPSILON);
+	assert(fabs(pxl_timer_progress(&timer) - 0.5) < EPSILON);
 
 	pxl_timer_advance(&timer, 1.0);
-	ASSERT(fabs(pxl_timer_progress(&timer) - 1.0) < EPSILON);
+	assert(fabs(pxl_timer_progress(&timer) - 1.0) < EPSILON);
 }
 
 static void
@@ -86,7 +87,7 @@ test_pxl_timer_progress_finished(void) {
 
 	pxl_timer_advance(&timer, 3.0);
 	/* Once finished, progress should be 1.0 */
-	ASSERT(fabs(pxl_timer_progress(&timer) - 1.0) < EPSILON);
+	assert(fabs(pxl_timer_progress(&timer) - 1.0) < EPSILON);
 }
 
 static void
@@ -94,13 +95,13 @@ test_pxl_timer_remaining(void) {
 	pxl_timer_t timer;
 	pxl_timer_start(&timer, 2.0);
 
-	ASSERT(timer.remaining == 2.0);
+	assert(timer.remaining == 2.0);
 
 	pxl_timer_advance(&timer, 0.5);
-	ASSERT(timer.remaining == 1.5);
+	assert(timer.remaining == 1.5);
 
 	pxl_timer_advance(&timer, 1.5);
-	ASSERT(timer.remaining <= 0.0);
+	assert(timer.remaining <= 0.0);
 }
 
 static void
@@ -110,9 +111,9 @@ test_pxl_timer_negative_remaining(void) {
 	
 	/* Advance past completion */
 	pxl_timer_advance(&timer, 3.0);
-	ASSERT(timer.remaining < 0.0);
-	ASSERT(pxl_timer_finished(&timer) == true);
-	ASSERT(pxl_timer_progress(&timer) == 1.0);
+	assert(timer.remaining < 0.0);
+	assert(pxl_timer_finished(&timer) == true);
+	assert(pxl_timer_progress(&timer) == 1.0);
 }
 
 static void
@@ -126,8 +127,8 @@ test_pxl_timer_small_advances(void) {
 	}
 	
 	/* Due to floating point precision, remaining might be very close to 0 */
-	ASSERT(timer.remaining <= 0.0001);
-	ASSERT(pxl_timer_finished(&timer) == true);
+	assert(timer.remaining <= 0.0001);
+	assert(pxl_timer_finished(&timer) == true);
 }
 
 static void
@@ -136,8 +137,8 @@ test_pxl_timer_exact_completion(void) {
 	pxl_timer_start(&timer, 1.5);
 	
 	bool finished = pxl_timer_advance(&timer, 1.5);
-	ASSERT(finished == true);
-	ASSERT(fabs(timer.remaining - 0.0) < EPSILON);
+	assert(finished == true);
+	assert(fabs(timer.remaining - 0.0) < EPSILON);
 }
 
 /* Main */

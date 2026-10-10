@@ -1,18 +1,19 @@
+#include <assert.h>
+#include <stdbool.h>
 #include "input.h"
-#include "test.h"
 
 static void
 test_pxl_input_state(void) {
 	pxl_input_t in = {0};
 
 	in.state[42 / 64] = 1ULL << (42 % 64);
-	ASSERT(pxl_input_state(&in, 42) == true);
-	ASSERT(pxl_input_state(&in, 41) == false);
-	ASSERT(pxl_input_state(&in, 43) == false);
+	assert(pxl_input_state(&in, 42) == true);
+	assert(pxl_input_state(&in, 41) == false);
+	assert(pxl_input_state(&in, 43) == false);
 
 	in.state[63 / 64] = 1ULL << (63 % 64);
-	ASSERT(pxl_input_state(&in, 63) == true);
-	ASSERT(pxl_input_state(&in, 62) == false);
+	assert(pxl_input_state(&in, 63) == true);
+	assert(pxl_input_state(&in, 62) == false);
 }
 
 static void
@@ -20,17 +21,17 @@ test_pxl_input_set_clear(void) {
 	pxl_input_t in = {0};
 
 	pxl_input_set(&in, PXL_KEYB_A);
-	ASSERT(pxl_input_state(&in, PXL_KEYB_A) == true);
-	ASSERT(pxl_input_state(&in, PXL_KEYB_B) == false);
+	assert(pxl_input_state(&in, PXL_KEYB_A) == true);
+	assert(pxl_input_state(&in, PXL_KEYB_B) == false);
 
 	pxl_input_unset(&in, PXL_KEYB_A);
-	ASSERT(pxl_input_state(&in, PXL_KEYB_A) == false);
+	assert(pxl_input_state(&in, PXL_KEYB_A) == false);
 
 	pxl_input_set(&in, PXL_IN_COUNT - 1);
-	ASSERT(pxl_input_state(&in, PXL_IN_COUNT - 1) == true);
+	assert(pxl_input_state(&in, PXL_IN_COUNT - 1) == true);
 
 	pxl_input_unset(&in, PXL_IN_COUNT - 1);
-	ASSERT(pxl_input_state(&in, PXL_IN_COUNT - 1) == false);
+	assert(pxl_input_state(&in, PXL_IN_COUNT - 1) == false);
 }
 
 /* Main */

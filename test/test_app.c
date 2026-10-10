@@ -1,5 +1,8 @@
+#include <assert.h>
+#include <stdbool.h>
 #include "app.h"
-#include "test.h"
+#include "backend.h"
+#include "input.h"
 
 static void
 test_app_transitions_active(void) {
@@ -9,9 +12,9 @@ test_app_transitions_active(void) {
 
 	pxl_input_set(&app.curr, PXL_KEYB_A);
 
-	ASSERT(pxl_app_is_active(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_is_active(&app, PXL_KEYB_A) == true);
+	assert(pxl_app_was_triggered(&app, PXL_KEYB_A) == true);
+	assert(pxl_app_was_released(&app, PXL_KEYB_A) == false);
 }
 
 static void
@@ -22,9 +25,9 @@ test_app_transitions_released(void) {
 
 	pxl_input_set(&app.prev, PXL_KEYB_A);
 
-	ASSERT(pxl_app_is_active(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == true);
+	assert(pxl_app_is_active(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_was_released(&app, PXL_KEYB_A) == true);
 }
 
 static void
@@ -36,16 +39,16 @@ test_app_transitions_no_change(void) {
 	pxl_input_set(&app.prev, PXL_KEYB_A);
 	pxl_input_set(&app.curr, PXL_KEYB_A);
 
-	ASSERT(pxl_app_is_active(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_is_active(&app, PXL_KEYB_A) == true);
+	assert(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_was_released(&app, PXL_KEYB_A) == false);
 
 	app.prev = (pxl_input_t){0};
 	app.curr = (pxl_input_t){0};
 
-	ASSERT(pxl_app_is_active(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_is_active(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_was_released(&app, PXL_KEYB_A) == false);
 }
 
 static void
@@ -57,10 +60,10 @@ test_app_transitions_multiple_keys(void) {
 	pxl_input_set(&app.prev, PXL_KEYB_A);
 	pxl_input_set(&app.curr, PXL_KEYB_B);
 
-	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
-	ASSERT(pxl_app_was_released(&app, PXL_KEYB_A) == true);
-	ASSERT(pxl_app_was_triggered(&app, PXL_KEYB_B) == true);
-	ASSERT(pxl_app_was_released(&app, PXL_KEYB_B) == false);
+	assert(pxl_app_was_triggered(&app, PXL_KEYB_A) == false);
+	assert(pxl_app_was_released(&app, PXL_KEYB_A) == true);
+	assert(pxl_app_was_triggered(&app, PXL_KEYB_B) == true);
+	assert(pxl_app_was_released(&app, PXL_KEYB_B) == false);
 }
 
 static void
@@ -76,10 +79,10 @@ test_app_mouse_wheel_reset(void) {
 	app.curr.mouse_wheel_x = 0;
 	app.curr.mouse_wheel_y = 0;
 
-	ASSERT(app.curr.mouse_wheel_x == 0);
-	ASSERT(app.curr.mouse_wheel_y == 0);
-	ASSERT(app.prev.mouse_wheel_x == 5);
-	ASSERT(app.prev.mouse_wheel_y == -3);
+	assert(app.curr.mouse_wheel_x == 0);
+	assert(app.curr.mouse_wheel_y == 0);
+	assert(app.prev.mouse_wheel_x == 5);
+	assert(app.prev.mouse_wheel_y == -3);
 }
 
 static void
@@ -88,14 +91,14 @@ test_app_should_close(void) {
 	app.curr = (pxl_input_t){0};
 	app.prev = (pxl_input_t){0};
 
-	ASSERT(pxl_input_state(&app.curr, PXL_WM_QUIT) == false);
+	assert(pxl_input_state(&app.curr, PXL_WM_QUIT) == false);
 
 	pxl_input_set(&app.curr, PXL_WM_QUIT);
-	ASSERT(pxl_input_state(&app.curr, PXL_WM_QUIT) == true);
+	assert(pxl_input_state(&app.curr, PXL_WM_QUIT) == true);
 
 	app.curr = (pxl_input_t){0};
 	pxl_input_set(&app.curr, PXL_KEYB_ESCAPE);
-	ASSERT(pxl_input_state(&app.curr, PXL_WM_QUIT) == false);
+	assert(pxl_input_state(&app.curr, PXL_WM_QUIT) == false);
 }
 
 static void
@@ -104,7 +107,7 @@ test_app_physics_disabled(void) {
 	app.physics_ts.dt = 0;
 
 	/* advance_physics should return false when stepper is disabled (dt=0) */
-	ASSERT(pxl_app_advance_physics(&app) == false);
+	assert(pxl_app_advance_physics(&app) == false);
 }
 
 static void
@@ -117,9 +120,9 @@ test_app_cfg_basic(void) {
 		.physics_dt = 1.0 / 60.0
 	};
 
-	ASSERT(cfg.width == 800);
-	ASSERT(cfg.height == 600);
-	ASSERT(cfg.physics_dt > 0);
+	assert(cfg.width == 800);
+	assert(cfg.height == 600);
+	assert(cfg.physics_dt > 0);
 }
 
 static void
@@ -132,7 +135,7 @@ test_app_cfg_zero_physics(void) {
 		.physics_dt = 0  /* Disable physics */
 	};
 
-	ASSERT(cfg.physics_dt == 0);
+	assert(cfg.physics_dt == 0);
 }
 
 /* Example test from app.h documentation */
@@ -147,9 +150,9 @@ test_example_pxl_app_init(void) {
 	};
 
 	/* This verifies the example compiles and config values are valid */
-	ASSERT(cfg.width == 800);
-	ASSERT(cfg.height == 600);
-	ASSERT(cfg.physics_dt == 1.0 / 60.0);
+	assert(cfg.width == 800);
+	assert(cfg.height == 600);
+	assert(cfg.physics_dt == 1.0 / 60.0);
 }
 
 /* Main */
