@@ -23,10 +23,6 @@
 
 /* Backend initialization flags.
  *
- * Usage:
- *   pxl_backend_init("Window", 800, 600, PXL_BACKEND_CENTERED | PXL_BACKEND_VSYNC);
- *   pxl_backend_init("Game", 0, 0, PXL_BACKEND_FULLSCREEN);
- *
  * Notes:
  *   - PXL_BACKEND_VSYNC: May be ignored by some backends (e.g., X11).
  *   - PXL_BACKEND_HIDDEN: Useful for testing (no window visible).

@@ -10,16 +10,6 @@
  *   - ts->dt: Fixed timestep (0 = disabled). Configuration.
  *   - accumulator/alpha: Internal state.
  *   - Control (time_scale, paused) is external: caller computes scaled_frame_dt.
- *
- * Usage:
- *   pxl_time_stepper_t ts;
- *   pxl_stepper_init(&ts, 1.0/60.0);
- *
- *   // In frame loop:
- *   double scaled_dt = frame_dt * time_scale;
- *   if (paused) scaled_dt = 0.0;
- *   pxl_stepper_update(&ts, scaled_dt);
- *   while (pxl_stepper_advance(&ts)) { update_physics(); }
  */
 typedef struct {
     double dt;            /* Fixed timestep (seconds). 0 = disabled. */

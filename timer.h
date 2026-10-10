@@ -13,15 +13,6 @@
  *   - remaining: Decremented each frame by scaled_dt.
  *   - initial: Initial duration (for progress calculation).
  *   - Control (time_scale, paused) is external: pass scaled_dt = 0 when paused.
- *
- * Usage:
- *   pxl_timer_t timer;
- *   pxl_timer_start(&timer, 2.0);  // 2-second timer
- *
- *   In frame loop:
- *   pxl_timer_advance(&timer, pxl_app_dt(&app));
- *   if (pxl_timer_finished(&timer)) { play_explosion(); }
- *   float progress = pxl_timer_progress(&timer);
  */
 typedef struct {
     double remaining;    /* Time remaining (decremented by scaled_dt). */

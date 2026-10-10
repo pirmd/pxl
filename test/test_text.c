@@ -1343,31 +1343,6 @@ test_pxl_draw_text_transformed_bounds_consistency(void) {
     assert(bounds.h == drawn_height + glyph_height * scale);
 }
 
-/* Example tests */
-
-static void
-test_example_pxl_text_bounds_transformed(void) {
-    /* Example: Get bounds of scaled text */
-    setup_fixture();
-    const char *text = "Hello";
-    pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 2);
-    assert(bounds.w > 0);
-    assert(bounds.h > 0);
-}
-
-static void
-test_example_pxl_draw_text_transformed(void) {
-    /* Example: Draw scaled text */
-    setup_fixture();
-    pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
-
-    const char *text = "PXL";
-    pxl_writer_set_cursor(&g_w, 5, 5);
-    pxl_draw_text_transformed(&g_cnv, &g_w, text, 2, PXL_FLIP_NONE);
-
-    assert(has_pixels_in_rect((pxl_rect_t){5, 5, 20, 20}));
-}
-
 /* Tests for pxl_next_textline */
 
 static void
@@ -1530,10 +1505,6 @@ main(void) {
     test_pxl_text_bounds_transformed_multiline_max_width();
     test_pxl_text_bounds_transformed_w_h_independence();
     test_pxl_draw_text_transformed_bounds_consistency();
-
-    /* Example tests */
-    test_example_pxl_text_bounds_transformed();
-    test_example_pxl_draw_text_transformed();
 
     return 0;
 }

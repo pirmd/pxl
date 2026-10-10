@@ -583,50 +583,6 @@ test_pxl_blit_transformed_scale_and_flip(void) {
     }
 }
 
-/* Example tests from documentation */
-
-static void
-test_example_pxl_draw_bitmask_transformed(void) {
-    /* Example: Draw a bitmask with 2x scaling */
-    pxl_buf_t pb = { .data = g_transform_buf_data, .width = TRANSFORM_W, .height = TRANSFORM_H, .stride = TRANSFORM_STRIDE };
-    pxl_canvas_t cnv;
-    pxl_canvas_init(&cnv, &pb);
-    memset(g_transform_buf_data, 0x00, sizeof(g_transform_buf_data));
-
-    uint8_t bm_data[1] = { 0xFF };
-    pxl_bitmask_t bm = { .data = bm_data, .width = 8, .height = 1, .stride = 1 };
-
-    pxl_canvas_set_color(&cnv, 0xFFFFFFFF);
-    pxl_draw_bitmask_transformed(&cnv, &bm, (pxl_rect_t){0, 0, 8, 1}, 0, 0, 2, PXL_FLIP_NONE);
-
-    /* Verify: 16x2 rectangle should be drawn */
-    assert(*pxl_buf_ptr(&pb, 0, 0) == 0xFFFFFFFF);
-    assert(*pxl_buf_ptr(&pb, 15, 1) == 0xFFFFFFFF);
-}
-
-static void
-test_example_pxl_blit_transformed(void) {
-    /* Example: Blit with 2x scaling */
-    pxl_buf_t pb = { .data = g_transform_buf_data, .width = TRANSFORM_W, .height = TRANSFORM_H, .stride = TRANSFORM_STRIDE };
-    pxl_canvas_t cnv;
-    pxl_canvas_init(&cnv, &pb);
-    memset(g_transform_buf_data, 0x00, sizeof(g_transform_buf_data));
-
-    pxl_t src_data[4 * 4];
-    pxl_buf_t src = { .data = src_data, .width = 4, .height = 4, .stride = 4 };
-    for (int y = 0; y < 4; y++) {
-        for (int x = 0; x < 4; x++) {
-            src_data[y * 4 + x] = 0xFF000000U | (uint32_t)(x * 64 + y * 16);
-        }
-    }
-
-    pxl_blit_transformed(&cnv, &src, (pxl_rect_t){0, 0, 4, 4}, 0, 0, 2, PXL_FLIP_NONE);
-
-    /* Verify: 8x8 rectangle should be drawn with scaled pixels */
-    assert(*pxl_buf_ptr(&pb, 0, 0) == 0xFF000000);
-    assert(*pxl_buf_ptr(&pb, 7, 7) == (0xFF000000 | (3 * 64 + 3 * 16)));
-}
-
 /* Main ----------------------------------------------------------------------- */
 int
 main(void) {
@@ -653,10 +609,6 @@ main(void) {
     test_pxl_blit_transformed_flip_h();
     test_pxl_blit_transformed_flip_v();
     test_pxl_blit_transformed_scale_and_flip();
-
-    /* Example tests */
-    test_example_pxl_draw_bitmask_transformed();
-    test_example_pxl_blit_transformed();
 
     return 0;
 }

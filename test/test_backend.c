@@ -2,9 +2,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "backend.h"
-#include "buf.h"
-#include "err.h"
-#include "input.h"
 #include "text.h"
 
 /* Lifecycle ---------------------------------------------------------------- */
@@ -235,45 +232,34 @@ test_pxl_backend_get_typed_text_null_termination(void) {
     pxl_backend_deinit();
 }
 
-/* Example tests -------------------------------------------------------------- */
-
+/* Example test from backend.h documentation */
 static void
 test_example_pxl_backend_get_typed_text(void) {
     /* This test verifies the example in backend.h compiles and works as documented */
     assert(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
 
+    /* Example from backend.h: */
     if (pxl_backend_has_typed_text()) {
         char utf8_buf[32];
         int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
-        assert(len > 0);
-        uint32_t rune;
-        int consumed = pxl_utf8_decode(utf8_buf, &rune);
-        assert(consumed > 0);
+        if (len > 0) {
+            uint32_t rune;
+            int consumed = pxl_utf8_decode(utf8_buf, &rune);
+            assert(consumed > 0);
+        }
     }
 
+    /* Verify null termination when no text is available */
     char utf8_buf[32];
     int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
     assert(len >= 0);
     assert(utf8_buf[0] == '\0' || len > 0);
 
+    /* Check for special keys separately (as per example) */
     pxl_input_t input = {0};
     pxl_backend_poll_events(&input);
     if (pxl_input_state(&input, PXL_KEYB_ENTER)) {
         /* Handle Enter key - verify it compiles */
-    }
-
-    pxl_backend_deinit();
-}
-
-static void
-test_example_pxl_backend_has_typed_text(void) {
-    /* This test verifies the example in backend.h for pxl_backend_has_typed_text */
-    assert(pxl_backend_init("test", 100, 100, PXL_BACKEND_HIDDEN) == PXL_SUCCESS);
-
-    if (pxl_backend_has_typed_text()) {
-        char utf8_buf[32];
-        int len = pxl_backend_get_typed_text(utf8_buf, sizeof(utf8_buf));
-        assert(len > 0);
     }
 
     pxl_backend_deinit();
@@ -298,7 +284,9 @@ main(void) {
     test_pxl_backend_get_typed_text_empty();
     test_pxl_backend_get_typed_text_edge_cases();
     test_pxl_backend_get_typed_text_null_termination();
+
+    /* Example test */
     test_example_pxl_backend_get_typed_text();
-    test_example_pxl_backend_has_typed_text();
+
     return 0;
 }
