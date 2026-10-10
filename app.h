@@ -64,12 +64,10 @@ typedef struct {
     double frame_dt;     /* Raw frame delta time (clamped). */
 } pxl_app_t;
 
-/* Returns effective dt (paused-aware, time-scaled). Use for game logic. */
 static inline double pxl_app_dt(const pxl_app_t *app) {
     return app->paused ? 0.0 : (app->frame_dt * (double)app->time_scale);
 }
 
-/* Initialize app and backend from configuration. */
 static inline pxl_err_t
 pxl_app_init(pxl_app_t *app, const pxl_app_cfg_t *cfg) {
     assert(app);
@@ -91,14 +89,12 @@ pxl_app_init(pxl_app_t *app, const pxl_app_cfg_t *cfg) {
     return PXL_SUCCESS;
 }
 
-/* Cleanup app and backend. */
 static inline void
 pxl_app_deinit(pxl_app_t *app) {
     assert(app);
     pxl_backend_deinit();
 }
 
-/* Internal: updates frame state. Not part of public API. */
 static inline void
 update_state(pxl_app_t *app, double frame_dt, double now) {
     app->prev = app->curr;
@@ -109,7 +105,6 @@ update_state(pxl_app_t *app, double frame_dt, double now) {
     pxl_stepper_update(&app->physics_ts, pxl_app_dt(app));
 }
 
-/* Advance one frame using poll mode (non-blocking, active loop). */
 static inline bool
 pxl_app_advance(pxl_app_t *app) {
     assert(app);
@@ -129,7 +124,6 @@ pxl_app_advance(pxl_app_t *app) {
     return !pxl_input_state(&app->curr, PXL_WM_QUIT);
 }
 
-/* Advance one frame using wait mode (blocking until event). */
 static inline bool
 pxl_app_advance_wait(pxl_app_t *app) {
     assert(app);
@@ -149,14 +143,12 @@ pxl_app_advance_wait(pxl_app_t *app) {
     return !pxl_input_state(&app->curr, PXL_WM_QUIT);
 }
 
-/* Advance physics stepper by one fixed step. */
 static inline bool
 pxl_app_advance_physics(pxl_app_t *app) {
     assert(app);
     return pxl_stepper_advance(&app->physics_ts);
 }
 
-/* --- Input Helpers --- */
 static inline bool
 pxl_app_is_active(const pxl_app_t *app, pxl_input_code_t code) {
     assert(app);

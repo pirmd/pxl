@@ -6,8 +6,6 @@
 #include "canvas.h"
 #include "geom.h"
 
-/* Rendering: blit and draw operations with optional flip/scale. */
-
 /* Blit a rectangle from a pixel buffer to the canvas at (cnv_x, cnv_y).
  * Caller must ensure pb_r is within pb bounds (asserted).
  */

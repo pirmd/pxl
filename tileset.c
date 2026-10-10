@@ -5,10 +5,6 @@
 #include "geom.h"
 #include "tileset.h"
 
-/* Draw a tile from a tileset to canvas at (x, y).
- * Uses pxl_blit_rect internally. Respects canvas offset and scissor.
- */
-
 void
 pxl_draw_tile(pxl_canvas_t *cnv, const pxl_tileset_t *ts, int tile_idx, int x, int y) {
     assert(cnv && cnv->pb);

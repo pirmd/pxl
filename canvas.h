@@ -8,12 +8,6 @@
 #include "buf.h"
 #include "geom.h"
 
-/*
- * Canvas: Drawing context wrapping a pixel buffer.
- * Stores offset, scissor clipping area, and drawing color as state.
- * Users must apply offset and scissor manually in their drawing code.
- */
-
 typedef struct {
     const pxl_buf_t *pb;              /* Target (read-only)    */
     int             offset_x, offset_y; /* Translation offset     */
@@ -22,7 +16,6 @@ typedef struct {
 
 } pxl_canvas_t;
 
-/* Initialization ---------------------------------------------------------- */
 static inline void
 pxl_canvas_init(pxl_canvas_t *cnv, const pxl_buf_t *pb) {
     assert(cnv);
@@ -35,7 +28,6 @@ pxl_canvas_init(pxl_canvas_t *cnv, const pxl_buf_t *pb) {
     cnv->color    = 0xFFFFFFFFU;
 }
 
-/* State ------------------------------------------------------------------- */
 static inline void
 pxl_canvas_set_color(pxl_canvas_t *cnv, pxl_t color) {
     assert(cnv);
@@ -75,11 +67,7 @@ pxl_canvas_reset_offset(pxl_canvas_t *cnv) {
     cnv->offset_y = 0;
 }
 
-/* Views ------------------------------------------------------------------- */
 
-/* Initialize a canvas with a specific view (offset + scissor).
- * Equivalent to pxl_canvas_init() followed by pxl_canvas_set_offset() and pxl_canvas_set_scissor().
- */
 static inline void
 pxl_canvas_init_view(pxl_canvas_t *cnv, const pxl_buf_t *pb, pxl_rect_t view) {
     pxl_canvas_init(cnv, pb);
@@ -87,16 +75,12 @@ pxl_canvas_init_view(pxl_canvas_t *cnv, const pxl_buf_t *pb, pxl_rect_t view) {
     pxl_canvas_set_scissor(cnv, view.x, view.y, view.w, view.h);
 }
 
-/* Get a canvas's view boundaries.
- * Boundariess are relative to canvas's offset.
- */
 static inline pxl_rect_t
 pxl_canvas_view(const pxl_canvas_t *cnv) {
     assert(cnv);
     return (pxl_rect_t){ 0, 0, cnv->scissor.w, cnv->scissor.h };
 }
 
-/* Drawing ----------------------------------------------------------------- */
 static inline void
 pxl_canvas_clear(pxl_canvas_t *cnv) {
     assert(cnv && cnv->pb);

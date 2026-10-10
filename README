@@ -11,6 +11,7 @@ Features:
   - Backends: SDL2, X11 (uses SHM, XIM/XIC extensions for performance and UTF-8 input)
   - Keyboard/mouse input
 
+
 Build:
   make                  # Build libpxl.a (default backend: x11)
   make PXL_BACKEND=sdl  # Build with SDL2 backend
@@ -50,9 +51,10 @@ Quick start (Minimal PXL application):
 
     pxl_app_deinit(&app);
 
+
 Demos:
   - demo_pong.c        - Complete game: physics, input, rendering, interpolation
-  - demo_fonview.c     - Bitmask font viewer
+  - demo_fontview.c    - Bitmask font viewer
 
 
 Architecture:
@@ -60,6 +62,7 @@ Architecture:
     backend.h      - Backend interface. All backends use ARGB8888 pixel format
     buf.h          - uint32_t pixel buffer with stride alignment
     err.h          - Error codes
+    geom.h         - Geometry primitives (rect, span) and clipping
     input.h        - Input state handling (keyboard, mouse, window events)
 
   Backend:
@@ -71,15 +74,14 @@ Architecture:
     blit.h/c       - Pixel operations (blit, bitmask drawing, with optional flip/scale)
     canvas.h       - Drawing surface with color, scissor, translation offset, clear, blit
     color.h        - ARGB8888 color creation and component extraction
-    geom.h         - Geometry primitives (rect, span) and clipping
     shape.h/c      - 2D primitives (line, rect, circle, triangle, outline + filled)
     text.h/c       - Text rendering with mono or proportional LSB bitmask fonts, alignment, and transformations
     text_basic.h/c - ASCII text rendering with built-in 8x8 font (char, string, bounds)
 
   Framework:
     app.h          - App management: frame management, input, poll/wait event modes
+    layout.h       - Layout helpers
     stepper.h      - Time-stepped physics loop helper (fixed timestep, interpolation)
-    timer.h        - Timer helpers for animations and delays
 
   Deprecated (will be removed in next version):
     camera.h       - Offset-based camera management helpers (use canvas offset directly)
@@ -94,8 +96,10 @@ Tools:
   - bdf2pxl - Convert BDF font files to pxl_font_t C header
     Example: bdf2pxl -n my_font -r U+0020-U+007F DejaVuSans.bdf > my_font.h
 
+
 Testing:
   Run tests: 'make test' or 'sh test-all.sh' to go through all available backends.
+
 
 License:
   MIT. See LICENSE.

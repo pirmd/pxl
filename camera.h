@@ -3,12 +3,6 @@
 
 #include "canvas.h"
 
-/*
- * Camera helpers: offset-based camera management for pxl_canvas_t.
- * Uses the canvas offset to represent camera position.
- */
-
-/* Movement ---------------------------------------------------------------- */
 static inline void
 pxl_canvas_move_camera(pxl_canvas_t *cnv, int dx, int dy) {
     cnv->offset_x += dx;

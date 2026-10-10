@@ -30,9 +30,6 @@ typedef struct {
     const int8_t  *glyph_offsets_y; /* Per-glyph Y offsets (NULL = 0) */
 } pxl_font_t;
 
-/* Writer ------------------------------------------------------------------ */
-
-/* Writer: cursor, fonts, and spacing for text rendering. */
 typedef struct {
     const pxl_font_t **fonts;      /* Array of fonts to try in order */
     size_t           font_count;   /* Number of fonts in array */
@@ -43,11 +40,9 @@ typedef struct {
     int              line_start_x; /* (private) X position at start of current line (for \n, \r) */
 } pxl_writer_t;
 
-/* Initialise writer */
 void
 pxl_writer_init(pxl_writer_t *w, const pxl_font_t **fonts, size_t font_count);
 
-/* Move writer cursor */
 static inline void
 pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
     assert(w);
@@ -56,7 +51,6 @@ pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
     w->line_start_x = x;
 }
 
-/* Tab advance width in pixels */
 static inline int
 pxl_tab_advance(const pxl_writer_t *w) {
     assert(w && w->font_count > 0);
@@ -86,13 +80,9 @@ pxl_rect_t
 pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes);
 
 
-/* Drawing ----------------------------------------------------------------- */
-
-/* Draw a single rune at current writer cursor. Handles \n, \r, \t. */
 void
 pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune);
 
-/* Draw text string at current writer cursor. Advances cursor. */
 void
 pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
 
@@ -102,16 +92,12 @@ pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
 void
 pxl_draw_text_n(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, size_t max_bytes);
 
-/* Helpers for manipulating text line per line ----------------------------- */
 
 /* Returns bounds for the first line of text (up to \n or \r or \r\n).
  */
 pxl_rect_t
 pxl_textline_bounds(const pxl_writer_t *w, const char *txt);
 
-/* Draws the first line of text (up to \n or \r or \r\n).
- * Advances writer cursor to next line if end-of-line is encoutered.
- */
 void
 pxl_draw_textline(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
 
@@ -139,7 +125,6 @@ pxl_next_textline(const char *txt) {
     return txt; /* Points to '\0' at end of string */
 }
 
-/* Text with scale and/or flip --------------------------------------------- */
 
 /* Text bounds with scaling. scale must be >= 1. */
 pxl_rect_t
@@ -148,7 +133,6 @@ pxl_rune_bounds_transformed(const pxl_writer_t *w, uint32_t rune, int scale);
 pxl_rect_t
 pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale);
 
-/* Text drawing with scaling and flipping. scale must be >= 1. */
 void
 pxl_draw_rune_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune, int scale, pxl_flip_t flip);
 

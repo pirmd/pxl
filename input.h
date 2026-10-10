@@ -5,13 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/*
- * Gather input state: physical keys, mouse button or windows-related events
- *
- * Physical key codes represent physical keys and not characters: names
- * correspond to QWERTY keyboard layout positions.
- *
- */
+/* Physical key codes represent physical keys and not characters: names correspond to QWERTY keyboard layout positions. */
 typedef enum {
     PXL_IN_UNKNOWN = 0,
 

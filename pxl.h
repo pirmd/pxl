@@ -18,6 +18,7 @@
 #include "canvas.h"
 #include "shape.h"
 #include "blit.h"
+#include "bitmask.h"
 #include "text_basic.h"
 
 /* Text */

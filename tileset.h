@@ -1,5 +1,3 @@
-/* Tile rendering module: tileset (grid atlas) + sprite (frame indices). */
-
 #ifndef PXL_TILESET_H
 #define PXL_TILESET_H
 
