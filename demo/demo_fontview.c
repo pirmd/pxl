@@ -40,7 +40,6 @@ static const struct {
 
 #define NUM_FONT_FAMILIES (sizeof(fonts.families) / sizeof(fonts.families[0]))
 
-/* Lorem ipsum texts for each font family */
 static const char *lorem_texts[] = {
     "Arma virumque cano, Troiae qui primus ab oris\nItaliam, fato profugus, Laviniaque venit\nlitora, multum ille et terris iactatus et alto",
     "明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。\n我欲乘风归去，又恐琼楼玉宇"
@@ -55,15 +54,20 @@ static const char *lorem_texts[] = {
 
 #define TITLE_H 16
 #define SCROLLBAR_W 8
-#define TEXT_PREVIEW_H 64 
+#define TEXT_PREVIEW_H 64
 #define FOOTER_H 16
 
-#define HELP_W     400 
+#define HELP_W     400
 #define HELP_H     300
 
-#define GLYPH_ZOOM_FACTOR 3
+#define GLYPH_ZOOM  3
 #define GRID_CELL_W 16
 #define GRID_CELL_H 16
+
+/* Layout ratios */
+#define CONTENT_PADDING_RATIO  20  /* 5% padding (1/20) */
+#define GRID_H_RATIO           40  /* Grid takes 40% of content height */
+#define ZOOM_SECTION_RATIO     15  /* Zoom section takes 15% of window height */
 
 /* Color */
 #define WIN_COLOR   0xFFFDF6E3U  /* Solarized Base3 */
@@ -106,6 +110,9 @@ typedef struct {
 	pxl_rect_t text_preview;
 	pxl_rect_t footer;
 	pxl_rect_t help;
+	
+	int grid_cols, grid_rows;
+	int grid_count;
 } layout_t;
 
 static layout_t
@@ -114,7 +121,7 @@ compute_layout(void) {
 	pxl_backend_get_window_size(&l.root.w, &l.root.h);
 
 	/* Content area: centered with horizontal padding (5% each side) */
-	pxl_rect_t content = pxl_pad_rect(l.root, l.root.w / 20, l.root.h / 20);
+	pxl_rect_t content = pxl_pad_rect(l.root, l.root.w / CONTENT_PADDING_RATIO, l.root.h / CONTENT_PADDING_RATIO);
 
 	/* Title at top with padding */
 	l.title = pxl_split_rect(&content, TITLE_H, PXL_SIDE_TOP);
@@ -122,13 +129,13 @@ compute_layout(void) {
 	(void)pxl_split_rect(&content, H_PADDING, PXL_SIDE_TOP);
 
 	/* Grid area + scrollbar (40% of original height) */
-	l.grid = pxl_split_rect(&content, l.root.h * 4 / 10, PXL_SIDE_TOP);
+	l.grid = pxl_split_rect(&content, l.root.h * GRID_H_RATIO / 100, PXL_SIDE_TOP);
 	l.scrollbar = pxl_split_rect(&l.grid, SCROLLBAR_W, PXL_SIDE_RIGHT);
 
 	(void)pxl_split_rect(&content, H_PADDING, PXL_SIDE_TOP);
 
 	/* Glyph zoom + info section */
-	pxl_rect_t zoom_total = pxl_split_rect(&content, l.root.h * 15 / 100, PXL_SIDE_TOP);
+	pxl_rect_t zoom_total = pxl_split_rect(&content, l.root.h * ZOOM_SECTION_RATIO / 100, PXL_SIDE_TOP);
 	l.glyph_zoom = pxl_split_rect(&zoom_total, zoom_total.h, PXL_SIDE_LEFT); /* Force square */
 	(void)pxl_split_rect(&zoom_total, W_PADDING, PXL_SIDE_LEFT);
 	l.glyph_info = zoom_total;
@@ -146,101 +153,27 @@ compute_layout(void) {
 	/* Help overlay: full content height */
 	l.help  = pxl_align_rect((pxl_rect_t){0, 0, HELP_W, HELP_H}, l.root, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
 
+	/* Adjust grid */
+	l.grid_cols  = l.grid.w / GRID_CELL_W;
+	l.grid_rows  = l.grid.h / GRID_CELL_H;
+	l.grid_count = l.grid_rows * l.grid_cols;
+
 	return l;
 }
 
-/* Font viewer logic -------------------------------------------------------- */
-
+/* Font viewer ------------------------------------------------------------- */
 typedef struct {
-	const pxl_bitmask_t *bitmask;
-	pxl_rect_t bitmask_r;
-	uint32_t codepoint;
-	int width;
-	int height;
-	int offset_x;
-	int offset_y;
-	int advance;
-} glyph_t;
-
-typedef struct {
-	int cols;               /* Number of columns in grid */
-	int rows;               /* Number of rows in grid */
 	int family_idx;         /* Current font family index */
 	int glyph_idx;          /* Index of selected glyph in current view */
 
-	/* Internal */
-	int glyph_per_page;
-	int start_idx;
-	int end_idx;
-
-	const pxl_font_t **font;
-	int font_size;
-	const char *font_name;
-	int font_glyph_count;
+	int family_glyph_count;
 } fontview_t;
-
-static int
-fontview_get_glyph(const fontview_t *fv, int idx, glyph_t *out_glyph) {
-	assert(out_glyph);
-	assert(idx >= 0 && idx < fv->font_glyph_count);
-
-	const pxl_font_t **family_fonts = fonts.families[fv->family_idx];
-	int idx_in_font = idx;
-
-	*out_glyph = (glyph_t){0};
-
-	for (int i = 0; i < fv->font_size; i++) {
-		const pxl_font_t *font = family_fonts[i];
-		int font_count = (int)(font->rune_end - font->rune_start + 1u);
-
-		if (idx_in_font < font_count) {
-			out_glyph->bitmask = &font->bitmask;
-			out_glyph->codepoint = (uint32_t)font->rune_start + (uint32_t)idx_in_font;
-			out_glyph->width = font->bitmask.width;
-			out_glyph->height = font->glyph_height;
-
-			/* Per-glyph metrics if available */
-			if (font->glyph_widths) {
-				out_glyph->width = font->glyph_widths[idx_in_font];
-			}
-			if (font->glyph_offsets_x) {
-				out_glyph->offset_x = font->glyph_offsets_x[idx_in_font];
-			}
-			if (font->glyph_offsets_y) {
-				out_glyph->offset_y = font->glyph_offsets_y[idx_in_font];
-			}
-			if (font->glyph_advances) {
-				out_glyph->advance = font->glyph_advances[idx_in_font];
-			}
-
-			out_glyph->bitmask_r = (pxl_rect_t){
-				.y = idx_in_font * out_glyph->height,
-				.w = out_glyph->width,
-				.h = out_glyph->height
-			};
-
-			return 0;
-		}
-		idx_in_font -= font_count;
-		assert(idx_in_font >= 0);
-	}
-
-	/* Fallback (should never happen due to assert) */
-	return 1;
-}
 
 static void
 fontview_next_glyph(fontview_t *fv, int idx_inc) {
 	int new_idx = fv->glyph_idx + idx_inc;
-	if (new_idx >= 0 && new_idx < fv->font_glyph_count) {
+	if (new_idx >= 0 && new_idx < fv->family_glyph_count) {
 		fv->glyph_idx = new_idx;
-	}
-
-	fv->start_idx = (fv->glyph_idx / fv->glyph_per_page) * fv->glyph_per_page;
-
-	fv->end_idx = fv->start_idx + fv->glyph_per_page;
-	if (fv->end_idx > fv->font_glyph_count) {
-		fv->end_idx = fv->font_glyph_count;
 	}
 }
 
@@ -248,15 +181,11 @@ static void
 fontview_next_font(fontview_t *fv) {
 	fv->family_idx = (fv->family_idx + 1) % (int)NUM_FONT_FAMILIES;
 
-	fv->font = fonts.families[fv->family_idx];
-	fv->font_size = (int)fonts.sizes[fv->family_idx];
-	fv->font_name = fonts.names[fv->family_idx];
-
-	fv->font_glyph_count = 0;
-	for (int i = 0; i < fv->font_size; i++) {
-		const pxl_font_t *font = fv->font[i];
+	fv->family_glyph_count = 0;
+	for (size_t i = 0; i < fonts.sizes[fv->family_idx]; i++) {
+		const pxl_font_t *font = fonts.families[fv->family_idx][i];
 		int font_count = (int)(font->rune_end - font->rune_start + 1u);
-		fv->font_glyph_count += font_count;
+		fv->family_glyph_count += font_count;
 	}
 
 	fv->glyph_idx = -1;
@@ -269,25 +198,63 @@ fontview_init(fontview_t *fv) {
 	fontview_next_font(fv);
 }
 
-static void
-handle_resize(fontview_t *fv, layout_t layout) {
-	fv->cols = layout.grid.w / GRID_CELL_W;
-	fv->rows = layout.grid.h / GRID_CELL_H;
-	fv->glyph_per_page = fv->rows * fv->cols;
+static uint32_t
+fontview_get_glyph(const fontview_t *fv, int idx) {
+	assert(fv && fonts.sizes[fv->family_idx] > 0);
+	assert(idx >= 0);
+	
+	for (size_t i = 0; i < fonts.sizes[fv->family_idx]; i++) {
+		const pxl_font_t *font = fonts.families[fv->family_idx][i];
+		int font_count = (int)(font->rune_end - font->rune_start + 1u);
 
-
-
-	fv->start_idx = (fv->glyph_idx / fv->glyph_per_page) * fv->glyph_per_page;
-	fv->end_idx = fv->start_idx + fv->glyph_per_page;
-	if (fv->end_idx > fv->font_glyph_count) {
-		fv->end_idx = fv->font_glyph_count;
+		if (idx < font_count) {
+			return font->rune_start + (uint32_t)idx;
+		}
+		
+		idx -= font_count;
+		assert(idx >= 0);
 	}
+
+	assert(0);
+	return 0;
+}
+
+static void
+fontview_get_glyph_info(const fontview_t *fv, int idx,
+						uint32_t *codepoint,
+						int *w, int *h, int *advance,
+						int *offset_x, int *offset_y) {
+	assert(fv && fonts.sizes[fv->family_idx] > 0);
+	assert(idx >= 0);
+	
+	const pxl_font_t *font = NULL;
+	int offset = idx;
+	
+	for (size_t i = 0; i < fonts.sizes[fv->family_idx]; i++) {
+		font = fonts.families[fv->family_idx][i];
+		int font_count = (int)(font->rune_end - font->rune_start + 1u);
+
+		if (offset < font_count) {
+			if (codepoint) *codepoint = font->rune_start + (uint32_t)offset;
+			break;
+		}
+		
+		offset -= font_count;
+		assert(offset >= 0);
+	}
+		
+	assert(font != NULL);
+	int glyph_w = (font->glyph_widths) ? font->glyph_widths[offset] : font->bitmask.width;
+	if (w) *w = glyph_w;
+	if (h) *h = font->glyph_height;
+	if (advance) *advance = (font->glyph_advances) ? font->glyph_advances[offset] : glyph_w;
+	if (offset_x) *offset_x = (font->glyph_offsets_x) ? font->glyph_offsets_x[offset] : 0;
+	if (offset_y) *offset_y = (font->glyph_offsets_y) ? font->glyph_offsets_y[offset] : 0;
 }
 
 /* Input ------------------------------------------------------------------- */
 static void
-handle_fontview_input(pxl_app_t *app, fontview_t *fv) {
-	/* Navigation */
+handle_fontview_input(pxl_app_t *app, fontview_t *fv, const layout_t *layout) {
 	if (pxl_app_was_triggered(app, PXL_KEYB_H) || pxl_app_was_triggered(app, PXL_KEYB_LEFT)) {
 		fontview_next_glyph(fv, -1);
 	}
@@ -295,10 +262,10 @@ handle_fontview_input(pxl_app_t *app, fontview_t *fv) {
 		fontview_next_glyph(fv, 1);
 	}
 	if (pxl_app_was_triggered(app, PXL_KEYB_J) || pxl_app_was_triggered(app, PXL_KEYB_DOWN)) {
-		fontview_next_glyph(fv, fv->cols);
+		fontview_next_glyph(fv, layout->grid_cols);
 	}
 	if (pxl_app_was_triggered(app, PXL_KEYB_K) || pxl_app_was_triggered(app, PXL_KEYB_UP)) {
-		fontview_next_glyph(fv, -fv->cols);
+		fontview_next_glyph(fv, -layout->grid_cols);
 	}
 }
 
@@ -313,8 +280,6 @@ handle_ui_input(pxl_app_t *app, ui_t *ui, fontview_t *fv) {
 	}
 
 	ui->show_help = pxl_app_is_active(app, PXL_KEYB_COMMA);
-
-	handle_fontview_input(app, fv);
 }
 
 /* Render ------------------------------------------------------------------ */
@@ -323,67 +288,65 @@ render_title(pxl_canvas_t *cnv, const fontview_t *fv, const ui_t *ui) {
 	assert(cnv && fv && ui);
 
 	char txt[128];
-	snprintf(txt, sizeof(txt), "PXL Font Viewer - %s", fv->font_name);
+	snprintf(txt, sizeof(txt), "PXL Font Viewer - %s", fonts.names[fv->family_idx]);
 
 	pxl_canvas_set_color(cnv, FG_COLOR);
 	ui_draw_text(ui, cnv, txt, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
 }
 
 static void
-render_grid(pxl_canvas_t *cnv, const fontview_t *fv, const ui_t *ui) {
+render_grid(pxl_canvas_t *cnv, const fontview_t *fv, const ui_t *ui, const layout_t *layout) {
 	assert(cnv && fv && ui);
 
 	pxl_writer_t w;
-	pxl_writer_init(&w, fv->font, (size_t)fv->font_size);
+	pxl_writer_init(&w, fonts.families[fv->family_idx], fonts.sizes[fv->family_idx]);
 
 	pxl_canvas_set_color(cnv, FG_COLOR);
-	for (int i = fv->start_idx; i < fv->end_idx; i++) {
-		glyph_t glyph;
-		if (fontview_get_glyph(fv, i, &glyph) != 0) continue;
+	
+	int start_idx = (fv->glyph_idx / layout->grid_count) * layout->grid_count;
+	int end_idx = start_idx + layout->grid_count;
+	if (end_idx > fv->family_glyph_count) end_idx = fv->family_glyph_count;
+	
+	for (int i = start_idx; i < end_idx; i++) {
+		int col = (i - start_idx) % layout->grid_cols;
+		int row = (i - start_idx) / layout->grid_cols;
 
-		int col = (i - fv->start_idx) % fv->cols;
-		int row = (i - fv->start_idx) / fv->cols;
-
-		pxl_rect_t cell = (pxl_rect_t){
-			col * GRID_CELL_W,
-			row * GRID_CELL_H,
-			GRID_CELL_W,
-			GRID_CELL_H
-		};
-
+		uint32_t codepoint = fontview_get_glyph(fv, i);
 		pxl_rect_t aligned = pxl_align_rect(
-			(pxl_rect_t){0, 0, glyph.width, glyph.height},
-			cell,
+			pxl_rune_bounds(&w, codepoint),
+			(pxl_rect_t){col * GRID_CELL_W, row * GRID_CELL_H, GRID_CELL_W, GRID_CELL_H},
 			PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER
 		);
 
 		pxl_writer_set_cursor(&w, aligned.x, aligned.y);
-		pxl_draw_rune(cnv, &w, glyph.codepoint);
+		pxl_draw_rune(cnv, &w, codepoint);
 	}
 
 	/* Highlight current glyph */
-	if (fv->glyph_idx >= fv->start_idx && fv->glyph_idx < fv->end_idx) {
-		int hi_col = (fv->glyph_idx - fv->start_idx) % fv->cols;
-		int hi_row = (fv->glyph_idx - fv->start_idx) / fv->cols;
+	if (fv->glyph_idx >= start_idx && fv->glyph_idx < end_idx) {
+		int hi_col = (fv->glyph_idx - start_idx) % layout->grid_cols;
+		int hi_row = (fv->glyph_idx - start_idx) / layout->grid_cols;
 		pxl_canvas_set_color(cnv, HI_COLOR);
 		pxl_draw_rect(cnv, hi_col * GRID_CELL_W, hi_row * GRID_CELL_H, GRID_CELL_W, GRID_CELL_H);
 	}
 }
 
 static void
-render_scrollbar(pxl_canvas_t *cnv, const fontview_t *fv) {
+render_scrollbar(pxl_canvas_t *cnv, const fontview_t *fv, const layout_t *layout) {
 	assert(cnv && fv);
 
 	pxl_rect_t bar = pxl_canvas_view(cnv);
 
 	/* Calculate thumb size based on visible portion */
-	int scroll_h = fv->font_glyph_count > 0 ?
-				(bar.h * fv->glyph_per_page) / fv->font_glyph_count : 0;
+	int scroll_h = fv->family_glyph_count > 0 ?
+				(bar.h * layout->grid_count) / fv->family_glyph_count : 0;
 	scroll_h = scroll_h < 8 ? 8 : scroll_h;
 
 	/* Calculate thumb position based on start_idx */
-	float position_ratio = fv->font_glyph_count > 0 ?
-				(float)fv->start_idx / (float)fv->font_glyph_count : 0.0f;
+	int start_idx = (fv->glyph_idx / layout->grid_count) * layout->grid_count;
+
+	float position_ratio = fv->family_glyph_count > 0 ?
+				(float)start_idx / (float)fv->family_glyph_count : 0.0f;
 	int thumb_y = bar.y + (int)(position_ratio * (float)(bar.h - scroll_h));
 
 	pxl_canvas_set_color(cnv, FG_COLOR);
@@ -394,56 +357,49 @@ static void
 render_glyph_zoom(pxl_canvas_t *cnv, const fontview_t *fv) {
 	assert(cnv && fv);
 
-	glyph_t glyph;
-	if (fontview_get_glyph(fv, fv->glyph_idx, &glyph) != 0) return;
+	pxl_writer_t w;
+	pxl_writer_init(&w, fonts.families[fv->family_idx], fonts.sizes[fv->family_idx]);
 
-	pxl_rect_t target = pxl_canvas_view(cnv);
-	pxl_rect_t src = (pxl_rect_t){
-		0, 0,
-		glyph.width * GLYPH_ZOOM_FACTOR,
-		glyph.height * GLYPH_ZOOM_FACTOR
-	};
+	uint32_t codepoint = fontview_get_glyph(fv, fv->glyph_idx);
 
-	pxl_rect_t aligned = pxl_align_rect(src, target, PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER);
+	pxl_rect_t aligned = pxl_align_rect(
+		pxl_rune_bounds_transformed(&w, codepoint, GLYPH_ZOOM),
+		pxl_canvas_view(cnv),
+		PXL_ALIGN_H_CENTER|PXL_ALIGN_V_CENTER
+	);
 
 	pxl_canvas_set_color(cnv, HI_COLOR);
-	pxl_draw_bitmask_transformed(cnv, glyph.bitmask, glyph.bitmask_r,
-						aligned.x, aligned.y, GLYPH_ZOOM_FACTOR, PXL_FLIP_NONE);
-}
-
-static void
-outline_rect(pxl_canvas_t *cnv, pxl_rect_t r, int thick) {
-	pxl_fill_rect(cnv, r.x, r.y, r.w, thick);
-	pxl_fill_rect(cnv, r.x, r.y, thick, r.h);
-	pxl_fill_rect(cnv, r.x + r.w - thick, r.y, thick, r.h);
-	pxl_fill_rect(cnv, r.x, r.y + r.h - thick, r.w, thick);
+	pxl_writer_set_cursor(&w, aligned.x, aligned.y);
+	pxl_draw_rune_transformed(cnv, &w, codepoint, GLYPH_ZOOM, PXL_FLIP_NONE);
 }
 
 static void
 render_glyph_info(pxl_canvas_t *cnv, const fontview_t *fv, const ui_t *ui) {
 	assert(cnv && fv && ui);
 
-	glyph_t glyph;
-	if (fontview_get_glyph(fv, fv->glyph_idx, &glyph) != 0) return;
+	uint32_t codepoint;
+	int glyph_w = 0, glyph_h = 0, advance = 0, offset_x = 0, offset_y = 0;
+	fontview_get_glyph_info(fv, fv->glyph_idx, &codepoint, 
+						&glyph_w, &glyph_h, &advance, &offset_x, &offset_y);
 
 	char txt[256];
 	snprintf(txt, sizeof(txt),
-		"U+%04X\nW:%d  H:%d\nOff:(%+d,%+d) Adv:%d",
-		(unsigned int)glyph.codepoint, glyph.width, glyph.height,
-		glyph.offset_x, glyph.offset_y, glyph.advance
+		"U+%04X\nW:%d  H:%d\nAdv: %d\tOff:(%+d,%+d)",
+		(unsigned int)codepoint, glyph_w, glyph_h, advance, offset_x, offset_y
 	);
 
 	pxl_canvas_set_color(cnv, HI_COLOR);
 
-	pxl_writer_t w;
-	pxl_writer_init(&w, ui->fonts, ui->font_count);
+	pxl_writer_t writer;
+	pxl_writer_init(&writer, ui->fonts, ui->font_count);
 
-	pxl_rect_t bbox = pxl_canvas_view(cnv);
-	pxl_rect_t bounds = pxl_text_bounds(&w, txt);
+	pxl_rect_t bbox = pxl_pad_rect(pxl_canvas_view(cnv), W_PADDING, H_PADDING);
+	
+	pxl_rect_t bounds = pxl_text_bounds(&writer, txt);
 	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, PXL_ALIGN_LEFT|PXL_ALIGN_V_CENTER);
 
-	pxl_writer_set_cursor(&w, aligned.x + W_PADDING, aligned.y);
-	pxl_draw_text(cnv, &w, txt);
+	pxl_writer_set_cursor(&writer, aligned.x, aligned.y);
+	pxl_draw_text(cnv, &writer, txt);
 }
 
 static void
@@ -453,7 +409,7 @@ render_text_preview(pxl_canvas_t *cnv, const fontview_t *fv, const ui_t *ui) {
 	const char *txt = lorem_texts[fv->family_idx];
 
 	pxl_writer_t w;
-	pxl_writer_init(&w, fv->font, (size_t)fv->font_size);
+	pxl_writer_init(&w, fonts.families[fv->family_idx], fonts.sizes[fv->family_idx]);
 
 	pxl_rect_t bbox = pxl_canvas_view(cnv);
 	pxl_rect_t bounds = pxl_text_bounds(&w, txt);
@@ -472,8 +428,8 @@ render_footer(pxl_canvas_t *cnv, const fontview_t *fv, const ui_t *ui) {
 	snprintf(txt, sizeof(txt),
 		"Family: %d/%zu | %s (%d glyphs)",
 		fv->family_idx + 1, NUM_FONT_FAMILIES,
-		fv->font_name,
-		fv->font_glyph_count
+		fonts.names[fv->family_idx],
+		fv->family_glyph_count
 	);
 
 	pxl_canvas_set_color(cnv, FG_COLOR);
@@ -481,11 +437,19 @@ render_footer(pxl_canvas_t *cnv, const fontview_t *fv, const ui_t *ui) {
 }
 
 static void
+outline_rect(pxl_canvas_t *cnv, pxl_rect_t r, int thick) {
+	pxl_fill_rect(cnv, r.x, r.y, r.w, thick);
+	pxl_fill_rect(cnv, r.x, r.y, thick, r.h);
+	pxl_fill_rect(cnv, r.x + r.w - thick, r.y, thick, r.h);
+	pxl_fill_rect(cnv, r.x, r.y + r.h - thick, r.w, thick);
+}
+
+static void
 render_help(pxl_canvas_t *cnv, const ui_t *ui) {
 	assert(cnv && ui);
 
 	const char txt[] =
-		"   PXL Font Viewer - Controls:\n"
+		"         ~ Controls ~\n"
 		"\n"
 		"H/J: prev glyph  L/K: next glyph\n"
 		"N: next font\n"
@@ -514,8 +478,7 @@ main(void) {
 	ui_t ui = {
 		.fonts = font_latin,
 		.font_count = 1,
-		.font_scale = 1,
-		.show_help = false
+		.font_scale = 1
 	};
 
 	/* Initialize font viewer */
@@ -524,7 +487,6 @@ main(void) {
 
 	/* Initial layout */
 	layout_t layout = compute_layout();
-	handle_resize(&fv, layout);
 
 	while (pxl_app_advance_wait(&app)) {
 		if (pxl_app_was_triggered(&app, PXL_KEYB_ESCAPE)) {
@@ -533,10 +495,10 @@ main(void) {
 
 		/* Handle input */
 		handle_ui_input(&app, &ui, &fv);
+		handle_fontview_input(&app, &fv, &layout);
 
 		/* Recompute layout every frame to handle resize */
 		layout = compute_layout();
-		handle_resize(&fv, layout);
 
 		/* Begin frame */
 		pxl_buf_t pb;
@@ -566,11 +528,11 @@ main(void) {
 
 			pxl_canvas_set_color(&cnv_grid, BG_COLOR);
 			pxl_canvas_clear(&cnv_grid);
-			render_grid(&cnv_grid, &fv, &ui);
+			render_grid(&cnv_grid, &fv, &ui, &layout);
 
 			pxl_canvas_set_color(&cnv_scrollbar, BG_COLOR);
 			pxl_canvas_clear(&cnv_scrollbar);
-			render_scrollbar(&cnv_scrollbar, &fv);
+			render_scrollbar(&cnv_scrollbar, &fv, &layout);
 
 			pxl_canvas_set_color(&cnv_glyph_zoom, BG_COLOR);
 			pxl_canvas_clear(&cnv_glyph_zoom);
