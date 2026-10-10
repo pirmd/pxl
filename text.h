@@ -35,7 +35,7 @@ typedef struct {
 /* Writer: cursor, fonts, and spacing for text rendering. */
 typedef struct {
 	const pxl_font_t **fonts;      /* Array of fonts to try in order */
-	size_t           font_count;    /* Number of fonts in array */
+	size_t           font_count;   /* Number of fonts in array */
 	int              tracking;     /* 0 = use first font's tracking */
 	int              leading;      /* 0 = use first font's leading */
 	int              tab_width;    /* Tab width in character spaces (default=4) */
@@ -134,11 +134,16 @@ pxl_next_textline(const char *txt) {
 
 /* Text with scale and/or flip --------------------------------------------- */
 
-/* Text bounds and drawing with scaling and flipping.
- * scale must be >= 1. flip is applied to destination coordinates.
- */
+/* Text bounds with scaling. scale must be >= 1. */
 pxl_rect_t
-pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);
+pxl_rune_bounds_transformed(const pxl_writer_t *w, uint32_t rune, int scale);
+
+pxl_rect_t
+pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale);
+
+/* Text drawing with scaling and flipping. scale must be >= 1. */
+void
+pxl_draw_rune_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune, int scale, pxl_flip_t flip);
 
 void
 pxl_draw_text_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip);

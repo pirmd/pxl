@@ -74,7 +74,7 @@ ui_draw_text(const ui_t *ui, pxl_canvas_t *cnv, const char *txt, pxl_align_t ali
 	pxl_writer_t w;
 	pxl_writer_init(&w, ui->fonts, ui->font_count);
 
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&w, txt, ui->font_scale, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&w, txt, ui->font_scale);
 	pxl_rect_t aligned = pxl_align_rect(bounds, bbox, align);
 
 	pxl_writer_set_cursor(&w, aligned.x, aligned.y);

@@ -10,8 +10,8 @@
  * If not found even with fallback, returns false.
  */
 static bool
-pxl_writer_find_glyph(const pxl_writer_t *w, uint32_t rune,
-                      const pxl_font_t **out_font, int *out_idx) {
+writer_find_glyph(const pxl_writer_t *w, uint32_t rune,
+                  const pxl_font_t **out_font, int *out_idx) {
 	assert(w && w->font_count > 0);
 
 	/* First, try to find the rune in any font */
@@ -46,9 +46,9 @@ pxl_writer_find_glyph(const pxl_writer_t *w, uint32_t rune,
  * If per-glyph arrays are NULL, uses bitmask.width for width and 0 for offsets.
  */
 static void
-pxl_font_glyph_metrics(const pxl_font_t *font, int idx,
-                       int *w, int *h, int *advance,
-                       int *offset_x, int *offset_y) {
+font_glyph_metrics(const pxl_font_t *font, int idx,
+                   int *w, int *h, int *advance,
+                    int *offset_x, int *offset_y) {
 	int glyph_w = (font->glyph_widths) ? font->glyph_widths[idx] : font->bitmask.width;
 	if (w) *w = glyph_w;
 	if (h) *h = font->glyph_height;
@@ -125,8 +125,6 @@ void
 pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune) {
 	assert(cnv && w && w->font_count > 0);
 
-	const int tracking = w->tracking;
-
 	switch (rune) {
 	case '\n':
 		w->x = w->line_start_x;
@@ -138,20 +136,20 @@ pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune) {
 		return;
 
 	case '\t':
-		w->x += tracking * w->tab_width;
+		w->x += w->tab_width * (w->fonts[0]->bitmask.width + w->tracking);
 		return;
 	}
 
 	const pxl_font_t *font;
 	int idx;
-	if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+	if (!writer_find_glyph(w, rune, &font, &idx)) {
 		/* Rune not found and no fallback available: advance cursor with default metrics */
-		w->x += w->fonts[0]->bitmask.width + tracking;
+		w->x += w->fonts[0]->bitmask.width + w->tracking;
 		return;
 	}
 
 	int glyph_w, glyph_h, advance, offset_x, offset_y;
-	pxl_font_glyph_metrics(font, idx, &glyph_w, &glyph_h, &advance, &offset_x, &offset_y);
+	font_glyph_metrics(font, idx, &glyph_w, &glyph_h, &advance, &offset_x, &offset_y);
 
 	assert((idx + 1) * glyph_h <= font->bitmask.height);
 	assert(glyph_w <= font->bitmask.width);
@@ -160,12 +158,12 @@ pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune) {
 		(pxl_rect_t){.y = idx * font->glyph_height, .w = glyph_w, .h = glyph_h},
 		w->x + offset_x, w->y + offset_y);
 
-	w->x += advance + tracking;
+	w->x += advance + w->tracking;
 }
 
 void
 pxl_draw_text(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt) {
-	assert(cnv && w && w->font_count > 0);
+	assert(cnv && w);
 	assert(txt);
 
 	uint32_t codepoint;
@@ -212,14 +210,14 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 
 		const pxl_font_t *font;
 		int idx;
-		if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+		if (!writer_find_glyph(w, rune, &font, &idx)) {
 			/* Rune not found: add default advance to width */
 			width += w->fonts[0]->bitmask.width + tracking;
 			continue;
 		}
 
 		int glyph_w, advance;
-		pxl_font_glyph_metrics(font, idx, &glyph_w, NULL, &advance, NULL, NULL);
+		font_glyph_metrics(font, idx, &glyph_w, NULL, &advance, NULL, NULL);
 
 		width += advance + tracking;
 	}
@@ -250,13 +248,13 @@ pxl_rune_bounds(const pxl_writer_t *w, uint32_t rune) {
 
 	const pxl_font_t *font;
 	int idx;
-	if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+	if (!writer_find_glyph(w, rune, &font, &idx)) {
 		/* Rune not found: return default bounds from first font */
 		return (pxl_rect_t){0, 0, w->fonts[0]->bitmask.width, w->fonts[0]->glyph_height};
 	}
 
 	int glyph_w, glyph_h;
-	pxl_font_glyph_metrics(font, idx, &glyph_w, &glyph_h, NULL, NULL, NULL);
+	font_glyph_metrics(font, idx, &glyph_w, &glyph_h, NULL, NULL, NULL);
 
 	return (pxl_rect_t){0, 0, glyph_w, glyph_h};
 }
@@ -308,13 +306,13 @@ pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes) {
 
 		const pxl_font_t *font;
 		int idx;
-		if (!pxl_writer_find_glyph(w, rune, &font, &idx)) {
+		if (!writer_find_glyph(w, rune, &font, &idx)) {
 			width += w->fonts[0]->bitmask.width + tracking;
 			continue;
 		}
 
 		int glyph_w, advance;
-		pxl_font_glyph_metrics(font, idx, &glyph_w, NULL, &advance, NULL, NULL);
+		font_glyph_metrics(font, idx, &glyph_w, NULL, &advance, NULL, NULL);
 
 		width += advance + tracking;
 	}
@@ -399,13 +397,13 @@ pxl_textline_bounds(const pxl_writer_t *w, const char *txt) {
 
 		const pxl_font_t *font;
 		int idx;
-		if (!pxl_writer_find_glyph(w, codepoint, &font, &idx)) {
+		if (!writer_find_glyph(w, codepoint, &font, &idx)) {
 			width += w->fonts[0]->bitmask.width + tracking;
 			continue;
 		}
 
 		int advance;
-		pxl_font_glyph_metrics(font, idx, NULL, NULL, &advance, NULL, NULL);
+		font_glyph_metrics(font, idx, NULL, NULL, &advance, NULL, NULL);
 
 		width += advance + tracking;
 	}
@@ -449,10 +447,17 @@ pxl_draw_textline(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt) {
 }
 
 /* --- Scaled text functions --- */
+pxl_rect_t
+pxl_rune_bounds_transformed(const pxl_writer_t *w, uint32_t rune, int scale) {
+	assert(w);
+	assert(scale >= 1);
+
+	pxl_rect_t bounds = pxl_rune_bounds(w, rune);
+	return (pxl_rect_t){0, 0, bounds.w * scale, bounds.h * scale};
+}
 
 pxl_rect_t
-pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip) {
-	(void)flip; /* Unused for bounds calculation */
+pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale) {
 	assert(w);
 	assert(scale >= 1);
 	assert(txt);
@@ -462,84 +467,57 @@ pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale, p
 }
 
 void
+pxl_draw_rune_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune, int scale, pxl_flip_t flip) {
+	assert(cnv && w);
+	assert(scale >= 1);
+
+	switch (rune) {
+	case '\n':
+		w->x = w->line_start_x;
+		w->y += w->leading * scale;
+		return;
+
+	case '\r':
+		w->x = w->line_start_x;
+		return;
+		
+	case '\t':
+		w->x += w->tab_width * (w->fonts[0]->bitmask.width + w->tracking) * scale;
+		return;
+	}
+
+	const pxl_font_t *font;
+	int idx;
+	if (!writer_find_glyph(w, rune, &font, &idx)) {
+		/* Rune not found and no fallback available: advance cursor with default metrics */
+		w->x += (w->fonts[0]->bitmask.width + w->tracking) * scale;
+		return;
+	}
+
+	int glyph_w, glyph_h, advance, offset_x, offset_y;
+	font_glyph_metrics(font, idx, &glyph_w, &glyph_h, &advance, &offset_x, &offset_y);
+
+	assert((idx + 1) * glyph_h <= font->bitmask.height);
+	assert(glyph_w <= font->bitmask.width);
+
+	pxl_draw_bitmask_transformed(cnv, &font->bitmask,
+		(pxl_rect_t){.y = idx * font->glyph_height, .w = glyph_w, .h = glyph_h},
+		w->x + offset_x, w->y + offset_y,
+		scale, flip);
+
+	w->x += (advance + w->tracking) * scale;
+}
+
+void
 pxl_draw_text_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip) {
-	assert(cnv && cnv->pb);
-	assert(w);
+	assert(cnv && w);
 	assert(scale >= 1);
 	assert(txt);
 
-	const int tracking = w->tracking;
-
+	uint32_t codepoint;
 	while (*txt) {
-		uint32_t codepoint;
-		int bytes = pxl_utf8_decode(txt, &codepoint);
-		if (bytes <= 0) {
-			txt++;
-			continue;
-		}
-
-		if (codepoint == '\n') {
-			w->x = w->line_start_x;
-			w->y += w->leading * scale;
-			txt += 1;
-			continue;
-		}
-
-		if (codepoint == '\r') {
-			w->x = w->line_start_x;
-			if (txt[1] == '\n') {
-				txt += 2;
-				w->y += w->leading * scale;
-			} else {
-				txt += 1;
-			}
-			continue;
-		}
-
-		if (codepoint == '\t') {
-			int tab_spaces = w->tab_width;
-			if (w->tab_width > 0) {
-				for (int i = 0; i < tab_spaces; i++) {
-					const pxl_font_t *font = NULL;
-					int idx = 0;
-					if (pxl_writer_find_glyph(w, ' ', &font, &idx)) {
-						int advance = (font->glyph_advances) ? font->glyph_advances[idx] :
-							(font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width);
-						pxl_draw_bitmask_transformed(cnv, &font->bitmask,
-							(pxl_rect_t){.x = 0, .y = idx * font->glyph_height,
-								.w = font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width,
-								.h = font->glyph_height},
-							w->x, w->y, scale, flip);
-						w->x += advance * scale + tracking * scale;
-					}
-				}
-			}
-			txt++;
-			continue;
-		}
-
-		/* Find glyph for this codepoint */
-		const pxl_font_t *font = NULL;
-		int idx = 0;
-		if (pxl_writer_find_glyph(w, codepoint, &font, &idx)) {
-			int advance = (font->glyph_advances) ? font->glyph_advances[idx] :
-				(font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width);
-			int gw = font->glyph_widths ? font->glyph_widths[idx] : font->bitmask.width;
-			int gh = font->glyph_height;
-
-			pxl_rect_t bm_r = {
-				.x = 0,
-				.y = idx * gh,
-				.w = gw,
-				.h = gh
-			};
-
-			pxl_draw_bitmask_transformed(cnv, &font->bitmask, bm_r,
-				w->x, w->y, scale, flip);
-
-			w->x += advance * scale + tracking * scale;
-		}
-
-		txt += bytes;
+		txt += pxl_utf8_decode(txt, &codepoint);
+		pxl_draw_rune_transformed(cnv, w, codepoint, scale, flip);
 	}
+
 }

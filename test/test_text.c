@@ -960,7 +960,7 @@ test_pxl_draw_textline_basic(void) {
 static void
 test_pxl_text_bounds_transformed_basic(void) {
 	setup_fixture();
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABC", 1, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABC", 1);
 	ASSERT(bounds.w > 0);
 	ASSERT(bounds.h > 0);
 }
@@ -968,8 +968,8 @@ test_pxl_text_bounds_transformed_basic(void) {
 static void
 test_pxl_text_bounds_transformed_scale2(void) {
 	setup_fixture();
-	pxl_rect_t bounds1 = pxl_text_bounds_transformed(&g_w, "ABC", 1, PXL_FLIP_NONE);
-	pxl_rect_t bounds2 = pxl_text_bounds_transformed(&g_w, "ABC", 2, PXL_FLIP_NONE);
+	pxl_rect_t bounds1 = pxl_text_bounds_transformed(&g_w, "ABC", 1);
+	pxl_rect_t bounds2 = pxl_text_bounds_transformed(&g_w, "ABC", 2);
 	ASSERT(bounds2.w == bounds1.w * 2);
 	ASSERT(bounds2.h == bounds1.h * 2);
 }
@@ -984,7 +984,7 @@ test_pxl_draw_text_transformed_basic(void) {
 	pxl_writer_set_cursor(&g_w, x, y);
 	pxl_draw_text_transformed(&g_cnv, &g_w, text, 1, PXL_FLIP_NONE);
 
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
 	ASSERT(has_pixels_in_rect(expected));
 }
@@ -1028,7 +1028,7 @@ test_pxl_text_bounds_transformed_exact_single_char(void) {
 	 * Note: tracking is added after each char, so 'A' = 5px + 1px tracking = 6px. */
 	setup_fixture();
 
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A", 1, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A", 1);
 	ASSERT(bounds.w == 6);  /* 5px glyph + 1px tracking */
 	ASSERT(bounds.h == 5);  /* glyph height */
 }
@@ -1039,7 +1039,7 @@ test_pxl_text_bounds_transformed_exact_multichar(void) {
 	 * 'ABC' = 3*(5px + 1px tracking) = 18px width, 5px height. */
 	setup_fixture();
 
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABC", 1, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABC", 1);
 	ASSERT(bounds.w == 18);  /* 3 chars * (5px + 1px tracking) */
 	ASSERT(bounds.h == 5);   /* glyph height */
 }
@@ -1054,7 +1054,7 @@ test_pxl_text_bounds_transformed_multiline_max_width(void) {
 	 * adds leading (leading is the full line-to-line advance already). */
 	setup_fixture();
 
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A\nABC", 1, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "A\nABC", 1);
 	ASSERT(bounds.w == 18);  /* Max line width */
 	ASSERT(bounds.h == 11);  /* glyph_height + 1*leading */
 }
@@ -1066,13 +1066,13 @@ test_pxl_text_bounds_transformed_w_h_independence(void) {
 	setup_fixture();
 
 	/* Wide text (width > height) */
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABCDE", 1, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, "ABCDE", 1);
 	/* 5 chars * (5px + 1px tracking) = 30px width */
 	ASSERT(bounds.w == 30);
 	ASSERT(bounds.h == 5);
 
 	/* With scale, both dimensions scale independently */
-	bounds = pxl_text_bounds_transformed(&g_w, "A", 3, PXL_FLIP_NONE);
+	bounds = pxl_text_bounds_transformed(&g_w, "A", 3);
 	/* 'A' = (5px + 1px) * 3 = 18px width, 5px * 3 = 15px height */
 	ASSERT(bounds.w == 18);
 	ASSERT(bounds.h == 15);
@@ -1092,7 +1092,7 @@ test_pxl_draw_text_transformed_bounds_consistency(void) {
 
 	const char *text = "A\nB\r\nC";
 	int scale = 2;
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, scale, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, scale);
 
 	int start_y = 5;
 	pxl_writer_set_cursor(&g_w, 0, start_y);
@@ -1117,7 +1117,7 @@ test_example_pxl_text_bounds_transformed(void) {
 	/* Example: Get bounds of scaled text */
 	setup_fixture();
 	const char *text = "Hello";
-	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 2, PXL_FLIP_NONE);
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 2);
 	ASSERT(bounds.w > 0);
 	ASSERT(bounds.h > 0);
 }
