@@ -136,7 +136,7 @@ pxl_draw_rune(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune) {
 		return;
 
 	case '\t':
-		w->x += w->tab_width * (w->fonts[0]->bitmask.width + w->tracking);
+		w->x += pxl_tab_advance(w);
 		return;
 	}
 
@@ -204,7 +204,7 @@ pxl_text_bounds(const pxl_writer_t *w, const char *txt) {
 				continue;
 
 			case '\t':
-				width += tracking * w->tab_width;
+				width += pxl_tab_advance(w);
 				continue;
 		}
 
@@ -300,7 +300,7 @@ pxl_text_bounds_n(const pxl_writer_t *w, const char *txt, size_t max_bytes) {
 				continue;
 
 			case '\t':
-				width += tracking * w->tab_width;
+				width += pxl_tab_advance(w);
 				continue;
 		}
 
@@ -391,7 +391,7 @@ pxl_textline_bounds(const pxl_writer_t *w, const char *txt) {
 		txt += (int)byte_len;
 
 		if (codepoint == '\t') {
-			width += tracking * w->tab_width;
+			width += pxl_tab_advance(w);
 			continue;
 		}
 
@@ -482,7 +482,7 @@ pxl_draw_rune_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune, int
 		return;
 		
 	case '\t':
-		w->x += w->tab_width * (w->fonts[0]->bitmask.width + w->tracking) * scale;
+		w->x += pxl_tab_advance(w) * scale;
 		return;
 	}
 

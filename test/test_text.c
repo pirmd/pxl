@@ -436,11 +436,19 @@ test_pxl_draw_text_with_tab(void) {
 	const char *text = "A\tB";
 	int x = 5, y = 5;
 	pxl_writer_set_cursor(&g_w, x, y);
+	int start_x = g_w.x;
 	pxl_draw_text(&g_cnv, &g_w, text);
+
+	/* Verify cursor advanced by exact amount */
+	/* A = 5+1 = 6px, tab = 4*(5+1) = 24px, B = 5+1 = 6px */
+	/* Total advance = 6 + 24 + 6 = 36px */
+	ASSERT(g_w.x == start_x + 36);
 
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
 	pxl_rect_t expected = {x, y, bounds.w, bounds.h};
 	ASSERT(has_pixels_in_rect(expected));
+	/* Bounds width must match actual cursor advance */
+	ASSERT(bounds.w == 36);
 }
 
 /* Tests for multi-line consistency */
@@ -692,8 +700,34 @@ test_pxl_text_bounds_height(void) {
 static void
 test_pxl_text_bounds_with_tab(void) {
 	setup_fixture();
+	/* Tab should advance by tab_width * (glyph_width + tracking) */
+	int char_width = g_test_font.bitmask.width + g_test_font.tracking;
+	int tab_advance = g_w.tab_width * char_width;
+	ASSERT(tab_advance == 24); /* 4 * (5 + 1) */
 	pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\tB");
-	ASSERT(bounds.w > 0);
+	/* Width of "A\tB" = width(A) + tab_advance + width(B) */
+	/* width(A) = char_width = 6, tab_advance = 24, width(B) = 6 */
+	/* Total = 6 + 24 + 6 = 36 */
+	ASSERT(bounds.w == 36);
+}
+
+static void
+test_pxl_text_bounds_tab_exact_width(void) {
+	setup_fixture();
+	/* Single tab: should be tab_width * (glyph_width + tracking) */
+	int expected_tab_width = g_w.tab_width * (g_test_font.bitmask.width + g_test_font.tracking);
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, "\t");
+	ASSERT(bounds.w == expected_tab_width);
+	ASSERT(bounds.h == 0); /* No glyph height for control char alone */
+
+	/* Tab with character: "A\t" */
+	/* = width(A) + tab_advance = (5+1) + 24 = 30 */
+	bounds = pxl_text_bounds(&g_w, "A\t");
+	ASSERT(bounds.w == 30);
+
+	/* Multiple tabs: "\t\t" */
+	bounds = pxl_text_bounds(&g_w, "\t\t");
+	ASSERT(bounds.w == expected_tab_width * 2);
 }
 
 static void
@@ -875,9 +909,13 @@ test_pxl_draw_text_n_partial(void) {
 static void
 test_pxl_text_bounds_n_with_tab(void) {
 	setup_fixture();
-	pxl_rect_t bounds = pxl_text_bounds_n(&g_w, "A\tB", 10);
-	ASSERT(bounds.w > 0);
-	ASSERT(bounds.h > 0);
+	/* Verify tab width calculation is consistent with pxl_text_bounds */
+	pxl_rect_t bounds_full = pxl_text_bounds(&g_w, "A\tB");
+	pxl_rect_t bounds_n = pxl_text_bounds_n(&g_w, "A\tB", 10);
+	ASSERT(bounds_n.w == bounds_full.w);
+	ASSERT(bounds_n.h == bounds_full.h);
+	/* Both should be 36px wide (A=6, tab=24, B=6) */
+	ASSERT(bounds_n.w == 36);
 }
 
 static void
@@ -909,6 +947,30 @@ test_pxl_draw_text_n_with_newline(void) {
 	ASSERT(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
 }
 
+static void
+test_pxl_tab_consistency_across_functions(void) {
+	setup_fixture();
+	/* Verify all functions calculate tab width consistently */
+	const char *text = "A\tB";
+	int expected_width = 36; /* A(6) + tab(24) + B(6) */
+
+	/* All bounds functions must agree */
+	pxl_rect_t bounds = pxl_text_bounds(&g_w, text);
+	pxl_rect_t bounds_n = pxl_text_bounds_n(&g_w, text, strlen(text));
+	pxl_rect_t line_bounds = pxl_textline_bounds(&g_w, text);
+
+	ASSERT(bounds.w == expected_width);
+	ASSERT(bounds_n.w == expected_width);
+	ASSERT(line_bounds.w == expected_width);
+
+	/* Verify draw functions advance cursor by same amount */
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+	pxl_writer_set_cursor(&g_w, 0, 0);
+	int start_x = g_w.x;
+	pxl_draw_text(&g_cnv, &g_w, text);
+	ASSERT(g_w.x == start_x + expected_width);
+}
+
 /* Tests for line-based helpers */
 
 static void
@@ -937,6 +999,20 @@ test_pxl_textline_bounds_empty(void) {
 	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "");
 	ASSERT(bounds.w == 0);
 	ASSERT(bounds.h == 0);
+}
+
+static void
+test_pxl_textline_bounds_with_tab(void) {
+	setup_fixture();
+	/* Tab in a single line: "A\tB" should be 36px wide */
+	pxl_rect_t bounds = pxl_textline_bounds(&g_w, "A\tB");
+	ASSERT(bounds.w == 36);
+	ASSERT(bounds.h == g_w.fonts[0]->glyph_height);
+
+	/* Tab at start: "\tA" */
+	/* tab_advance = 4*(5+1) = 24, A = 5+1 = 6, total = 30 */
+	bounds = pxl_textline_bounds(&g_w, "\tA");
+	ASSERT(bounds.w == 30);
 }
 
 static void
@@ -1222,6 +1298,7 @@ main(void) {
 	test_pxl_draw_text_with_tab();
 	test_pxl_draw_text_with_carriage_return();
 	test_pxl_text_draw_consistency();
+	test_pxl_tab_consistency_across_functions();
 	test_pxl_draw_text_with_scissor();
 	test_pxl_draw_text_with_offset();
 	test_pxl_draw_text_proportional();
@@ -1261,6 +1338,7 @@ main(void) {
 	test_pxl_textline_bounds_basic();
 	test_pxl_textline_bounds_with_newline();
 	test_pxl_textline_bounds_empty();
+	test_pxl_textline_bounds_with_tab();
 	test_pxl_draw_textline_basic();
 
 	/* Tests for pxl_next_textline */

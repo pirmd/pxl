@@ -56,6 +56,13 @@ pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
 	w->line_start_x = x;
 }
 
+/* Tab advance width in pixels */
+static inline int
+pxl_tab_advance(const pxl_writer_t *w) {
+	assert(w && w->font_count > 0);
+	return w->tab_width * (w->fonts[0]->bitmask.width + w->tracking);
+}
+
 /* UTF-8 decoder: returns bytes consumed (1-4), outputs Unicode codepoint.
  * On invalid sequences, returns 1 and outputs U+FFFD (REPLACEMENT CHARACTER).
  */
