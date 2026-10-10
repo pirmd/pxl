@@ -466,23 +466,40 @@ pxl_text_bounds_transformed(const pxl_writer_t *w, const char *txt, int scale) {
 	return (pxl_rect_t){0, 0, bounds.w * scale, bounds.h * scale};
 }
 
+/* Draw a rune with scaling and flipping. scale must be >= 1.
+ * If flip contains PXL_FLIP_H, cursor moves left after drawing; if PXL_FLIP_V, cursor moves up.
+ * \n respects flip: in PXL_FLIP_H mode, X position is preserved as start of next line.
+ */
 void
 pxl_draw_rune_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune, int scale, pxl_flip_t flip) {
 	assert(cnv && w);
 	assert(scale >= 1);
 
+	int dx = (flip & PXL_FLIP_H) ? -1 : 1;
+	int dy = (flip & PXL_FLIP_V) ? -1 : 1;
+	int leading = (w->leading ? w->leading : w->fonts[0]->leading) * scale;
+
 	switch (rune) {
 	case '\n':
-		w->x = w->line_start_x;
-		w->y += w->leading * scale;
+		if (flip & PXL_FLIP_H) {
+			/* In horizontal flip mode: current X becomes start of next line.
+			 * This allows right-to-left text to continue from the right edge. */
+			w->line_start_x = w->x;
+		} else {
+			w->x = w->line_start_x;
+		}
+		w->y += dy * leading;
 		return;
 
 	case '\r':
 		w->x = w->line_start_x;
+		/* Note: \r with flip modes assumes line_start_x was set correctly
+		 * (e.g., by pxl_draw_text_transformed). For direct pxl_draw_rune_transformed
+		 * calls, user must initialize writer accordingly. */
 		return;
 		
 	case '\t':
-		w->x += pxl_tab_advance(w) * scale;
+		w->x += dx * pxl_tab_advance(w) * scale;
 		return;
 	}
 
@@ -490,7 +507,7 @@ pxl_draw_rune_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune, int
 	int idx;
 	if (!writer_find_glyph(w, rune, &font, &idx)) {
 		/* Rune not found and no fallback available: advance cursor with default metrics */
-		w->x += (w->fonts[0]->bitmask.width + w->tracking) * scale;
+		w->x += dx * (w->fonts[0]->bitmask.width + w->tracking) * scale;
 		return;
 	}
 
@@ -505,14 +522,22 @@ pxl_draw_rune_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, uint32_t rune, int
 		w->x + offset_x, w->y + offset_y,
 		scale, flip);
 
-	w->x += (advance + w->tracking) * scale;
+	w->x += dx * (advance + w->tracking) * scale;
 }
 
+/* Draw text with scaling and flipping. scale must be >= 1.
+ * Sets starting position based on flip: right-to-left for PXL_FLIP_H, bottom-to-top for PXL_FLIP_V.
+ */
 void
 pxl_draw_text_transformed(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt, int scale, pxl_flip_t flip) {
 	assert(cnv && w);
 	assert(scale >= 1);
 	assert(txt);
+
+	pxl_rect_t bounds = pxl_text_bounds_transformed(w, txt, scale);
+	w->x += (flip & PXL_FLIP_H) ? bounds.w : 0;
+	w->y += (flip & PXL_FLIP_V) ? bounds.h : 0;
+	w->line_start_x = w->x;
 
 	uint32_t codepoint;
 	while (*txt) {

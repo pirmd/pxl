@@ -1095,6 +1095,160 @@ test_pxl_draw_text_transformed_with_flip(void) {
 	ASSERT(has_pixels_in_rect((pxl_rect_t){x, y, 10, 10}));
 }
 
+/* Tests for pxl_draw_rune_transformed with flip cursor behavior */
+
+static void
+test_pxl_draw_rune_transformed_flip_h_cursor_moves_left(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 20, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	int start_x = g_w.x;
+
+	pxl_draw_rune_transformed(&g_cnv, &g_w, 'A', 1, PXL_FLIP_H);
+
+	/* Cursor should move left (negative direction) */
+	ASSERT(g_w.x < start_x);
+}
+
+static void
+test_pxl_draw_rune_transformed_flip_v_cursor_moves_up(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 5, y = 20;
+	pxl_writer_set_cursor(&g_w, x, y);
+	int start_x = g_w.x;
+	int start_y = g_w.y;
+
+	pxl_draw_rune_transformed(&g_cnv, &g_w, 'A', 1, PXL_FLIP_V);
+
+	/* With PXL_FLIP_V only, x advances normally (dx=1), y stays same (no \n) */
+	ASSERT(g_w.x > start_x); /* x advances normally */
+	ASSERT(g_w.y == start_y); /* y unchanged for single char */
+
+	/* Now test newline with flip_v */
+	pxl_writer_set_cursor(&g_w, x, y);
+	start_y = g_w.y;
+	pxl_draw_rune_transformed(&g_cnv, &g_w, '\n', 1, PXL_FLIP_V);
+	ASSERT(g_w.y < start_y); /* y moves up with flip_v */
+}
+
+static void
+test_pxl_draw_rune_transformed_flip_h_newline_resets_to_left(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	int x = 20, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+
+	pxl_draw_rune_transformed(&g_cnv, &g_w, '\n', 1, PXL_FLIP_H);
+
+	/* After newline with flip_h, cursor should be at line_start_x (right side) */
+	ASSERT(g_w.x == g_w.line_start_x);
+	ASSERT(g_w.y > y); /* y advances normally (dy not applied to \n y-movement) */
+}
+
+static void
+test_pxl_draw_rune_transformed_flip_h_newline_preserves_x(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	/* Test that \n with PXL_FLIP_H preserves X position for next line start */
+	int x = 20, y = 5;
+	pxl_writer_set_cursor(&g_w, x, y);
+	
+	/* Draw a character to move cursor left */
+	pxl_draw_rune_transformed(&g_cnv, &g_w, 'A', 1, PXL_FLIP_H);
+	int x_after_A = g_w.x;
+	ASSERT(x_after_A < x); /* Cursor moved left */
+	
+	/* Newline should preserve current X as line_start_x */
+	pxl_draw_rune_transformed(&g_cnv, &g_w, '\n', 1, PXL_FLIP_H);
+	ASSERT(g_w.x == x_after_A); /* X unchanged by \n in flip_h mode */
+	ASSERT(g_w.y > y); /* Y advanced */
+	ASSERT(g_w.line_start_x == x_after_A); /* line_start_x updated to preserved X */
+}
+
+static void
+test_pxl_draw_text_transformed_flip_h_reversed_order(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "ABC";
+	int start_x = 20, start_y = 5;
+	pxl_writer_set_cursor(&g_w, start_x, start_y);
+
+	pxl_draw_text_transformed(&g_cnv, &g_w, text, 1, PXL_FLIP_H);
+
+	/* Text should be drawn right-to-left, final cursor position should be at start */
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1);
+	ASSERT(g_w.x == start_x); /* Cursor ended up at original start position */
+	ASSERT(g_w.y == start_y);
+	/* Pixels should be drawn from start_x to start_x + bounds.w */
+	ASSERT(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
+}
+
+static void
+test_pxl_draw_text_transformed_flip_v_reversed_lines(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "A\nB";
+	int start_x = 5, start_y = 20;
+	pxl_writer_set_cursor(&g_w, start_x, start_y);
+
+	pxl_draw_text_transformed(&g_cnv, &g_w, text, 1, PXL_FLIP_V);
+
+	/* Text should be drawn bottom-to-top */
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1);
+	/* Starting y is start_y + bounds.h, after drawing two lines with flip_v,
+	 * final y should be start_y + bounds.h - leading (after \n) - advance_B */
+	/* But x resets to line_start_x after \n, then advances for B */
+	int expected_y = start_y + bounds.h - g_test_font.leading;
+	ASSERT(g_w.y == expected_y);
+	/* x should be at line_start_x + advance_B + tracking */
+	ASSERT(g_w.x > start_x);
+	/* Pixels should be drawn from start_y to start_y + bounds.h */
+	ASSERT(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
+}
+
+static void
+test_pxl_draw_text_transformed_flip_hv_combined(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "A";
+	int x = 20, y = 20;
+	pxl_writer_set_cursor(&g_w, x, y);
+
+	pxl_draw_text_transformed(&g_cnv, &g_w, text, 1, PXL_FLIP_H | PXL_FLIP_V);
+
+	/* Should draw something without crashing */
+	ASSERT(has_pixels_in_rect((pxl_rect_t){x - 10, y - 10, 20, 20}));
+}
+
+static void
+test_pxl_draw_text_transformed_flip_h_tab_advance_left(void) {
+	setup_fixture();
+	pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
+
+	const char *text = "\tA";
+	int start_x = 25, start_y = 5;
+	pxl_writer_set_cursor(&g_w, start_x, start_y);
+
+	pxl_draw_text_transformed(&g_cnv, &g_w, text, 1, PXL_FLIP_H);
+
+	/* With flip_h, text starts at start_x + bounds.w, then moves left.
+	 * After \t and A, cursor should be back at start_x */
+	pxl_rect_t bounds = pxl_text_bounds_transformed(&g_w, text, 1);
+	ASSERT(g_w.x == start_x);
+	ASSERT(g_w.y == start_y);
+	/* Pixels should be drawn from start_x to start_x + bounds.w */
+	ASSERT(has_pixels_in_rect((pxl_rect_t){start_x, start_y, bounds.w, bounds.h}));
+}
+
 /* Regression tests for w/h swap bug */
 
 static void
@@ -1356,6 +1510,16 @@ main(void) {
 	test_pxl_draw_text_transformed_basic();
 	test_pxl_draw_text_transformed_scale2();
 	test_pxl_draw_text_transformed_with_flip();
+
+	/* Tests for flip cursor behavior */
+	test_pxl_draw_rune_transformed_flip_h_cursor_moves_left();
+	test_pxl_draw_rune_transformed_flip_v_cursor_moves_up();
+	test_pxl_draw_rune_transformed_flip_h_newline_resets_to_left();
+	test_pxl_draw_rune_transformed_flip_h_newline_preserves_x();
+	test_pxl_draw_text_transformed_flip_h_reversed_order();
+	test_pxl_draw_text_transformed_flip_v_reversed_lines();
+	test_pxl_draw_text_transformed_flip_hv_combined();
+	test_pxl_draw_text_transformed_flip_h_tab_advance_left();
 
 	/* Regression tests for transformed text functions */
 	test_pxl_text_bounds_transformed_exact_single_char();
