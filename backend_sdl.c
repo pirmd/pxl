@@ -24,152 +24,152 @@ static struct {
 
 static bool
 init_display(void) {
-	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-		pxl_log(SDL_GetError());
-		return false;
-	}
-	return true;
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        pxl_log(SDL_GetError());
+        return false;
+    }
+    return true;
 }
 
 static bool
 init_window(const char *title, int w, int h, pxl_backend_flags_t flags) {
-	uint32_t window_flags = 0;
-	if (flags & PXL_BACKEND_RESIZABLE) {
-		window_flags |= SDL_WINDOW_RESIZABLE;
-	}
-	if (flags & PXL_BACKEND_FULLSCREEN) {
-		window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-	}
-	if (flags & PXL_BACKEND_HIDDEN) {
-		window_flags |= SDL_WINDOW_HIDDEN;
-	}
+    uint32_t window_flags = 0;
+    if (flags & PXL_BACKEND_RESIZABLE) {
+        window_flags |= SDL_WINDOW_RESIZABLE;
+    }
+    if (flags & PXL_BACKEND_FULLSCREEN) {
+        window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+    if (flags & PXL_BACKEND_HIDDEN) {
+        window_flags |= SDL_WINDOW_HIDDEN;
+    }
 
-	int x = SDL_WINDOWPOS_UNDEFINED, y = SDL_WINDOWPOS_UNDEFINED;
-	if (flags & PXL_BACKEND_CENTERED) {
-		x = SDL_WINDOWPOS_CENTERED;
-		y = SDL_WINDOWPOS_CENTERED;
-	}
+    int x = SDL_WINDOWPOS_UNDEFINED, y = SDL_WINDOWPOS_UNDEFINED;
+    if (flags & PXL_BACKEND_CENTERED) {
+        x = SDL_WINDOWPOS_CENTERED;
+        y = SDL_WINDOWPOS_CENTERED;
+    }
 
-	g_sdl.window = SDL_CreateWindow(title, x, y, w, h, window_flags);
-	if (!g_sdl.window) {
-		pxl_log(SDL_GetError());
-		return false;
-	}
+    g_sdl.window = SDL_CreateWindow(title, x, y, w, h, window_flags);
+    if (!g_sdl.window) {
+        pxl_log(SDL_GetError());
+        return false;
+    }
 
-	g_sdl.width = w;
-	g_sdl.height = h;
-	return true;
+    g_sdl.width = w;
+    g_sdl.height = h;
+    return true;
 }
 
 static bool
 resize_renderer(int w, int h) {
-	SDL_Texture *new_texture = SDL_CreateTexture(
-		g_sdl.renderer,
-		SDL_PIXELFORMAT_ARGB8888,  /* Match PXL color format */
-		SDL_TEXTUREACCESS_STREAMING,
-		w, h
-	);
-	if (!new_texture) {
-		pxl_log(SDL_GetError());
-		return false;
-	}
-	SDL_DestroyTexture(g_sdl.texture);
-	g_sdl.texture = new_texture;
-	return true;
+    SDL_Texture *new_texture = SDL_CreateTexture(
+        g_sdl.renderer,
+        SDL_PIXELFORMAT_ARGB8888,  /* Match PXL color format */
+        SDL_TEXTUREACCESS_STREAMING,
+        w, h
+    );
+    if (!new_texture) {
+        pxl_log(SDL_GetError());
+        return false;
+    }
+    SDL_DestroyTexture(g_sdl.texture);
+    g_sdl.texture = new_texture;
+    return true;
 }
 
 static bool
 init_renderer(int w, int h, pxl_backend_flags_t flags) {
-	uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
-	if (flags & PXL_BACKEND_VSYNC) {
-		renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
-	}
+    uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
+    if (flags & PXL_BACKEND_VSYNC) {
+        renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
+    }
 
-	g_sdl.renderer = SDL_CreateRenderer(g_sdl.window, -1, renderer_flags);
-	if (!g_sdl.renderer) {
-		pxl_log(SDL_GetError());
-		return false;
-	}
+    g_sdl.renderer = SDL_CreateRenderer(g_sdl.window, -1, renderer_flags);
+    if (!g_sdl.renderer) {
+        pxl_log(SDL_GetError());
+        return false;
+    }
 
-	return resize_renderer(w, h);
+    return resize_renderer(w, h);
 }
 
 static bool
 init_input_method(void) {
-	SDL_StartTextInput();
-	return true;
+    SDL_StartTextInput();
+    return true;
 }
 
 static void
 deinit_renderer(void) {
-	if (g_sdl.texture)  { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
-	if (g_sdl.renderer) { SDL_DestroyRenderer(g_sdl.renderer); g_sdl.renderer = NULL; }
+    if (g_sdl.texture)  { SDL_DestroyTexture(g_sdl.texture); g_sdl.texture = NULL; }
+    if (g_sdl.renderer) { SDL_DestroyRenderer(g_sdl.renderer); g_sdl.renderer = NULL; }
 }
 
 static void
 deinit_window(void) {
-	if (g_sdl.window) { SDL_DestroyWindow(g_sdl.window); g_sdl.window = NULL; }
+    if (g_sdl.window) { SDL_DestroyWindow(g_sdl.window); g_sdl.window = NULL; }
 }
 
 static void
 deinit_display(void) {
-	SDL_StopTextInput();
-	SDL_Quit();
+    SDL_StopTextInput();
+    SDL_Quit();
 }
 
 pxl_err_t
 pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
-	pxl_backend_deinit();
+    pxl_backend_deinit();
 
-	if (!title) {
-		return PXL_E_INVALID_PARAM;
-	}
+    if (!title) {
+        return PXL_E_INVALID_PARAM;
+    }
 
-	if (!init_display())                        goto fail;
+    if (!init_display())                        goto fail;
 
-	if (flags & PXL_BACKEND_FULLSCREEN) {
-		SDL_DisplayMode mode;
-		if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
-			w = mode.w;
-			h = mode.h;
-		} else {
-			pxl_log(SDL_GetError());
-			goto fail;
-		}
-	} else if (w <= 0 || h <= 0) {
-		return PXL_E_INVALID_PARAM;
-	}
+    if (flags & PXL_BACKEND_FULLSCREEN) {
+        SDL_DisplayMode mode;
+        if (SDL_GetDesktopDisplayMode(0, &mode) == 0) {
+            w = mode.w;
+            h = mode.h;
+        } else {
+            pxl_log(SDL_GetError());
+            goto fail;
+        }
+    } else if (w <= 0 || h <= 0) {
+        return PXL_E_INVALID_PARAM;
+    }
 
-	if (!init_window(title, w, h, flags))       goto fail;
-	if (!init_renderer(w, h, flags))            goto fail;
-	if (!init_input_method())                  goto fail;
+    if (!init_window(title, w, h, flags))       goto fail;
+    if (!init_renderer(w, h, flags))            goto fail;
+    if (!init_input_method())                  goto fail;
 
-	return PXL_SUCCESS;
+    return PXL_SUCCESS;
 
 fail:
-	pxl_backend_deinit();
-	return PXL_E_BACKEND_INIT;
+    pxl_backend_deinit();
+    return PXL_E_BACKEND_INIT;
 }
 
 void
 pxl_backend_deinit(void) {
-	deinit_renderer();
-	deinit_window();
-	deinit_display();
+    deinit_renderer();
+    deinit_window();
+    deinit_display();
 
-	/* Reset global state */
-	g_sdl.width = 0;
-	g_sdl.height = 0;
-	g_sdl.text_buffer_len = 0;
-	g_sdl.text_buffer_head = 0;
-	g_sdl.text_buffer_tail = 0;
-	memset(g_sdl.text_buffer, 0, sizeof(g_sdl.text_buffer));
+    /* Reset global state */
+    g_sdl.width = 0;
+    g_sdl.height = 0;
+    g_sdl.text_buffer_len = 0;
+    g_sdl.text_buffer_head = 0;
+    g_sdl.text_buffer_tail = 0;
+    memset(g_sdl.text_buffer, 0, sizeof(g_sdl.text_buffer));
 }
 
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
-	assert(out_pb);
-	assert(g_sdl.width > 0 && g_sdl.height > 0);
+    assert(out_pb);
+    assert(g_sdl.width > 0 && g_sdl.height > 0);
 
     void *pixels;
     int pitch;
@@ -346,25 +346,25 @@ static void
 process_sdl_event(SDL_Event *event, pxl_input_t *in) {
     switch (event->type) {
         case SDL_QUIT:
-			pxl_input_set(in, PXL_WM_QUIT);
+            pxl_input_set(in, PXL_WM_QUIT);
             break;
 
         case SDL_KEYDOWN:
             if (!event->key.repeat) {
-				pxl_input_set(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
+                pxl_input_set(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
             }
             break;
 
         case SDL_KEYUP:
-			pxl_input_unset(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
+            pxl_input_unset(in, sdl_keysym_to_pxl_input_code(event->key.keysym.sym));
             break;
 
         case SDL_MOUSEBUTTONDOWN:
-			pxl_input_set(in, sdl_button_to_pxl_input_code(event->button.button));
+            pxl_input_set(in, sdl_button_to_pxl_input_code(event->button.button));
             break;
 
         case SDL_MOUSEBUTTONUP:
-			pxl_input_unset(in, sdl_button_to_pxl_input_code(event->button.button));
+            pxl_input_unset(in, sdl_button_to_pxl_input_code(event->button.button));
             break;
 
         case SDL_MOUSEMOTION:
@@ -401,38 +401,37 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
             }
             break;
 
-        case SDL_TEXTINPUT:
-			{
-				int len = strlen(event->text.text);
-				int free_space = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_len;
+        case SDL_TEXTINPUT: {
+                int len = strlen(event->text.text);
+                int free_space = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_len;
 
-				if (len > free_space) {
-					/* Buffer full: drop oldest characters to make room */
-					int excess = len - free_space;
-					g_sdl.text_buffer_tail = (g_sdl.text_buffer_tail + excess) % PXL_BACKEND_TEXT_BUFFER_SIZE;
-					g_sdl.text_buffer_len = PXL_BACKEND_TEXT_BUFFER_SIZE;
-				}
+                if (len > free_space) {
+                    /* Buffer full: drop oldest characters to make room */
+                    int excess = len - free_space;
+                    g_sdl.text_buffer_tail = (g_sdl.text_buffer_tail + excess) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+                    g_sdl.text_buffer_len = PXL_BACKEND_TEXT_BUFFER_SIZE;
+                }
 
-				/* Copy new text, handling wrap-around */
-				int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_head;
-				if (len <= first_chunk) {
-					memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, len);
-				} else {
-					memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, first_chunk);
-					memcpy(g_sdl.text_buffer, event->text.text + first_chunk, len - first_chunk);
-				}
+                /* Copy new text, handling wrap-around */
+                int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_head;
+                if (len <= first_chunk) {
+                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, len);
+                } else {
+                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, first_chunk);
+                    memcpy(g_sdl.text_buffer, event->text.text + first_chunk, len - first_chunk);
+                }
 
-				g_sdl.text_buffer_head = (g_sdl.text_buffer_head + len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
-				g_sdl.text_buffer_len += len;
-			}
-			break;
+                g_sdl.text_buffer_head = (g_sdl.text_buffer_head + len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+                g_sdl.text_buffer_len += len;
+            }
+            break;
     }
 }
 
 void
 pxl_backend_poll_events(pxl_input_t *in) {
     assert(in);
-    
+
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         process_sdl_event(&event, in);
@@ -442,7 +441,7 @@ pxl_backend_poll_events(pxl_input_t *in) {
 void
 pxl_backend_wait_events(pxl_input_t *in) {
     assert(in);
-    
+
     SDL_Event event;
     if (SDL_WaitEvent(&event)) {
         process_sdl_event(&event, in);
@@ -457,38 +456,38 @@ pxl_backend_has_typed_text(void) {
 
 int
 pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
-	assert(out_text);
-	assert(out_text_max_len > 0);
+    assert(out_text);
+    assert(out_text_max_len > 0);
 
-	if (g_sdl.text_buffer_len == 0) {
-		out_text[0] = '\0';
-		return 0;
-	}
+    if (g_sdl.text_buffer_len == 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
-	int copy_len = (g_sdl.text_buffer_len < out_text_max_len)
-		? g_sdl.text_buffer_len
-		: out_text_max_len - 1;
+    int copy_len = (g_sdl.text_buffer_len < out_text_max_len)
+        ? g_sdl.text_buffer_len
+        : out_text_max_len - 1;
 
-	if (copy_len <= 0) {
-		out_text[0] = '\0';
-		return 0;
-	}
+    if (copy_len <= 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
-	/* Read from circular buffer, handling wrap-around */
-	if (g_sdl.text_buffer_tail + copy_len <= PXL_BACKEND_TEXT_BUFFER_SIZE) {
-		memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, copy_len);
-	} else {
-		int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_tail;
-		memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, first_chunk);
-		memcpy(out_text + first_chunk, g_sdl.text_buffer, copy_len - first_chunk);
-	}
+    /* Read from circular buffer, handling wrap-around */
+    if (g_sdl.text_buffer_tail + copy_len <= PXL_BACKEND_TEXT_BUFFER_SIZE) {
+        memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, copy_len);
+    } else {
+        int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_tail;
+        memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, first_chunk);
+        memcpy(out_text + first_chunk, g_sdl.text_buffer, copy_len - first_chunk);
+    }
 
-	out_text[copy_len] = '\0';
+    out_text[copy_len] = '\0';
 
-	g_sdl.text_buffer_tail = (g_sdl.text_buffer_tail + copy_len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
-	g_sdl.text_buffer_len -= copy_len;
+    g_sdl.text_buffer_tail = (g_sdl.text_buffer_tail + copy_len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+    g_sdl.text_buffer_len -= copy_len;
 
-	return copy_len;
+    return copy_len;
 }
 
 void

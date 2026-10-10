@@ -96,32 +96,32 @@ typedef enum {
 /* pxl_input_t: Gathers current input state (keyboard, mouse, WM events).
  * MUST be zero-initialized before use. */
 typedef struct {
-	uint64_t state[(PXL_IN_COUNT + 63) / 64];    /* Current key/mouse button state */
-	int mouse_x, mouse_y;                        /* Current mouse position         */
-	int mouse_wheel_x, mouse_wheel_y;            /* Wheel delta since last reset   */
+    uint64_t state[(PXL_IN_COUNT + 63) / 64];    /* Current key/mouse button state */
+    int mouse_x, mouse_y;                        /* Current mouse position         */
+    int mouse_wheel_x, mouse_wheel_y;            /* Wheel delta since last reset   */
 } pxl_input_t;
 
 /* Check if a code is active. */
 static inline bool
 pxl_input_state(const pxl_input_t *in, pxl_input_code_t c) {
-	assert(in);
-	assert(c >= 0 && c < PXL_IN_COUNT);
-	return (in->state[c / 64] & (1ULL << (c % 64))) != 0;
+    assert(in);
+    assert(c >= 0 && c < PXL_IN_COUNT);
+    return (in->state[c / 64] & (1ULL << (c % 64))) != 0;
 }
 
 
 /* Set a code in input state bitset */
 static inline void
 pxl_input_set(pxl_input_t *in, pxl_input_code_t code) {
-	assert(in && code >= 0 && code < PXL_IN_COUNT);
-	in->state[code / 64] |= (1ULL << (code % 64));
+    assert(in && code >= 0 && code < PXL_IN_COUNT);
+    in->state[code / 64] |= (1ULL << (code % 64));
 }
 
 /* Unset a code in input state bitset */
 static inline void
 pxl_input_unset(pxl_input_t *in, pxl_input_code_t code) {
-	assert(in && code >= 0 && code < PXL_IN_COUNT);
-	in->state[code / 64] &= ~(1ULL << (code % 64));
+    assert(in && code >= 0 && code < PXL_IN_COUNT);
+    in->state[code / 64] &= ~(1ULL << (code % 64));
 }
 
 #endif /* PXL_INPUT_H */

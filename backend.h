@@ -34,11 +34,11 @@
  *   - Flags can be combined using bitwise OR (|).
  */
 typedef enum {
-	PXL_BACKEND_FULLSCREEN = (1 << 0),  /* Fullscreen mode */
-	PXL_BACKEND_HIDDEN     = (1 << 1),  /* Hidden window (for headless testing) */
-	PXL_BACKEND_VSYNC      = (1 << 2),  /* Enable vertical sync */
-	PXL_BACKEND_CENTERED   = (1 << 3),  /* Center window on screen */
-	PXL_BACKEND_RESIZABLE  = (1 << 4),  /* Allow window resizing */
+    PXL_BACKEND_FULLSCREEN = (1 << 0),  /* Fullscreen mode */
+    PXL_BACKEND_HIDDEN     = (1 << 1),  /* Hidden window (for headless testing) */
+    PXL_BACKEND_VSYNC      = (1 << 2),  /* Enable vertical sync */
+    PXL_BACKEND_CENTERED   = (1 << 3),  /* Center window on screen */
+    PXL_BACKEND_RESIZABLE  = (1 << 4),  /* Allow window resizing */
 } pxl_backend_flags_t;
 
 /* Initialize the backend.

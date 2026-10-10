@@ -150,82 +150,82 @@ static const char font8x8_basic[128][8] = {
 };
 
 static const pxl_bitmask_t ascii_font = {
-	.data = (const uint8_t *)font8x8_basic,
-	.width = ASCII_CHAR_W,
-	.height = 128 * ASCII_CHAR_H,
-	.stride = 1,
+    .data = (const uint8_t *)font8x8_basic,
+    .width = ASCII_CHAR_W,
+    .height = 128 * ASCII_CHAR_H,
+    .stride = 1,
 };
 
 void
 pxl_draw_char(pxl_canvas_t *cnv, int x, int y, unsigned char c) {
-	assert(cnv && cnv->pb);
+    assert(cnv && cnv->pb);
 
-	if (c < 32)  c = ' ';
-	if (c > 127) c = '?';
+    if (c < 32)  c = ' ';
+    if (c > 127) c = '?';
 
-	pxl_rect_t char_rect = {0, c * ASCII_CHAR_H, ASCII_CHAR_W, ASCII_CHAR_H};
-	pxl_draw_bitmask(cnv, &ascii_font, char_rect, x, y);
+    pxl_rect_t char_rect = {0, c * ASCII_CHAR_H, ASCII_CHAR_W, ASCII_CHAR_H};
+    pxl_draw_bitmask(cnv, &ascii_font, char_rect, x, y);
 }
 
 void
 pxl_draw_str(pxl_canvas_t *cnv, int x, int y, const char *str) {
-	assert(cnv && cnv->pb);
+    assert(cnv && cnv->pb);
     assert(str);
 
-	int cur_x = x;
-	while (*str) {
-		if (*str == '\n') {
-			y += ASCII_ADVANCE_Y;
-			cur_x = x;
-		} else if (*str == '\t') {
-			int tab_stop = ASCII_TAB_WIDTH;
-			int remainder = cur_x % tab_stop;
-			cur_x += tab_stop - remainder;
-		} else {
-			pxl_draw_char(cnv, cur_x, y, (unsigned char)*str);
-			cur_x += ASCII_ADVANCE_X;
-		}
+    int cur_x = x;
+    while (*str) {
+        if (*str == '\n') {
+            y += ASCII_ADVANCE_Y;
+            cur_x = x;
+        } else if (*str == '\t') {
+            int tab_stop = ASCII_TAB_WIDTH;
+            int remainder = cur_x % tab_stop;
+            cur_x += tab_stop - remainder;
+        } else {
+            pxl_draw_char(cnv, cur_x, y, (unsigned char)*str);
+            cur_x += ASCII_ADVANCE_X;
+        }
 
-		++str;
-	}
+        ++str;
+    }
 }
 
 pxl_rect_t
 pxl_char_bounds(unsigned char c) {
-	/* Handle special cases (same as pxl_draw_char) */
-	if (c == '\t') {
-		return (pxl_rect_t){0, 0, ASCII_TAB_WIDTH, ASCII_CHAR_H};
-	}
-	if (c < 32)  c = ' ';
-	if (c > 127) c = '?';
-	return (pxl_rect_t){0, 0, ASCII_CHAR_W, ASCII_CHAR_H};
+    /* Handle special cases (same as pxl_draw_char) */
+    if (c == '\t') {
+        return (pxl_rect_t){0, 0, ASCII_TAB_WIDTH, ASCII_CHAR_H};
+    }
+    if (c < 32)  c = ' ';
+    if (c > 127) c = '?';
+    return (pxl_rect_t){0, 0, ASCII_CHAR_W, ASCII_CHAR_H};
 }
 
 pxl_rect_t
 pxl_str_bounds(const char *str) {
-	if (!str || !*str) {
-		return (pxl_rect_t){0, 0, 0, 0};  /* Empty string */
-	}
+    if (!str || !*str) {
+        return (pxl_rect_t){0, 0, 0, 0};  /* Empty string */
+    }
 
-	int max_x = 0;
-	int cur_x = 0;
-	int height = ASCII_CHAR_H;  /* Initial height = 1 line */
+    int max_x = 0;
+    int cur_x = 0;
+    int height = ASCII_CHAR_H;  /* Initial height = 1 line */
 
-	while (*str) {
-		if (*str == '\n') {
-			cur_x = 0;
-			height += ASCII_ADVANCE_Y;
-		} else if (*str == '\t') {
-			int tab_stop = ASCII_TAB_WIDTH;
-			int remainder = cur_x % tab_stop;
-			cur_x += tab_stop - remainder;
-		} else {
-			cur_x += ASCII_ADVANCE_X;
-		}
+    while (*str) {
+        if (*str == '\n') {
+            cur_x = 0;
+            height += ASCII_ADVANCE_Y;
+        } else if (*str == '\t') {
+            int tab_stop = ASCII_TAB_WIDTH;
+            int remainder = cur_x % tab_stop;
+            cur_x += tab_stop - remainder;
+        } else {
+            cur_x += ASCII_ADVANCE_X;
+        }
 
         if (cur_x > max_x) max_x = cur_x;
-		str++;
-	}
+        str++;
+    }
 
-	return (pxl_rect_t){0, 0, max_x, height};
+    return (pxl_rect_t){0, 0, max_x, height};
 }

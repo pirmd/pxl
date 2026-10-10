@@ -18,7 +18,7 @@
 /* Big-endian implementation (ARGB in memory: [A, R, G, B]) */
 static inline pxl_t
 pxl_argb(uint8_t a, uint8_t r, uint8_t g, uint8_t b) {
-	return ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+    return ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
 }
 
 static inline uint8_t pxl_a(pxl_t c) { return (c >> 24) & 0xFF; }
@@ -31,7 +31,7 @@ static inline uint8_t pxl_b(pxl_t c) { return c & 0xFF; }
 /* Little-endian implementation (ARGB in memory: [B, G, R, A]) */
 static inline pxl_t
 pxl_argb(uint8_t a, uint8_t r, uint8_t g, uint8_t b) {
-	return ((uint32_t)b << 24) | ((uint32_t)g << 16) | ((uint32_t)r << 8) | (uint32_t)a;
+    return ((uint32_t)b << 24) | ((uint32_t)g << 16) | ((uint32_t)r << 8) | (uint32_t)a;
 }
 
 static inline uint8_t pxl_a(pxl_t c) { return c & 0xFF; }

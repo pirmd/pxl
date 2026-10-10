@@ -22,17 +22,17 @@ typedef char static_assert_pxl_buf_align_is_power_of_2[
     (PXL_BUF_ALIGN & (PXL_BUF_ALIGN - 1)) == 0 ? 1 : -1];
 
 typedef struct {
-	pxl_t  *data;    /* buffer data                     */
-	int     width;   /* actual width in pix             */
-	int     height;  /* actual height in pix            */
-	int     stride;  /* row stride in pix for alignment */
+    pxl_t  *data;    /* buffer data                     */
+    int     width;   /* actual width in pix             */
+    int     height;  /* actual height in pix            */
+    int     stride;  /* row stride in pix for alignment */
 } pxl_buf_t;
 
 /* Calculate aligned stride for a buffer width */
 static inline int
 pxl_calc_stride(int w) {
-	assert(w <= INT_MAX - (PXL_BUF_ALIGN - 1));
-	return (w + PXL_BUF_ALIGN - 1) & ~(PXL_BUF_ALIGN - 1);
+    assert(w <= INT_MAX - (PXL_BUF_ALIGN - 1));
+    return (w + PXL_BUF_ALIGN - 1) & ~(PXL_BUF_ALIGN - 1);
 }
 
 /* Return address of pixel (x, y) in provided pixel buffer
@@ -40,11 +40,11 @@ pxl_calc_stride(int w) {
  */
 static inline pxl_t *
 pxl_buf_ptr(const pxl_buf_t *pb, int x, int y) {
-	assert(pb && pb->data);
-	assert(x >= 0 && x < pb->width);
-	assert(y >= 0 && y < pb->height);
+    assert(pb && pb->data);
+    assert(x >= 0 && x < pb->width);
+    assert(y >= 0 && y < pb->height);
 
-	return pb->data + x + (y * pb->stride);
+    return pb->data + x + (y * pb->stride);
 }
 
 #endif

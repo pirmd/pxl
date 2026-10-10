@@ -22,36 +22,36 @@
  *   while (pxl_stepper_advance(&ts)) { update_physics(); }
  */
 typedef struct {
-	double dt;            /* Fixed timestep (seconds). 0 = disabled. */
-	double accumulator;   /* Accumulated time for fixed steps. */
-	float  alpha;         /* Current interpolation factor [0, 1). */
+    double dt;            /* Fixed timestep (seconds). 0 = disabled. */
+    double accumulator;   /* Accumulated time for fixed steps. */
+    float  alpha;         /* Current interpolation factor [0, 1). */
 } pxl_time_stepper_t;
 
 static inline void
 pxl_stepper_init(pxl_time_stepper_t *ts, double dt) {
-	assert(ts);
-	ts->dt = dt;
-	ts->accumulator = 0.0;
-	ts->alpha = 0.0f;
+    assert(ts);
+    ts->dt = dt;
+    ts->accumulator = 0.0;
+    ts->alpha = 0.0f;
 }
 
 static inline void
 pxl_stepper_update(pxl_time_stepper_t *ts, double scaled_frame_dt) {
-	assert(ts);
-	if (ts->dt <= 0.0) return;
-	ts->accumulator += scaled_frame_dt;
+    assert(ts);
+    if (ts->dt <= 0.0) return;
+    ts->accumulator += scaled_frame_dt;
 }
 
 static inline bool
 pxl_stepper_advance(pxl_time_stepper_t *ts) {
-	assert(ts);
-	if (ts->dt <= 0.0) return false;
-	if (ts->accumulator >= ts->dt) {
-		ts->accumulator -= ts->dt;
-		return true;
-	}
-	ts->alpha = (float)(ts->accumulator / ts->dt);
-	return false;
+    assert(ts);
+    if (ts->dt <= 0.0) return false;
+    if (ts->accumulator >= ts->dt) {
+        ts->accumulator -= ts->dt;
+        return true;
+    }
+    ts->alpha = (float)(ts->accumulator / ts->dt);
+    return false;
 }
 
 #endif /* PXL_STEPPER_H */

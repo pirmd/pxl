@@ -52,8 +52,8 @@ static struct {
  * Returns 0 to ignore the error; we check the result via XShmAttach return value. */
 static int
 xshm_error_handler(Display *d, XErrorEvent *e) {
-	(void)d; (void)e;
-	return 0;
+    (void)d; (void)e;
+    return 0;
 }
 
 static bool
@@ -402,7 +402,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
     if (!g_x11.display) {
         if (!init_display()) return PXL_E_BACKEND_INIT;
     }
-    
+
     if (flags & PXL_BACKEND_FULLSCREEN) {
         int scr = DefaultScreen(g_x11.display);
         w = DisplayWidth(g_x11.display, scr);
@@ -410,7 +410,7 @@ pxl_backend_init(const char *title, int w, int h, pxl_backend_flags_t flags) {
         /* Ensure we got valid dimensions */
         if (w <= 0 || h <= 0) return PXL_E_BACKEND_INIT;
     }
-    
+
     if (!init_window(title, w, h, flags))            goto fail;
     if (!init_input_method())                        goto fail;
     if (!init_render(w, h, flags))                    goto fail;
@@ -444,9 +444,9 @@ pxl_backend_deinit(void) {
 
 pxl_err_t
 pxl_backend_begin_frame(pxl_buf_t *out_pb) {
-	assert(out_pb);
-	assert(g_x11.display && g_x11.img && g_x11.img->data);
-	assert(g_x11.width > 0 && g_x11.height > 0);
+    assert(out_pb);
+    assert(g_x11.display && g_x11.img && g_x11.img->data);
+    assert(g_x11.width > 0 && g_x11.height > 0);
     assert(g_x11.img->bytes_per_line % (int)sizeof(pxl_t) == 0);
 
     out_pb->width  = g_x11.width;
@@ -619,28 +619,28 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
             int len = Xutf8LookupString(g_x11.xic, &event->xkey, buf, sizeof(buf) - 1,
                                          &keysym_return, &status);
             if (len > 0 && (status == XLookupChars || status == XLookupBoth)) {
-				/* Circular buffer: handle wrap-around */
-				int free_space = PXL_BACKEND_TEXT_BUFFER_SIZE - g_x11.text_buffer_len;
+                /* Circular buffer: handle wrap-around */
+                int free_space = PXL_BACKEND_TEXT_BUFFER_SIZE - g_x11.text_buffer_len;
 
-				if (len > free_space) {
-					/* Buffer full: drop oldest characters to make room */
-					int excess = len - free_space;
-					g_x11.text_buffer_tail = (g_x11.text_buffer_tail + excess) % PXL_BACKEND_TEXT_BUFFER_SIZE;
-					g_x11.text_buffer_len = PXL_BACKEND_TEXT_BUFFER_SIZE;
-				}
+                if (len > free_space) {
+                    /* Buffer full: drop oldest characters to make room */
+                    int excess = len - free_space;
+                    g_x11.text_buffer_tail = (g_x11.text_buffer_tail + excess) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+                    g_x11.text_buffer_len = PXL_BACKEND_TEXT_BUFFER_SIZE;
+                }
 
-				/* Copy new text, handling wrap-around */
-				int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_x11.text_buffer_head;
-				if (len <= first_chunk) {
-					memcpy(g_x11.text_buffer + g_x11.text_buffer_head, buf, (size_t)len);
-				} else {
-					memcpy(g_x11.text_buffer + g_x11.text_buffer_head, buf, (size_t)first_chunk);
-					memcpy(g_x11.text_buffer, buf + first_chunk, (size_t)(len - first_chunk));
-				}
+                /* Copy new text, handling wrap-around */
+                int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_x11.text_buffer_head;
+                if (len <= first_chunk) {
+                    memcpy(g_x11.text_buffer + g_x11.text_buffer_head, buf, (size_t)len);
+                } else {
+                    memcpy(g_x11.text_buffer + g_x11.text_buffer_head, buf, (size_t)first_chunk);
+                    memcpy(g_x11.text_buffer, buf + first_chunk, (size_t)(len - first_chunk));
+                }
 
-				g_x11.text_buffer_head = (g_x11.text_buffer_head + len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
-				g_x11.text_buffer_len += len;
-			}
+                g_x11.text_buffer_head = (g_x11.text_buffer_head + len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+                g_x11.text_buffer_len += len;
+            }
             break;
         }
 
@@ -696,7 +696,7 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
         case ConfigureNotify: {
             int new_w = event->xconfigure.width;
             int new_h = event->xconfigure.height;
-            
+
             /* Resize render buffer */
             if (resize_render(new_w, new_h)) {
                 g_x11.width = new_w;
@@ -713,7 +713,7 @@ process_x11_event(XEvent *event, pxl_input_t *in) {
 void
 pxl_backend_poll_events(pxl_input_t *in) {
     assert(in);
-    
+
     XEvent event;
     while (XPending(g_x11.display)) {
         XNextEvent(g_x11.display, &event);
@@ -725,7 +725,7 @@ pxl_backend_poll_events(pxl_input_t *in) {
 void
 pxl_backend_wait_events(pxl_input_t *in) {
     assert(in);
-    
+
     XEvent event;
     XNextEvent(g_x11.display, &event);
     if (!XFilterEvent(&event, None)) {
@@ -741,38 +741,38 @@ pxl_backend_has_typed_text(void) {
 
 int
 pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
-	assert(out_text);
-	assert(out_text_max_len > 0);
+    assert(out_text);
+    assert(out_text_max_len > 0);
 
-	if (g_x11.text_buffer_len == 0) {
-		out_text[0] = '\0';
-		return 0;
-	}
+    if (g_x11.text_buffer_len == 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
-	int copy_len = (g_x11.text_buffer_len < out_text_max_len)
-		? g_x11.text_buffer_len
-		: out_text_max_len - 1;
+    int copy_len = (g_x11.text_buffer_len < out_text_max_len)
+        ? g_x11.text_buffer_len
+        : out_text_max_len - 1;
 
-	if (copy_len <= 0) {
-		out_text[0] = '\0';
-		return 0;
-	}
+    if (copy_len <= 0) {
+        out_text[0] = '\0';
+        return 0;
+    }
 
-	/* Read from circular buffer, handling wrap-around */
-	if (g_x11.text_buffer_tail + copy_len <= PXL_BACKEND_TEXT_BUFFER_SIZE) {
-		memcpy(out_text, g_x11.text_buffer + g_x11.text_buffer_tail, (size_t)copy_len);
-	} else {
-		int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_x11.text_buffer_tail;
-		memcpy(out_text, g_x11.text_buffer + g_x11.text_buffer_tail, (size_t)first_chunk);
-		memcpy(out_text + first_chunk, g_x11.text_buffer, (size_t)(copy_len - first_chunk));
-	}
+    /* Read from circular buffer, handling wrap-around */
+    if (g_x11.text_buffer_tail + copy_len <= PXL_BACKEND_TEXT_BUFFER_SIZE) {
+        memcpy(out_text, g_x11.text_buffer + g_x11.text_buffer_tail, (size_t)copy_len);
+    } else {
+        int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_x11.text_buffer_tail;
+        memcpy(out_text, g_x11.text_buffer + g_x11.text_buffer_tail, (size_t)first_chunk);
+        memcpy(out_text + first_chunk, g_x11.text_buffer, (size_t)(copy_len - first_chunk));
+    }
 
-	out_text[copy_len] = '\0';
+    out_text[copy_len] = '\0';
 
-	g_x11.text_buffer_tail = (g_x11.text_buffer_tail + copy_len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
-	g_x11.text_buffer_len -= copy_len;
+    g_x11.text_buffer_tail = (g_x11.text_buffer_tail + copy_len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
+    g_x11.text_buffer_len -= copy_len;
 
-	return copy_len;
+    return copy_len;
 }
 
 void

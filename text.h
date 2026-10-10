@@ -15,32 +15,32 @@
  * Covers a single contiguous rune range [rune_start, rune_end].
  */
 typedef struct {
-	pxl_bitmask_t  bitmask;         /* Bitmask data (LSB=leftmost) */
+    pxl_bitmask_t  bitmask;         /* Bitmask data (LSB=leftmost) */
 
-	uint32_t       rune_start;      /* First rune in the font */
-	uint32_t       rune_end;        /* Last rune in the font (inclusive) */
-	uint32_t       fallback_rune;   /* Fallback character (0 = skip) */
-	int            tracking;        /* Extra horizontal space (pixels, added to glyph advance) */
-	int            leading;         /* Vertical line spacing (pixels, baseline to baseline, excludes glyph_height) */
+    uint32_t       rune_start;      /* First rune in the font */
+    uint32_t       rune_end;        /* Last rune in the font (inclusive) */
+    uint32_t       fallback_rune;   /* Fallback character (0 = skip) */
+    int            tracking;        /* Extra horizontal space (pixels, added to glyph advance) */
+    int            leading;         /* Vertical line spacing (pixels, baseline to baseline, excludes glyph_height) */
 
-	int            glyph_height;    /* Glyph height (pixels) */
-	const uint8_t *glyph_widths;    /* Per-glyph widths (NULL = use bitmask.width) */
-	const uint8_t *glyph_advances;  /* Per-glyph advances (NULL = use glyph_widths or bitmask.width) */
-	const int8_t  *glyph_offsets_x; /* Per-glyph X offsets (NULL = 0) */
-	const int8_t  *glyph_offsets_y; /* Per-glyph Y offsets (NULL = 0) */
+    int            glyph_height;    /* Glyph height (pixels) */
+    const uint8_t *glyph_widths;    /* Per-glyph widths (NULL = use bitmask.width) */
+    const uint8_t *glyph_advances;  /* Per-glyph advances (NULL = use glyph_widths or bitmask.width) */
+    const int8_t  *glyph_offsets_x; /* Per-glyph X offsets (NULL = 0) */
+    const int8_t  *glyph_offsets_y; /* Per-glyph Y offsets (NULL = 0) */
 } pxl_font_t;
 
 /* Writer ------------------------------------------------------------------ */
 
 /* Writer: cursor, fonts, and spacing for text rendering. */
 typedef struct {
-	const pxl_font_t **fonts;      /* Array of fonts to try in order */
-	size_t           font_count;   /* Number of fonts in array */
-	int              tracking;     /* 0 = use first font's tracking */
-	int              leading;      /* 0 = use first font's leading */
-	int              tab_width;    /* Tab width in character spaces (default=4) */
-	int              x, y;         /* Cursor position (before canvas offset) */
-	int              line_start_x; /* (private) X position at start of current line (for \n, \r) */
+    const pxl_font_t **fonts;      /* Array of fonts to try in order */
+    size_t           font_count;   /* Number of fonts in array */
+    int              tracking;     /* 0 = use first font's tracking */
+    int              leading;      /* 0 = use first font's leading */
+    int              tab_width;    /* Tab width in character spaces (default=4) */
+    int              x, y;         /* Cursor position (before canvas offset) */
+    int              line_start_x; /* (private) X position at start of current line (for \n, \r) */
 } pxl_writer_t;
 
 /* Initialise writer */
@@ -50,17 +50,17 @@ pxl_writer_init(pxl_writer_t *w, const pxl_font_t **fonts, size_t font_count);
 /* Move writer cursor */
 static inline void
 pxl_writer_set_cursor(pxl_writer_t *w, int x, int y) {
-	assert(w);
-	w->x = x;
-	w->y = y;
-	w->line_start_x = x;
+    assert(w);
+    w->x = x;
+    w->y = y;
+    w->line_start_x = x;
 }
 
 /* Tab advance width in pixels */
 static inline int
 pxl_tab_advance(const pxl_writer_t *w) {
-	assert(w && w->font_count > 0);
-	return w->tab_width * (w->fonts[0]->bitmask.width + w->tracking);
+    assert(w && w->font_count > 0);
+    return w->tab_width * (w->fonts[0]->bitmask.width + w->tracking);
 }
 
 /* UTF-8 decoder: returns bytes consumed (1-4), outputs Unicode codepoint.
@@ -126,17 +126,17 @@ pxl_draw_textline(pxl_canvas_t *cnv, pxl_writer_t *w, const char *txt);
  */
 static inline const char *
 pxl_next_textline(const char *txt) {
-	if (!txt) return txt;
-	while (*txt) {
-		if (*txt == '\n') return txt + 1;
-		if (*txt == '\r') {
-			/* Handle \r\n as single line break */
-			if (txt[1] == '\n') return txt + 2;
-			return txt + 1;
-		}
-		txt++;
-	}
-	return txt; /* Points to '\0' at end of string */
+    if (!txt) return txt;
+    while (*txt) {
+        if (*txt == '\n') return txt + 1;
+        if (*txt == '\r') {
+            /* Handle \r\n as single line break */
+            if (txt[1] == '\n') return txt + 2;
+            return txt + 1;
+        }
+        txt++;
+    }
+    return txt; /* Points to '\0' at end of string */
 }
 
 /* Text with scale and/or flip --------------------------------------------- */
