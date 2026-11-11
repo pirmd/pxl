@@ -6,7 +6,10 @@ SRC = err.c shape.c blit.c text_basic.c text.c tileset.c
 
 -include config.mk
 CC     ?= cc
-CFLAGS ?= -O0 -g -std=c99 -Wall -Wextra
+CFLAGS ?= -O0 -g
+# Mandatory flags: appended to whatever base came from sys.mk, the
+# environment or config.mk
+CFLAGS += -std=c99 -Wall -Wextra
 
 include Makefile.inc
 SRC    += $(PXL_BACKEND_SRC)
@@ -28,7 +31,7 @@ $(LIB): $(OBJ)
 ${OBJ}: $(PXL_HDR)
 
 lint:
-	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(SRC) $(HDR)
+	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(SRC) $(PXL_HDR)
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) test/*.c
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) demo/*.c
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) tool/*.c
