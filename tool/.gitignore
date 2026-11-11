@@ -1,2 +1,4 @@
-bdf2pxl
-test_bdf2pxl
+bdf2pxl*
+test_*
+!*.c
+!*.h
