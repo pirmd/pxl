@@ -125,7 +125,8 @@ setup_fixture(void) {
     g_pb.data = &g_buf_data[0][0];
     pxl_canvas_init(&g_cnv, &g_pb);
     memset(g_buf_data, 0x00, sizeof(g_buf_data));
-    const pxl_font_t *fonts[] = {&g_test_font};
+    /* pxl_writer_init keeps the pointer: the array must outlive g_w */
+    static const pxl_font_t *fonts[] = {&g_test_font};
     pxl_writer_init(&g_w, fonts, 1);
 }
 
@@ -343,9 +344,10 @@ test_pxl_draw_rune_fallback(void) {
 static void
 test_pxl_draw_rune_no_fallback(void) {
     setup_fixture();
-    pxl_font_t font_no_fallback = g_test_font;
+    static pxl_font_t font_no_fallback;
+    font_no_fallback = g_test_font;
     font_no_fallback.fallback_rune = 0;
-    const pxl_font_t *fonts[] = {&font_no_fallback};
+    static const pxl_font_t *fonts[] = {&font_no_fallback};
     pxl_writer_init(&g_w, fonts, 1);
 
     pxl_canvas_set_color(&g_cnv, COLOR_WHITE);
@@ -721,7 +723,7 @@ test_pxl_text_bounds_tab_exact_width(void) {
     int expected_tab_width = g_w.tab_width * (g_test_font.bitmask.width + g_test_font.tracking);
     pxl_rect_t bounds = pxl_text_bounds(&g_w, "\t");
     assert(bounds.w == expected_tab_width);
-    assert(bounds.h == 0); /* No glyph height for control char alone */
+    assert(bounds.h == g_test_font.glyph_height); /* tab has width, so height = glyph_height */
 
     /* Tab with character: "A\t" */
     /* = width(A) + tab_advance = (5+1) + 24 = 30 */
@@ -736,9 +738,10 @@ test_pxl_text_bounds_tab_exact_width(void) {
 static void
 test_pxl_text_bounds_zero_tracking(void) {
     setup_fixture();
-    pxl_font_t font_zero_tracking = g_test_font;
+    static pxl_font_t font_zero_tracking;
+    font_zero_tracking = g_test_font;
     font_zero_tracking.tracking = 0;
-    const pxl_font_t *fonts[] = {&font_zero_tracking};
+    static const pxl_font_t *fonts[] = {&font_zero_tracking};
     pxl_writer_init(&g_w, fonts, 1);
 
     pxl_rect_t bounds_abc = pxl_text_bounds(&g_w, "ABC");
@@ -751,9 +754,10 @@ test_pxl_text_bounds_zero_tracking(void) {
 static void
 test_pxl_text_bounds_zero_leading(void) {
     setup_fixture();
-    pxl_font_t font_zero_leading = g_test_font;
+    static pxl_font_t font_zero_leading;
+    font_zero_leading = g_test_font;
     font_zero_leading.leading = 0;
-    const pxl_font_t *fonts[] = {&font_zero_leading};
+    static const pxl_font_t *fonts[] = {&font_zero_leading};
     pxl_writer_init(&g_w, fonts, 1);
 
     pxl_rect_t bounds = pxl_text_bounds(&g_w, "A\nB");
@@ -1439,6 +1443,7 @@ main(void) {
     test_pxl_text_bounds_empty();
     test_pxl_text_bounds_height();
     test_pxl_text_bounds_with_tab();
+    test_pxl_text_bounds_tab_exact_width();
     test_pxl_text_bounds_carriage_return_only();
     test_pxl_text_bounds_crlf();
     test_pxl_text_bounds_double_newline();

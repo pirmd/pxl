@@ -31,7 +31,7 @@ typedef struct {
 } pxl_font_t;
 
 typedef struct {
-    const pxl_font_t **fonts;      /* Array of fonts to try in order */
+    const pxl_font_t **fonts;      /* Borrowed: array and fonts must outlive the writer */
     size_t           font_count;   /* Number of fonts in array */
     int              tracking;     /* 0 = use first font's tracking */
     int              leading;      /* 0 = use first font's leading */
@@ -40,6 +40,7 @@ typedef struct {
     int              line_start_x; /* (private) X position at start of current line (for \n, \r) */
 } pxl_writer_t;
 
+/* Does not copy `fonts`: the array and the fonts it points to must outlive `w`. */
 void
 pxl_writer_init(pxl_writer_t *w, const pxl_font_t **fonts, size_t font_count);
 

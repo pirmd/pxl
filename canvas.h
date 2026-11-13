@@ -9,7 +9,7 @@
 #include "geom.h"
 
 typedef struct {
-    const pxl_buf_t *pb;              /* Target (read-only)    */
+    const pxl_buf_t *pb;              /* Target (read-only, borrowed: must outlive the canvas) */
     int             offset_x, offset_y; /* Translation offset     */
     pxl_rect_t      scissor;            /* Drawing clipping area */
     pxl_t           color;              /* Drawing color         */

@@ -12,7 +12,7 @@
  * Caller must ensure: tile_w * cols <= atlas->width, tile_h * rows <= atlas->height.
  */
 typedef struct {
-    const pxl_buf_t *atlas;  /* Source image (read-only) */
+    const pxl_buf_t *atlas;  /* Source image (read-only, borrowed: must outlive the tileset) */
     int tile_w;             /* Tile width in pixels */
     int tile_h;             /* Tile height in pixels */
     int cols;               /* Number of columns in grid */
@@ -27,7 +27,7 @@ typedef struct {
 typedef struct {
     int base_idx;           /* First tile index (used only if frames==NULL) */
     int frame_count;        /* Total number of frames (must be > 0) */
-    const uint16_t *frames; /* Frame tile indices (NULL = sequential) */
+    const uint16_t *frames; /* Frame tile indices (NULL = sequential, borrowed: must outlive the sprite) */
 } pxl_sprite_t;
 
 /* Draw a single tile from tileset at (x, y) on canvas.
