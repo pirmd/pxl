@@ -3,6 +3,10 @@
   *     if XShm is unavailable (e.g., size too large, SHM limits).
   */
 
+/* struct timespec/clock_gettime are POSIX.1-2008, hidden by glibc under
+ * strict -std=c99 without a feature-test macro. Must precede all includes. */
+#define _POSIX_C_SOURCE 200809L
+
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>

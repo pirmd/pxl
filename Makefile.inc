@@ -10,7 +10,6 @@ PXL_BACKEND_SRC = $(PXL_DIR)/backend_$(PXL_BACKEND).c
 .if !defined(X11_CFLAGS)
 X11_CFLAGS != pkg-config --cflags x11 xext 2>/dev/null || echo "-I/usr/X11R6/include"
 .endif
-X11_CFLAGS += -D_DEFAULT_SOURCE
 
 .if !defined(X11_LIBS)
 X11_LIBS != pkg-config --libs x11 xext 2>/dev/null || echo "-L/usr/X11R6/lib -lX11 -lXext"

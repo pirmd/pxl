@@ -1,5 +1,9 @@
 /* test_bdf2pxl.c - Tests for bdf2pxl */
 
+/* popen/mkstemp are POSIX.1-2008, hidden by glibc under strict -std=c99
+ * without a feature-test macro. Must precede all includes. */
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

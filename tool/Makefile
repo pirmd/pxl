@@ -6,9 +6,9 @@ CC     ?= cc
 CFLAGS ?= -O0 -g
 # Mandatory flags: appended to whatever base came from sys.mk, the
 # environment or config.mk.
-# -D_DEFAULT_SOURCE: getopt/optind from <unistd.h> are hidden by glibc in
-# strict -std=c99 mode; no-op on BSD.
-CFLAGS += -std=c99 -Wall -Wextra -D_DEFAULT_SOURCE
+# POSIX prototypes (getopt, strdup, popen, mkstemp) are requested per-file
+# via _POSIX_C_SOURCE at the top of each .c, keeping flags pure -std=c99.
+CFLAGS += -std=c99 -Wall -Wextra
 
 all: $(TOOL)
 
