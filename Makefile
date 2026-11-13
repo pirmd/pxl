@@ -44,10 +44,23 @@ demo: $(LIB)
 tool:
 	$(MAKE) -C tool
 
+# Vendoring snapshot: source tarball to drop into a consumer's vendor/pxl
+# (see README "Vendoring"). One backend only, per PXL_BACKEND.
+GIT_COMMIT != git rev-parse --short HEAD 2>/dev/null || echo dev
+DIST       = pxl-$(GIT_COMMIT)-$(PXL_BACKEND)
+DIST_FILES = LICENSE README Makefile Makefile.inc config.mk.example $(SRC) $(PXL_HDR)
+
+dist:
+	mkdir -p $(DIST)
+	cp $(DIST_FILES) $(DIST)/
+	tar -czf $(DIST).tar.gz $(DIST)
+	rm -f $(DIST)/*
+	rmdir $(DIST)
+
 clean:
-	rm -f *.o $(LIB)
+	rm -f *.o $(LIB) pxl-*.tar.gz
 	$(MAKE) -C test clean
 	$(MAKE) -C demo clean
 	$(MAKE) -C tool clean
 
-.PHONY: all lint test demo tool clean
+.PHONY: all lint test demo tool dist clean

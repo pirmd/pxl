@@ -24,7 +24,34 @@ Build:
   Main configuration is defined in Makefile.inc. Copy 'config.mk.example' to 'config.mk' to customize
   backend, CFLAGS, or library paths.
 
-  
+
+Vendoring:
+  pxl is meant to be vendored as-is: flat sources, no generated files, no
+  config header (POSIX prototypes are requested per-file). Build a clean
+  snapshot and drop it into your project:
+
+    bmake dist                          # -> pxl-<commit>-<backend>.tar.gz
+    bmake PXL_BACKEND=sdl dist          # SDL2 variant
+    mkdir -p vendor/pxl
+    tar -xzf pxl-<commit>-<backend>.tar.gz -C vendor/pxl --strip-components=1
+
+  Then either compile the sources directly in your own build system:
+    cc -std=c99 -Ivendor/pxl -c vendor/pxl/*.c
+    cc ... *.o $(pkg-config --cflags --libs x11 xext)     # or: sdl2
+  or build the static library with bmake: 'bmake -C vendor/pxl', link -lpxl.
+  Note: Makefile.inc is bmake syntax; with another build system, use the
+  pkg-config line above for the backend cflags/libs.
+  The snapshot ships exactly one backend_*.c (PXL_BACKEND at dist time,
+  default x11); copy the other backend file from the full repo to switch.
+  Keep LICENSE inside vendor/pxl and record the upstream commit there
+  (e.g. in vendor/pxl/VENDORED-AT) so updates stay traceable.
+  When vendoring several flat C libraries side by side (pxl and rlk both
+  ship err.h/geom.h), use a single include root and prefixed paths:
+    cc -Ivendor ...    with #include "pxl/pxl.h"   /* never bare "err.h" */
+  Quoted includes inside a header resolve in its own directory first, so
+  umbrella headers stay unambiguous regardless of -I order.
+
+
 Quick start (Minimal PXL application):
     pxl_app_t app = {
         .title = "My App",

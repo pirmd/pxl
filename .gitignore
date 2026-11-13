@@ -3,3 +3,4 @@
 *.so
 
 config.mk
+pxl-*.tar.gz
