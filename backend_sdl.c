@@ -402,7 +402,7 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
             break;
 
         case SDL_TEXTINPUT: {
-                int len = strlen(event->text.text);
+                int len = (int)strlen(event->text.text);
                 int free_space = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_len;
 
                 if (len > free_space) {
@@ -415,10 +415,10 @@ process_sdl_event(SDL_Event *event, pxl_input_t *in) {
                 /* Copy new text, handling wrap-around */
                 int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_head;
                 if (len <= first_chunk) {
-                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, len);
+                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, (size_t)len);
                 } else {
-                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, first_chunk);
-                    memcpy(g_sdl.text_buffer, event->text.text + first_chunk, len - first_chunk);
+                    memcpy(g_sdl.text_buffer + g_sdl.text_buffer_head, event->text.text, (size_t)first_chunk);
+                    memcpy(g_sdl.text_buffer, event->text.text + first_chunk, (size_t)(len - first_chunk));
                 }
 
                 g_sdl.text_buffer_head = (g_sdl.text_buffer_head + len) % PXL_BACKEND_TEXT_BUFFER_SIZE;
@@ -475,11 +475,11 @@ pxl_backend_get_typed_text(char *out_text, int out_text_max_len) {
 
     /* Read from circular buffer, handling wrap-around */
     if (g_sdl.text_buffer_tail + copy_len <= PXL_BACKEND_TEXT_BUFFER_SIZE) {
-        memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, copy_len);
+        memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, (size_t)copy_len);
     } else {
         int first_chunk = PXL_BACKEND_TEXT_BUFFER_SIZE - g_sdl.text_buffer_tail;
-        memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, first_chunk);
-        memcpy(out_text + first_chunk, g_sdl.text_buffer, copy_len - first_chunk);
+        memcpy(out_text, g_sdl.text_buffer + g_sdl.text_buffer_tail, (size_t)first_chunk);
+        memcpy(out_text + first_chunk, g_sdl.text_buffer, (size_t)(copy_len - first_chunk));
     }
 
     out_text[copy_len] = '\0';
