@@ -20,7 +20,8 @@ all: $(LIB)
 OBJ = ${SRC:.c=.o}
 
 $(LIB): $(OBJ)
-	ar rcs $@ $?
+	rm -f $@
+	ar rcs $@ $(OBJ)
 
 ${OBJ}: $(PXL_HDR)
 
