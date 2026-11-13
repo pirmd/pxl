@@ -422,11 +422,3 @@ pxl_fill_triangle(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int
         }
     }
 }
-
-/* Inline triangle outline (uses draw_line) */
-static inline void
-pxl_draw_triangle_impl(pxl_canvas_t *cnv, int x0, int y0, int x1, int y1, int x2, int y2) {
-    pxl_draw_line(cnv, x0, y0, x1, y1);
-    pxl_draw_line(cnv, x1, y1, x2, y2);
-    pxl_draw_line(cnv, x2, y2, x0, y0);
-}
