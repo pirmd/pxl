@@ -10,6 +10,14 @@ CFLAGS ?= -O0 -g
 # via _POSIX_C_SOURCE at the top of each .c, keeping flags pure -std=c99.
 CFLAGS += -std=c99 -Wall -Wextra
 
+# Lint flags for this standalone tool (kept local: tool/ does not include
+# Makefile.inc). Developer-local extras via config.mk: CFLAGS_LINT_LOCAL.
+CFLAGS_LINT  = -Wall -Wextra
+CFLAGS_LINT += -Wpedantic -Wshadow -Wvla
+CFLAGS_LINT += -Wwrite-strings -Wold-style-definition
+CFLAGS_LINT += -Wconversion
+CFLAGS_LINT += $(CFLAGS_LINT_LOCAL)
+
 all: $(TOOL)
 
 .for d in $(TOOL)
@@ -22,6 +30,9 @@ test: $(TOOL) $(TOOL_TST)
 		./$${t} >/dev/null || { echo "$${t} FAIL"; exit 1; }; \
 		done
 
+lint:
+	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(TOOL:%=%.c) $(TOOL_TST:%=%.c)
+
 .for t in $(TOOL_TST)
 $(t): $(TOOL) $(t).c
 	$(CC) $(CFLAGS) $(t).c -o $@ $(LDFLAGS)
@@ -30,4 +41,4 @@ $(t): $(TOOL) $(t).c
 clean:
 	rm -f $(TOOL) $(TOOL_TST)
 
-.PHONY: all clean test
+.PHONY: all clean test lint

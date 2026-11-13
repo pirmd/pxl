@@ -3,6 +3,14 @@ PXL_DIR ?= .
 PXL_CFLAGS = -I$(PXL_DIR)
 PXL_LDLIBS = -L$(PXL_DIR) -lpxl
 
+# Shared lint flags: root lib, tests and demos all use the same set.
+# Developer-local extras: CFLAGS_LINT_LOCAL (see config.mk.example).
+CFLAGS_LINT  = -Wall -Wextra
+CFLAGS_LINT += -Wpedantic -Wshadow -Wvla
+CFLAGS_LINT += -Wwrite-strings -Wold-style-definition
+CFLAGS_LINT += -Wconversion
+CFLAGS_LINT += $(CFLAGS_LINT_LOCAL)
+
 PXL_BACKEND ?= x11
 PXL_BACKEND_SRC = $(PXL_DIR)/backend_$(PXL_BACKEND).c
 

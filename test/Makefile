@@ -28,6 +28,9 @@ test: $(TST)
 		./$${t} >/dev/null || { echo "$${t} FAIL"; exit 1; }; \
 		done
 
+lint:
+	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(TST:%=%.c)
+
 .for t in $(TST)
 $(t): $(t).c $(PXL_DIR)/libpxl.a
 	$(CC) $(CFLAGS) $(t).c -o $@ $(LDFLAGS)
@@ -38,4 +41,4 @@ ${TST}: $(PXL_HDR)
 clean:
 	@rm -f $(TST)
 
-.PHONY: all test clean
+.PHONY: all test lint clean

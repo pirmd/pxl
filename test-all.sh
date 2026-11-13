@@ -3,17 +3,30 @@ set -e
 
 [ -z "$DISPLAY" ] && { echo "Error: DISPLAY not set. Please ensure X11 is running or use xhost +local." >&2; exit 1; }
 
+# Pick a make implementation: $MAKE if set, else make (BSD systems), else bmake.
+if [ -z "$MAKE" ]; then
+	if command -v make >/dev/null 2>&1; then
+		MAKE=make
+	elif command -v bmake >/dev/null 2>&1; then
+		MAKE=bmake
+	else
+		echo "Error: neither make nor bmake found; set MAKE=/path/to/make" >&2
+		exit 1
+	fi
+fi
+
 echo "Linting..." >&2
-make lint >/dev/null
+"$MAKE" lint >/dev/null
 
 echo "Running tests..." >&2
-PXL_BACKEND=x11 make clean >/dev/null && PXL_BACKEND=x11 make test >/dev/null
+PXL_BACKEND=x11 "$MAKE" clean >/dev/null && PXL_BACKEND=x11 "$MAKE" test >/dev/null
 
 echo "Testing demo compilation..." >&2
-make demo >/dev/null
+"$MAKE" demo >/dev/null
 
 echo "Testing SDL backend..." >&2
-make clean >/dev/null && PXL_BACKEND=sdl make >/dev/null && PXL_BACKEND=sdl make -C test test_backend >/dev/null
+"$MAKE" clean >/dev/null && PXL_BACKEND=sdl "$MAKE" >/dev/null && PXL_BACKEND=sdl "$MAKE" -C test test_backend >/dev/null
+PXL_BACKEND=sdl "$MAKE" lint >/dev/null
 
 echo "Testing tools..." >&2
-make -C tool test >/dev/null
+"$MAKE" -C tool test >/dev/null

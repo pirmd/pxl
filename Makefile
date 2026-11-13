@@ -15,11 +15,6 @@ include Makefile.inc
 SRC    += $(PXL_BACKEND_SRC)
 CFLAGS += $(PXL_CFLAGS)
 
-CFLAGS_LINT  = -Wall -Wextra
-CFLAGS_LINT += -Wpedantic -Wshadow -Wvla
-CFLAGS_LINT += -Wwrite-strings -Wold-style-definition
-CFLAGS_LINT += -Wconversion
-
 all: $(LIB)
 
 OBJ = ${SRC:.c=.o}
@@ -31,9 +26,9 @@ ${OBJ}: $(PXL_HDR)
 
 lint:
 	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(SRC) $(PXL_HDR)
-	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) test/*.c
-	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) demo/*.c
-	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) tool/*.c
+	$(MAKE) -C test lint
+	$(MAKE) -C demo lint
+	$(MAKE) -C tool lint
 
 test: $(LIB)
 	$(MAKE) -C test test

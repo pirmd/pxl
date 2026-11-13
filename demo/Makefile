@@ -22,12 +22,15 @@ all: $(DEMO)
 
 .for d in $(DEMO)
 $(d): $(d).c $(PXL_DIR)/libpxl.a
-	$(CC) $(CFLAGS) $(d).c $(PXL_DIR)/libpxl.a -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(d).c -o $@ $(LDFLAGS)
 .endfor
 
 ${DEMO}: $(PXL_HDR)
 
+lint:
+	$(CC) -Werror -fsyntax-only $(CFLAGS) $(CFLAGS_LINT) $(DEMO:%=%.c)
+
 clean:
 	rm -f $(DEMO)
 
-.PHONY: all clean
+.PHONY: all lint clean
