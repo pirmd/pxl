@@ -53,10 +53,14 @@ dist:
 	rm -f $(DIST)/*
 	rmdir $(DIST)
 
+# check: full gate (check.sh): lint + tests + demos, both backends, tools.
+check:
+	@sh ./check.sh
+
 clean:
 	rm -f *.o $(LIB) pxl-*.tar.gz
 	$(MAKE) -C test clean
 	$(MAKE) -C demo clean
 	$(MAKE) -C tool clean
 
-.PHONY: all lint test demo tool dist clean
+.PHONY: all lint test demo tool dist check clean

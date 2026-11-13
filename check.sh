@@ -1,4 +1,7 @@
 #!/bin/sh
+# pxl - full check (make check): lint + unit tests + demo build + both
+# backends (x11, sdl) + tools. Picks $MAKE if set, else make (BSD systems),
+# else bmake. Needs a DISPLAY for the x11 backend tests.
 set -e
 
 [ -z "$DISPLAY" ] && { echo "Error: DISPLAY not set. Please ensure X11 is running or use xhost +local." >&2; exit 1; }

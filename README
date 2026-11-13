@@ -125,7 +125,8 @@ Tools:
 
 
 Testing:
-  Run tests: 'make test' or 'sh test-all.sh' to go through all available backends.
+  Run tests: 'make test', or 'make check' for the full suite (lint + tests +
+  demos, both x11 and sdl backends, tools) via check.sh.
 
 
 License:
