@@ -2,7 +2,7 @@
 
 LIB = libpxl.a
 
-SRC = err.c shape.c blit.c text_basic.c text.c tileset.c
+SRC = err.c buf.c shape.c blit.c text_basic.c text.c tileset.c
 
 -include config.mk
 CC     ?= cc

@@ -1,7 +1,9 @@
 #include <stddef.h>  /* for ptrdiff_t */
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include "buf.h"
+#include "color.h"
 
 /* pxl_calc_stride tests ------------------------------------------------------ */
 
@@ -127,6 +129,52 @@ test_pxl_buf_ptr_grid_access(void) {
     }
 }
 
+/* pxl_buf_save_ppm tests ---------------------------------------------------- */
+
+static const char *PPM_TMP = "test_buf_save_ppm_tmp.ppm";
+
+static void
+test_pxl_buf_save_ppm_roundtrip(void) {
+    /* width 3 with stride 4: the padding column must not reach the file */
+    pxl_t data[4 * 2];
+    pxl_buf_t buf = { .data = data, .width = 3, .height = 2, .stride = 4 };
+    for (int i = 0; i < 8; i++)
+        data[i] = 0xFF000000;  /* padding marker, opaque black */
+    *pxl_buf_ptr(&buf, 0, 0) = pxl_argb(0xFF, 1, 2, 3);
+    *pxl_buf_ptr(&buf, 1, 0) = pxl_argb(0x80, 4, 5, 6);  /* alpha dropped */
+    *pxl_buf_ptr(&buf, 2, 0) = pxl_argb(0xFF, 7, 8, 9);
+    *pxl_buf_ptr(&buf, 0, 1) = pxl_argb(0xFF, 10, 11, 12);
+    *pxl_buf_ptr(&buf, 1, 1) = pxl_argb(0xFF, 13, 14, 15);
+    *pxl_buf_ptr(&buf, 2, 1) = pxl_argb(0xFF, 16, 17, 18);
+
+    assert(pxl_buf_save_ppm(&buf, PPM_TMP) == 0);
+
+    FILE *f = fopen(PPM_TMP, "rb");
+    assert(f);
+    const char *hdr = "P6\n3 2\n255\n";
+    char header[32];
+    assert(fread(header, 1, strlen(hdr), f) == strlen(hdr));
+    assert(memcmp(header, hdr, strlen(hdr)) == 0);
+    unsigned char px[3 * 2 * 3];
+    assert(fread(px, 1, sizeof(px), f) == sizeof(px));
+    assert(fgetc(f) == EOF);  /* no extra byte */
+    fclose(f);
+
+    const unsigned char expect[3 * 2 * 3] = {
+        1, 2, 3,  4, 5, 6,  7, 8, 9,
+        10, 11, 12,  13, 14, 15,  16, 17, 18,
+    };
+    assert(memcmp(px, expect, sizeof(px)) == 0);
+    remove(PPM_TMP);
+}
+
+static void
+test_pxl_buf_save_ppm_io_error(void) {
+    pxl_t data[4];
+    pxl_buf_t buf = { .data = data, .width = 1, .height = 1, .stride = 4 };
+    assert(pxl_buf_save_ppm(&buf, "/nonexistent-dir-pxl/x.ppm") == -1);
+}
+
 /* Main -------------------------------------------------------------------- */
 
 int
@@ -140,6 +188,9 @@ main(void) {
     test_pxl_buf_ptr_stride_calculation();
     test_pxl_buf_ptr_grid_access();
     test_pxl_buf_ptr_minimal_buffer();
+
+    test_pxl_buf_save_ppm_roundtrip();
+    test_pxl_buf_save_ppm_io_error();
 
     return 0;
 }

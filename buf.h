@@ -47,4 +47,8 @@ pxl_buf_ptr(const pxl_buf_t *pb, int x, int y) {
     return pb->data + x + (y * pb->stride);
 }
 
+/* Write the buffer as a binary P6 PPM (RGB; alpha dropped, a rendered frame
+ * is opaque). Stride is honored. Returns 0 on success, -1 on I/O error. */
+int pxl_buf_save_ppm(const pxl_buf_t *pb, const char *path);
+
 #endif
